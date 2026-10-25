@@ -1,1 +1,1 @@
-{ "name": "tryumph-gym", "compatibility_date": "2026-10-24", "compatibility_flags": ["nodejs_compat"], "main": "@tanstack/react-start/server-entry" }
+{ "name": "tryumph-independent-v2", "compatibility_date": "2026-10-24", "compatibility_flags": ["nodejs_compat"], "main": "@tanstack/react-start/server-entry" }
