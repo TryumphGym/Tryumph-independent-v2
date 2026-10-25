@@ -1,1 +1,11 @@
-{ "name": "tryumph-independent-v2", "compatibility_date": "2026-10-24", "compatibility_flags": ["nodejs_compat"], "main": "@tanstack/react-start/server-entry" }
+{
+  "name": "tryumph-independent-v2",
+  "compatibility_date": "2026-10-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "vars": {
+    "BUNNY_STREAM_LIBRARY_ID": "789649",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ET9tIaYl29uw2m6k5TOzMQ_CymEECMF",
+    "SUPABASE_URL": "https://ptdoswinanmsldyefsjs.supabase.co"
+  }
+}
