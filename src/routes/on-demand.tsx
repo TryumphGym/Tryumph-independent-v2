@@ -173,7 +173,7 @@ function RealPlayer({ video, onClose }: { video: Uploaded; onClose: () => void }
   return (
     <div className="card mb-6 overflow-hidden">
       <div className="relative bg-secondary">
-        {url ? <video ref={ref} src={url} controls={ad === 0} autoPlay onTimeUpdate={onTime} className="aspect-video w-full" /> : <div className="grid aspect-video place-items-center text-muted-foreground">Loading…</div>}
+        {url?.startsWith("https://iframe.mediadelivery.net/") ? <iframe src={url} title={video.title} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen className="aspect-video w-full" /> : url ? <video ref={ref} src={url} controls={ad === 0} autoPlay onTimeUpdate={onTime} className="aspect-video w-full" /> : <div className="grid aspect-video place-items-center text-muted-foreground">Loading…</div>}
         {ad > 0 && (
           <div className="absolute inset-0 grid place-items-center bg-background/95 text-center">
             <div><Droplets className="mx-auto h-10 w-10 text-primary" /><p className="mt-3 font-display text-2xl font-bold">Water break 💧</p><p className="text-muted-foreground">Grab some water — resuming in {ad}s</p><button className="btn btn-ghost mt-3" onClick={() => { setAd(0); void ref.current?.play(); }}>Resume now</button></div>

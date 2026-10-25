@@ -267,6 +267,7 @@ function Uploads() {
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const vids = s.extra.trainer.videos.filter(isLaunchWorkout);
   useEffect(() => {
     if (!me) return;
@@ -285,12 +286,40 @@ function Uploads() {
     const MAX = 3 * 1024 * 1024 * 1024;
     if (file.size > MAX) { toast.error(`That file is ${(file.size / 1024 / 1024 / 1024).toFixed(1)} GB — the limit is 3 GB. Re-record in 720p or trim it.`); return; }
     setBusy(true);
-    const path = `${me}/${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
-    const up = await supabase.storage.from("videos").upload(path, file);
-    if (up.error) { setBusy(false); toast.error("Upload failed — try a smaller file (max 3 GB)."); return; }
+    setProgress(0);
+    let path = "";
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session?.access_token) throw new Error("Please sign in again before uploading");
+      const ticketResponse = await fetch("/api/bunny-upload", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.session.access_token}` },
+        body: JSON.stringify({ title: f.title }),
+      });
+      const ticket = await ticketResponse.json() as { error?: string; videoId?: string; libraryId?: string; signature?: string; expires?: number };
+      if (!ticketResponse.ok || !ticket.videoId || !ticket.libraryId || !ticket.signature || !ticket.expires) throw new Error(ticket.error || "Could not start Bunny upload");
+      const { Upload } = await import("tus-js-client");
+      await new Promise<void>((resolve, reject) => {
+        const upload = new Upload(file, {
+          endpoint: "https://video.bunnycdn.com/tusupload",
+          retryDelays: [0, 1000, 3000, 5000, 10000],
+          chunkSize: 8 * 1024 * 1024,
+          headers: { AuthorizationSignature: ticket.signature!, AuthorizationExpire: String(ticket.expires), VideoId: ticket.videoId!, LibraryId: ticket.libraryId! },
+          metadata: { filetype: file.type || "video/mp4", title: file.name },
+          onProgress: (sent, total) => setProgress(Math.round(sent / total * 100)),
+          onError: reject,
+          onSuccess: resolve,
+        });
+        upload.start();
+      });
+      path = `bunny:${ticket.libraryId}:${ticket.videoId}`;
+    } catch (error) {
+      setBusy(false);
+      toast.error(error instanceof Error ? error.message : "Video upload failed");
+      return;
+    }
     const equipment = encodeEquipment(f.gear, f.friendly, f.goals);
     const ins = await supabase.from("trainer_videos").insert({ user_id: me, title: f.title, category: f.category, level: f.level, path, minutes: +f.minutes || 0, breaks: toSecs(f.breaks), equipment, pregnancy_safe: f.pregnancySafe, playlist, break_seconds: f.breakSecs }).select("id").single();
-    if (ins.error || !ins.data) { setBusy(false); await supabase.storage.from("videos").remove([path]); toast.error("Couldn't publish your workout. Your selections are saved here so you can retry."); return; }
+    if (ins.error || !ins.data) { setBusy(false); toast.error(`Video uploaded to Bunny, but publishing failed: ${ins.error?.message || "database error"}. Contact support before retrying to avoid duplicate uploads.`); return; }
     const id = ins.data.id;
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: [...x.trainer.videos, { id, title: f.title, category: f.category, level: f.level, minutes: +f.minutes || 0, path, equipment, goals: f.goals, pregnancySafe: f.pregnancySafe, playlist }] } }));
     setF({ ...f, title: "", breaks: "", newPl: "", goals: [], playlist }); setFile(null); setBusy(false);
@@ -310,7 +339,7 @@ function Uploads() {
       obj = obj ?? data?.[0]?.path;
     }
     if (ids.length) await supabase.from("trainer_videos").delete().in("id", ids);
-    if (obj) await supabase.storage.from("videos").remove([obj]);
+    if (obj && !obj.startsWith("bunny:")) await supabase.storage.from("videos").remove([obj]);
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: x.trainer.videos.filter((y) => y.id !== v.id) } }));
     toast.success("Video removed from your library");
   };
@@ -321,6 +350,7 @@ function Uploads() {
         <p className="text-sm text-muted-foreground">{vids.length >= UNLOCK ? "Live classes unlocked 🎉" : `${UNLOCK - vids.length} more to unlock live classes.`}</p>
         {youthLocked && <p className="rounded-lg bg-secondary p-3 text-sm text-warning">Youth Ambassador uploads are locked until the Tryumph team approves your parent/guardian consent.</p>}
         <input type="file" accept="video/*" className="field" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        {busy && <p role="status" className="text-sm text-primary">Uploading to Bunny: {progress}%</p>}
         <p className="text-xs text-muted-foreground">Max 3 GB. A 45-minute class in 720p lands near 1 GB; in 1080p it runs 2–3 GB. Phone recordings are usually fine.</p>
         <input className="field" placeholder="Title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         <div className="grid grid-cols-3 gap-3">

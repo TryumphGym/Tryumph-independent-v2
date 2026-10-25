@@ -7,10 +7,20 @@ import { z } from "zod";
 export const getVideoUrl = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin.from("trainer_videos").select("path").eq("id", data.id).maybeSingle();
+    const { createClient } = await import("@supabase/supabase-js");
+    const url = process.env["SUPABASE_URL"];
+    const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    if (!url || !key) throw new Error("Supabase server settings missing");
+    const publicDb = createClient(url, key);
+    const { data: row, error: lookupError } = await publicDb.from("trainer_videos").select("path").eq("id", data.id).maybeSingle();
+    if (lookupError) throw new Error(`Video lookup failed: ${lookupError.message}`);
     if (!row?.path) throw new Error("Video not found");
-    const { data: signed, error } = await supabaseAdmin.storage.from("videos").createSignedUrl(row.path, 60 * 60 * 3);
+    if (row.path.startsWith("bunny:")) {
+      const match = /^bunny:(\d+):([a-f0-9-]{36})$/i.exec(row.path);
+      if (!match) throw new Error("Invalid Bunny video reference");
+      return `https://iframe.mediadelivery.net/embed/${match[1]}/${match[2]}`;
+    }
+    const { data: signed, error } = await publicDb.storage.from("videos").createSignedUrl(row.path, 60 * 60 * 3);
     if (error || !signed?.signedUrl) throw new Error("This video could not be opened");
     return signed.signedUrl;
   });
