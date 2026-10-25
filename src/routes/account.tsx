@@ -130,16 +130,25 @@ const NEED_OPTS = ["Low impact", "Knee friendly", "Postpartum", "Diastasis recti
 const tog = (a: string[], v: string) => (a.includes(v) ? a.filter((x) => x !== v) : [...a, v]);
 
 function SignedInAccount() {
-  const { s, set, signOut } = useStore();
+  const { s, set, saveProfile, signOut } = useStore();
   const [units, setUnits] = useUnits();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => ({ name: s.name, profile: s.profile, goals: s.extra.goals, conditions: s.extra.conditions, dueDate: s.extra.dueDate ?? "" }));
   const [w, setW] = useState("");
   const startEdit = () => { setDraft({ name: s.name, profile: s.profile, goals: s.extra.goals, conditions: s.extra.conditions, dueDate: s.extra.dueDate ?? "" }); setEditing(true); };
-  const save = () => {
-    set((x) => ({ ...x, name: draft.name.trim() || x.name, profile: { ...draft.profile, level: x.profile.level, postpartum: draft.conditions.includes("Postpartum") }, extra: { ...x.extra, goals: draft.goals, conditions: draft.conditions, pregnant: draft.conditions.includes("Pregnant"), dueDate: draft.dueDate, onboarded: true } }));
-    setEditing(false);
-    toast.success("Profile saved");
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await saveProfile((x) => ({ ...x, name: draft.name.trim() || x.name, profile: { ...draft.profile, level: x.profile.level, postpartum: draft.conditions.includes("Postpartum") }, extra: { ...x.extra, goals: draft.goals, conditions: draft.conditions, pregnant: draft.conditions.includes("Pregnant"), dueDate: draft.dueDate, onboarded: true } }));
+      setEditing(false);
+      toast.success("Profile saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
   const p = editing ? draft.profile : s.profile;
   const goals = editing ? draft.goals : s.extra.goals;
@@ -163,7 +172,7 @@ function SignedInAccount() {
         <div className="flex flex-wrap gap-2">
           {s.role === "member" && (editing ? (
             <>
-              <button className="btn btn-primary" onClick={save}>Save changes</button>
+              <button className="btn btn-primary" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save changes"}</button>
               <button className="btn btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
             </>
           ) : <button className="btn btn-primary" onClick={startEdit}>Edit profile</button>)}

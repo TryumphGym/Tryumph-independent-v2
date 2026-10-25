@@ -71,6 +71,7 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 type Ctx = {
   s: State;
   set: (fn: (s: State) => State) => void;
+  saveProfile: (fn: (s: State) => State) => Promise<void>;
   signIn: (name: string, role: State["role"]) => void;
   signOut: () => void;
   buyTokens: (n: number) => void;
@@ -141,6 +142,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const userIdRef = useRef<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipSave = useRef(false);
+  const stateRef = useRef(s);
+  stateRef.current = s;
+  const profileLoadVersion = useRef(0);
 
   // Load guest state from device, then attach to the cloud session if one exists.
   useEffect(() => {
@@ -148,8 +152,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
 
     const loadProfile = async (userId: string) => {
-      const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+      const version = ++profileLoadVersion.current;
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+      if (version !== profileLoadVersion.current) return;
+      if (error) { console.error("[Tryumph] Profile load failed:", error); return; }
       if (data) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
         skipSave.current = true;
         userIdRef.current = userId;
         setS(rowToState(data as ProfileRow));
@@ -165,6 +173,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") loadProfile(session.user.id);
       } else if (event === "SIGNED_OUT") {
+        profileLoadVersion.current++;
+        if (saveTimer.current) clearTimeout(saveTimer.current);
         userIdRef.current = null;
         skipSave.current = true;
         setS({ ...initial, posts: seedPosts, reviews: initial.reviews, extra: emptyExtra });
@@ -180,8 +190,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (userIdRef.current && s.signedIn) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const snapshot = s;
+      const userId = userIdRef.current;
       saveTimer.current = setTimeout(() => {
-        supabase.from("profiles").upsert(stateToRow(userIdRef.current!, snapshot)).then(() => {});
+        if (userIdRef.current !== userId) return;
+        void supabase.from("profiles").update(stateToRow(userId, snapshot))
+          .eq("id", userId)
+          .then(({ error }) => {
+            if (error) {
+              console.error("[Tryumph] Automatic profile save failed:", error);
+              // Background saves must not falsely report success.
+            }
+          });
       }, 600);
     } else {
       localStorage.setItem(KEY, JSON.stringify(s));
@@ -191,8 +210,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const set = (fn: (s: State) => State) => setS(fn);
   const markActive = () => set((x) => (x.activeDays.includes(today()) ? x : { ...x, activeDays: [...x.activeDays, today()] }));
 
+  const saveProfile = async (fn: (current: State) => State): Promise<void> => {
+    const userId = userIdRef.current;
+    if (!userId) throw new Error("Your profile is still loading. Please try again in a moment.");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const next = fn(stateRef.current);
+    // Do not show success or update the local state until Supabase confirms the write.
+    const { data, error } = await supabase.from("profiles")
+      .update(stateToRow(userId, next)).eq("id", userId).select("id");
+    if (error) { console.error("[Tryumph] Profile save failed:", error); throw new Error(error.message); }
+    if (!data?.length) throw new Error("Supabase did not update your profile. Please check your account permissions.");
+    if (userIdRef.current !== userId) throw new Error("Your session changed while saving. Please sign in again.");
+    skipSave.current = true;
+    setS(next);
+  };
+
   const ctx: Ctx = {
-    s, set, uid, markActive,
+    s, set, saveProfile, uid, markActive,
     signIn: (name, role) => set((x) => ({ ...x, signedIn: true, name, role })),
     signOut: () => { void supabase.auth.signOut(); },
     buyTokens: (n) => set((x) => ({ ...x, tokens: x.tokens + n, ledger: [{ id: uid(), label: `Bought ${n} tokens ($${n * TOKEN_PRICE})`, tokens: n, date: today() }, ...x.ledger] })),
