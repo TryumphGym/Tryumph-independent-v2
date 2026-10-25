@@ -1,6 +1,12 @@
-
 import { hydrateStart } from "@tanstack/react-start/client";
 
-// Start React on the browser after the server renders the page.
-hydrateStart();
-  
+console.log("[Tryumph] Browser client entry started");
+
+Promise.resolve()
+  .then(() => hydrateStart())
+  .then(() => {
+    console.log("[Tryumph] Hydration completed");
+  })
+  .catch((error) => {
+    console.error("[Tryumph] Hydration failed:", error);
+  });
