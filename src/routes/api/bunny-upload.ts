@@ -17,7 +17,15 @@ export const Route = createFileRoute("/api/bunny-upload")({
       const { data: auth, error: authError } = await supabase.auth.getUser(jwt);
       if (authError || !auth.user) return Response.json({ error: "Invalid session" }, { status: 401 });
       const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", auth.user.id).maybeSingle();
-      if (profileError || profile?.role !== "trainer") return Response.json({ error: "Only trainer accounts can upload workouts" }, { status: 403 });
+      if (profileError) {
+  console.error("Trainer profile lookup failed:", profileError.message);
+  return Response.json({ error: "Unable to verify trainer profile" }, { status: 500 });
+}
+
+if (profile?.role !== "trainer") {
+  console.error("Trainer role check failed");
+  return Response.json({ error: "Only trainer accounts can upload workouts" }, { status: 403 });
+}
       const body = await request.json() as { title?: string };
       const title = body.title?.trim().slice(0, 180);
       if (!title) return Response.json({ error: "A workout title is required" }, { status: 400 });
