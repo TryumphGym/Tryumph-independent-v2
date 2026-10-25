@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
@@ -5,14 +6,14 @@ import { createClient } from "@supabase/supabase-js";
 export const Route = createFileRoute("/api/bunny-upload")({
   server: { handlers: { POST: async ({ request }) => {
     try {
-      const url = process.env["SUPABASE_URL"];
-      const publicKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
-      const libraryId = process.env["BUNNY_STREAM_LIBRARY_ID"];
-      const bunnyKey = process.env["BUNNY_STREAM_API_KEY"];
+      const url = env.SUPABASE_URL;
+      const publicKey = env.SUPABASE_PUBLISHABLE_KEY;
+      const libraryId = env.BUNNY_STREAM_LIBRARY_ID;
+      const bunnyKey = env.BUNNY_STREAM_API_KEY;
       if (!url || !publicKey || !libraryId || !bunnyKey) return Response.json({ error: "Bunny or Supabase server variables are missing" }, { status: 503 });
       const jwt = request.headers.get("Authorization")?.replace(/^Bearer /, "");
       if (!jwt) return Response.json({ error: "Sign in first" }, { status: 401 });
-      const supabase = createClient(url, publicKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      const supabase = createClient(url, publicKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${jwt}` } } });
       const { data: auth, error: authError } = await supabase.auth.getUser(jwt);
       if (authError || !auth.user) return Response.json({ error: "Invalid session" }, { status: 401 });
       const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", auth.user.id).maybeSingle();

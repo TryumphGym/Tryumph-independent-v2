@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -8,8 +9,8 @@ export const getVideoUrl = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
     const { createClient } = await import("@supabase/supabase-js");
-    const url = process.env["SUPABASE_URL"];
-    const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    const url = env.SUPABASE_URL;
+    const key = env.SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) throw new Error("Supabase server settings missing");
     const publicDb = createClient(url, key);
     const { data: row, error: lookupError } = await publicDb.from("trainer_videos").select("path").eq("id", data.id).maybeSingle();
