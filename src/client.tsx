@@ -1,12 +1,13 @@
-import { hydrateStart } from "@tanstack/react-start/client";
+import { StartClient } from "@tanstack/react-start/client";
+import { hydrateRoot } from "react-dom/client";
 
-console.log("[Tryumph] Browser client entry started");
+console.log("[Tryumph] Starting React hydration");
 
-Promise.resolve()
-  .then(() => hydrateStart())
-  .then(() => {
-    console.log("[Tryumph] Hydration completed");
-  })
-  .catch((error) => {
-    console.error("[Tryumph] Hydration failed:", error);
-  });
+hydrateRoot(document, <StartClient />, {
+  onRecoverableError(error) {
+    console.error("[Tryumph] Hydration recovery:", error);
+  },
+  onUncaughtError(error) {
+    console.error("[Tryumph] Hydration error:", error);
+  },
+});
