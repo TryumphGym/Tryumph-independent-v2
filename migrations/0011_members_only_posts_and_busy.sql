@@ -1,0 +1,10 @@
+DROP POLICY IF EXISTS "busy public read" ON public.trainer_busy;
+CREATE POLICY "busy member read" ON public.trainer_busy FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
+REVOKE SELECT ON public.trainer_busy FROM anon;
+DROP POLICY IF EXISTS "posts_read" ON public.posts;
+CREATE POLICY "posts_read" ON public.posts FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "comments_read" ON public.post_comments;
+CREATE POLICY "comments_read" ON public.post_comments FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "likes_read" ON public.post_likes;
+CREATE POLICY "likes_read" ON public.post_likes FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
+REVOKE SELECT ON public.posts, public.post_comments, public.post_likes FROM anon;
