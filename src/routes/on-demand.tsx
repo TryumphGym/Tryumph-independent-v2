@@ -125,21 +125,24 @@ type Uploaded = { id: string; title: string; category: string; level: string; pa
 function TrainerUploads({ accepts }: { accepts: (video: WorkoutMatch & { minutes: number }) => boolean }) {
   const [rows, setRows] = useState<Uploaded[]>([]);
   const [open, setOpen] = useState<Uploaded | null>(null);
+  const [exploreAll, setExploreAll] = useState(false);
   useEffect(() => {
     supabase.from("trainer_videos").select("id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment").order("created_at", { ascending: false }).limit(24)
       .then(({ data }) => setRows((data ?? []) as Uploaded[]));
   }, []);
   const matching = rows.filter((x) => accepts({ ...x, pregnancySafe: x.pregnancy_safe, postpartum: x.level === "Postpartum" }));
-  if (!matching.length) return null;
+  const displayed = exploreAll ? rows : matching;
+  if (!rows.length) return null;
   return (
     <section className="mb-8">
-      <h2 className="mb-3 text-xl font-bold">New from trainers</h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{exploreAll ? "Explore all trainer workouts" : "Matching trainer workouts"}</h2><p className="text-sm text-muted-foreground">{exploreAll ? "Browse all available trainer uploads, including workouts outside your preferences." : "Workouts matching your saved preferences."}</p></div><button type="button" className="btn btn-ghost" onClick={() => setExploreAll((v) => !v)}>{exploreAll ? "Show my matches" : `Explore all (${rows.length})`}</button></div>
       {open && <RealPlayer video={open} onClose={() => setOpen(null)} />}
+      {!displayed.length && <p className="card mb-4 p-6 text-sm text-muted-foreground">No exact matches yet. Choose Explore all to see other workouts.</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {matching.map((x) => (
+        {displayed.map((x) => (
           <button key={x.id} onClick={() => setOpen(x)} className="card overflow-hidden text-left">
             <div className="bg-brand grid aspect-video w-full place-items-center"><Play className="h-8 w-8 text-primary-foreground" /></div>
-            <div className="p-4"><p className="eyebrow">{x.category} · {x.level}{x.pregnancy_safe ? " · Pregnancy safe" : ""}</p><p className="mt-1 font-semibold">{x.title}</p>{x.playlist && <p className="text-xs text-accent">Playlist: {x.playlist}</p>}<p className="text-sm text-muted-foreground">{x.minutes ? `${x.minutes} min · ` : ""}{x.breaks.length ? `${x.breaks.length} water break${x.breaks.length > 1 ? "s" : ""}` : "Ad-free"}</p></div>
+            <div className="p-4"><p className="eyebrow">{x.category} · {x.level}{x.pregnancy_safe ? " · Pregnancy safe" : ""}</p><p className="mt-1 font-semibold">{x.title}</p>{x.playlist && <p className="text-xs text-accent">Playlist: {x.playlist}</p>}<p className="text-sm text-muted-foreground">{x.minutes ? `${x.minutes} min · ` : ""}{(x.breaks?.length ?? 0) ? `${x.breaks.length} water break${x.breaks.length > 1 ? "s" : ""}` : "Ad-Free · No ad revenue"}</p></div>
           </button>
         ))}
       </div>
@@ -166,9 +169,9 @@ function RealPlayer({ video, onClose }: { video: Uploaded; onClose: () => void }
   }, [ad]);
   const onTime = () => {
     const v = ref.current; if (!v || ad > 0) return;
-    const hit = video.breaks.find((b) => !done.has(b) && v.currentTime >= b && v.currentTime < b + 2);
+    const hit = (video.breaks ?? []).find((b) => !done.has(b) && v.currentTime >= b && v.currentTime < b + 2);
     if (hit !== undefined) { v.pause(); setDone(new Set(done).add(hit)); setAd(video.break_seconds || 15); setSoon(false); return; }
-    setSoon(video.breaks.some((b) => !done.has(b) && b - v.currentTime > 0 && b - v.currentTime <= 5));
+    setSoon((video.breaks ?? []).some((b) => !done.has(b) && b - v.currentTime > 0 && b - v.currentTime <= 5));
   };
   return (
     <div className="card mb-6 overflow-hidden">
