@@ -120,13 +120,13 @@ function OnDemand() {
   );
 }
 
-type Uploaded = { id: string; title: string; category: string; level: string; path: string; minutes: number; breaks: number[]; equipment: string; pregnancy_safe: boolean; playlist: string; break_seconds: number };
+type Uploaded = { id: string; title: string; category: string; level: string; path: string; minutes: number; breaks: number[]; equipment: string; pregnancy_safe: boolean; playlist: string; break_seconds: number; required_equipment?: string[]; optional_equipment?: string[] };
 
 function TrainerUploads({ accepts }: { accepts: (video: WorkoutMatch & { minutes: number }) => boolean }) {
   const [rows, setRows] = useState<Uploaded[]>([]);
   const [open, setOpen] = useState<Uploaded | null>(null);
   useEffect(() => {
-    supabase.from("trainer_videos").select("id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds").order("created_at", { ascending: false }).limit(24)
+    supabase.from("trainer_videos").select("id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment").order("created_at", { ascending: false }).limit(24)
       .then(({ data }) => setRows((data ?? []) as Uploaded[]));
   }, []);
   const matching = rows.filter((x) => accepts({ ...x, pregnancySafe: x.pregnancy_safe, postpartum: x.level === "Postpartum" }));
