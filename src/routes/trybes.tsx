@@ -33,6 +33,29 @@ function Trybes() {
   const { posts: all, reload } = usePosts(me);
   const { friends, reload: reloadFriends } = useFriends(me);
   const [trybe, setTrybe] = useState(t ?? "all");
+  const [joinedIds, setJoinedIds] = useState<string[]>([]);
+  const [membershipsReady, setMembershipsReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setMembershipsReady(false);
+    if (!me) { setJoinedIds([]); setMembershipsReady(true); return; }
+    supabase.from("trybe_memberships").select("trybe_id").eq("user_id", me).then(({data,error}) => {
+      if (!active) return;
+      if (error) { toast.error("Trybe memberships unavailable. Please try again later."); setJoinedIds([]); }
+      else setJoinedIds((data ?? []).map(x => x.trybe_id));
+      setMembershipsReady(!error);
+    });
+    return () => { active = false; };
+  }, [me]);
+  const changeMembership = async (id: string, join: boolean) => {
+    if (!me || !membershipsReady || id === "all") return;
+    const result = join
+      ? await supabase.from("trybe_memberships").upsert({user_id:me,trybe_id:id})
+      : await supabase.from("trybe_memberships").delete().eq("user_id",me).eq("trybe_id",id);
+    if (result.error) { toast.error("Could not update Trybe membership."); return; }
+    setJoinedIds(old => join ? [...new Set([...old,id])] : old.filter(x => x !== id));
+    reload();
+  };
   const [text, setText] = useState("");
   const [kind, setKind] = useState("Goal");
   const [comment, setComment] = useState<Record<string, string>>({});
@@ -44,14 +67,14 @@ function Trybes() {
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
   // Private Trybes: posts are only ever visible to joined members.
-  const canSee = (id: string) => !isPrivateTrybe(id) || e.joinedTrybes.includes(id);
+  const canSee = (id: string) => !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && !canSee(trybe);
   const visible = all.filter((p) => !e.trainer.removed.includes(p.id) && canSee(p.trybe));
-  const filtered = visible.filter((p) => inTrybeFeed(p.trybe, trybe, e.joinedTrybes));
+  const filtered = visible.filter((p) => inTrybeFeed(p.trybe, trybe, joinedIds));
   const posts = [...filtered].sort((a, b) => Number(e.trainer.pinned.includes(b.id)) - Number(e.trainer.pinned.includes(a.id)));
   const coaches = [...new Map(all.filter((p) => p.trybe.startsWith("coach-")).map((p) => [p.trybe, { id: p.trybe, name: `${p.author_name.split(" ")[0]}'s Trybe` }])).values()];
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
-  const joined = e.joinedTrybes.includes(trybe);
+  const joined = joinedIds.includes(trybe);
   const isFriend = (id: string | null) => !!id && friends.some((f) => f.friend_id === id);
   // Never suggest partners based on private-Trybe activity.
   const suggestions = me ? [...new Map(filtered.filter((p) => p.author_id && p.author_id !== me && !isFriend(p.author_id) && !isPrivateTrybe(p.trybe)).flatMap((p) => p.author_id ? [[p.author_id, { id: p.author_id, name: p.author_name, trybe: p.trybe }] as const] : [])).values()].slice(0, 6) : [];
@@ -71,9 +94,9 @@ function Trybes() {
   }, [me, partners.length]);
 
   const needAuth = (what: string) => { if (!s.signedIn || !me) { toast.error(`Sign in to ${what}.`); return true; } return false; };
-  const target = trybe === "all" ? e.joinedTrybes[0] : trybe;
-  const canPost = trybe === "all" ? e.joinedTrybes.length > 0 : joined;
-  const joinTrybe = () => { if (needAuth("join a Trybe")) return; setExtra((x) => ({ ...x, joinedTrybes: x.joinedTrybes.includes(trybe) ? x.joinedTrybes : [...x.joinedTrybes, trybe] })); toast.success(`Welcome to ${trybeName(trybe)}!`); };
+  const target = trybe === "all" ? joinedIds[0] : trybe;
+  const canPost = membershipsReady && (trybe === "all" ? joinedIds.length > 0 : joined);
+  const joinTrybe = () => { if (needAuth("join a Trybe")) return; void changeMembership(trybe, true); };
   const post = async () => {
     if (needAuth("post") || !text.trim()) return;
     if (!canPost || !target) { toast.error("Join this Trybe to post."); return; }
@@ -123,7 +146,7 @@ function Trybes() {
       {trybe !== "all" && (
         <div className="card mb-6 flex flex-wrap items-center gap-3 p-4">
           <div className="flex-1"><p className="font-semibold">{trybeName(trybe)}</p><p className="text-sm text-muted-foreground">{goalTrybes.find((g) => g.id === trybe)?.desc ?? "Trainer-led group for classes, tips and encouragement."}</p></div>
-          <button className={`btn ${joined ? "btn-ghost" : "btn-primary"}`} onClick={() => { if (needAuth("join a Trybe")) return; setExtra((x) => ({ ...x, joinedTrybes: joined ? x.joinedTrybes.filter((y) => y !== trybe) : [...x.joinedTrybes, trybe] })); }}>{joined ? "Joined ✓" : "Join Trybe"}</button>
+          <button className={`btn ${joined ? "btn-ghost" : "btn-primary"}`} onClick={() => { if (needAuth("join a Trybe")) return; void changeMembership(trybe, !joined); }}>{joined ? "Joined ✓" : "Join Trybe"}</button>
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
