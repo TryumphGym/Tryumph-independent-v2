@@ -106,9 +106,21 @@ function Live() {
       .gte("starts_at", since)
       .order("starts_at")
       .limit(50)
-      .then(({ data }) => {
+      .then(async ({ data, error }) => {
+        if (error) {
+          toast.error("Unable to load live classes");
+          setCoachLives([]);
+          return;
+        }
+        const candidates = data ?? [];
+        const trainerIds = [...new Set(candidates.map((r) => r.trainer_id))];
+        const checks = await Promise.all(trainerIds.map(async (id) => {
+          const result = await supabase.rpc("trainer_is_eligible", { p_user_id: id, p_live: true });
+          return [id, !result.error && result.data === true] as const;
+        }));
+        const eligibleIds = new Set(checks.filter(([, eligible]) => eligible).map(([id]) => id));
         setCoachLives(
-          (data ?? []).map((r) => ({
+          candidates.filter((r) => eligibleIds.has(r.trainer_id)).map((r) => ({
             id: r.id,
             title: r.title,
             trainerId: r.trainer_id,
