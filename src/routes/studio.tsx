@@ -788,7 +788,7 @@ function Uploads() {
     spotify: "",
     category: "Strength",
     level: "Beginner",
-    minutes: "20",
+    minutes: "",
     breaks: "",
     gear: [] as string[],
     optionalGear: [] as string[],
@@ -1443,6 +1443,7 @@ function Uploads() {
 
 function TrainerProfileTab() {
   const { s, setExtra, set } = useStore();
+  const me = useUserId();
   const trainer = s.extra.trainer;
   const update = (patch: Partial<typeof trainer>) =>
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, ...patch } }));
@@ -1519,7 +1520,7 @@ function TrainerProfileTab() {
         Changes save with your account. Public trainer profile synchronization
         must be verified before inviting trainers.
       </p>
-      <Link to="/trybes" className="btn btn-outline inline-flex">
+      <Link to="/trybes" search={{ t: me ? `coach-${me}` : undefined }} className="btn btn-outline inline-flex">
         Manage My Trybe
       </Link>
     </section>
