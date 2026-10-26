@@ -262,7 +262,7 @@ function CalendarTab() {
 function Uploads() {
   const { s, setExtra, uid } = useStore();
   const me = useUserId();
-  const [f, setF] = useState({ title: "", category: "Strength", level: "Beginner", minutes: "20", breaks: "", gear: [] as string[], friendly: [] as string[], goals: [] as string[], pregnancySafe: false, playlist: "", newPl: "", breakSecs: 15 });
+  const [f, setF] = useState({ title: "", category: "Strength", level: "Beginner", minutes: "20", breaks: "", gear: [] as string[], optionalGear: [] as string[], friendly: [] as string[], goals: [] as string[], pregnancySafe: false, playlist: "", newPl: "", breakSecs: 15 });
   const myPlaylists = [...new Set(s.extra.trainer.videos.map((v) => v.playlist).filter(Boolean) as string[])];
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
   const [file, setFile] = useState<File | null>(null);
@@ -317,12 +317,14 @@ function Uploads() {
       toast.error(error instanceof Error ? error.message : "Video upload failed");
       return;
     }
-    const equipment = encodeEquipment(f.gear, f.friendly, f.goals);
-    const ins = await supabase.from("trainer_videos").insert({ user_id: me, title: f.title, category: f.category, level: f.level, path, minutes: +f.minutes || 0, breaks: toSecs(f.breaks), equipment, pregnancy_safe: f.pregnancySafe, playlist, break_seconds: f.breakSecs }).select("id").single();
+    const requiredEquipment = f.gear.filter((g) => !f.optionalGear.includes(g));
+    const optionalEquipment = f.gear.filter((g) => f.optionalGear.includes(g));
+    const equipment = encodeEquipment(requiredEquipment, f.friendly, f.goals);
+    const ins = await supabase.from("trainer_videos").insert({ user_id: me, title: f.title, category: f.category, level: f.level, path, minutes: +f.minutes || 0, breaks: toSecs(f.breaks), equipment, pregnancy_safe: f.pregnancySafe, playlist, break_seconds: f.breakSecs, required_equipment: requiredEquipment, optional_equipment: optionalEquipment } as any).select("id").single();
     if (ins.error || !ins.data) { setBusy(false); toast.error(`Video uploaded to Bunny, but publishing failed: ${ins.error?.message || "database error"}. Contact support before retrying to avoid duplicate uploads.`); return; }
     const id = ins.data.id;
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: [...x.trainer.videos, { id, title: f.title, category: f.category, level: f.level, minutes: +f.minutes || 0, path, equipment, goals: f.goals, pregnancySafe: f.pregnancySafe, playlist }] } }));
-    setF({ ...f, title: "", breaks: "", newPl: "", goals: [], playlist }); setFile(null); setBusy(false);
+    setF({ ...f, title: "", breaks: "", newPl: "", goals: [], optionalGear: [], gear: [], playlist }); setFile(null); setBusy(false);
     toast.success("Video uploaded and published");
   };
   const drop = async (v: TrainerVideo) => {
@@ -360,7 +362,12 @@ function Uploads() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2"><MultiDropdown label="Fitness goals" values={f.goals} options={FITNESS_GOALS} emptyLabel="Choose goals" onChange={(goals) => setF({ ...f, goals })} /></div>
-          <div className="col-span-2 text-sm font-medium">Equipment needed<div className="mt-1 flex flex-wrap gap-2">{EQUIPMENT.filter((c) => c !== "No equipment").map((c) => <button type="button" key={c} className={`chip ${f.gear.includes(c) ? "chip-active" : ""}`} onClick={() => setF({ ...f, gear: f.gear.includes(c) ? f.gear.filter((y) => y !== c) : [...f.gear, c] })}>{c}</button>)}</div></div>
+          <div className="col-span-2 text-sm font-medium">Equipment used
+            <p className="mt-1 text-xs font-normal text-muted-foreground">Select all equipment used. Each selected item can be required or optional. No equipment selected means bodyweight/no equipment required.</p>
+            <div className="mt-2 flex flex-wrap gap-2">{EQUIPMENT.filter((c) => c !== "No equipment").map((c) => <button type="button" key={c} className={`chip ${f.gear.includes(c) ? "chip-active" : ""}`} onClick={() => setF({ ...f, gear: f.gear.includes(c) ? f.gear.filter((y) => y !== c) : [...f.gear, c], optionalGear: f.optionalGear.filter((y) => y !== c) })}>{c}</button>)}</div>
+            {f.gear.map((c) => <div key={c} className="mt-2 flex items-center justify-between gap-3 text-sm"><span>{c}</span><select className="field max-w-36" aria-label={`${c} requirement`} value={f.optionalGear.includes(c) ? "optional" : "required"} onChange={(e) => setF({ ...f, optionalGear: e.target.value === "optional" ? [...f.optionalGear, c] : f.optionalGear.filter((y) => y !== c) })}><option value="required">Required</option><option value="optional">Optional</option></select></div>)}
+            {f.gear.length > 0 && f.gear.every((g) => f.optionalGear.includes(g)) && <p className="mt-2 text-xs text-muted-foreground">No equipment required — all selected equipment is optional.</p>}
+          </div>
           <div className="col-span-2 text-sm font-medium">Good for<div className="mt-1 flex flex-wrap gap-2">{FRIENDLY.map((c) => <button type="button" key={c} className={`chip ${f.friendly.includes(c) ? "chip-active" : ""}`} onClick={() => setF({ ...f, friendly: f.friendly.includes(c) ? f.friendly.filter((y) => y !== c) : [...f.friendly, c] })}>{c}</button>)}</div></div>
           <label className="text-sm font-medium">Playlist<select className="field mt-1" value={f.playlist} onChange={(e) => setF({ ...f, playlist: e.target.value })}><option value="">None</option>{myPlaylists.map((p) => <option key={p}>{p}</option>)}<option value="__new">+ New playlist</option></select></label>
         </div>
