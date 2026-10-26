@@ -139,7 +139,7 @@ function Trybes() {
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
   // Private Trybes: posts are only ever visible to joined members.
-  const canSee = (id: string) => !isPrivateTrybe(id) || joinedIds.includes(id);
+  const canSee = (id: string) => id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
   const visible = all.filter((p) => !p.is_hidden && canSee(p.trybe));
   const filtered = visible.filter((p) =>
@@ -152,7 +152,7 @@ function Trybes() {
   );
   const coaches = directoryCoaches;
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
-  const joined = joinedIds.includes(trybe);
+  const joined = joinedIds.includes(trybe) || (s.signedIn && s.role === "trainer" && trybe === `coach-${me}`);
   const isFriend = (id: string | null) =>
     !!id && friends.some((f) => f.friend_id === id);
   // Never suggest partners based on private-Trybe activity.
@@ -331,7 +331,7 @@ function Trybes() {
     <div>
       <PageHeader
         eyebrow="Community"
-        title={trybe === "all" ? "Your Trybe feed" : trybeName(trybe)}
+        title={trybe === "all" ? "Your Trybe feed" : trybe === `coach-${me}` && s.role === "trainer" ? "My Trybe" : trybeName(trybe)}
         sub={
           trybe === "all"
             ? "Updates from the Trybes you've joined."
