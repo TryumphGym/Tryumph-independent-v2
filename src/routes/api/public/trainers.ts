@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 export const Route = createFileRoute("/api/public/trainers")({
   server: { handlers: { GET: async () => {
     let stage = "configuration";
+    let safeDetail: { code: string; message: string } | null = null;
     try {
       const url = env.SUPABASE_URL;
       const key = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -14,7 +15,10 @@ export const Route = createFileRoute("/api/public/trainers")({
       stage = "certifications";
       const { data: credentials, error: certError } = await db.from("certifications")
         .select("user_id,name,expires").eq("status", "verified").not("verified_at", "is", null).not("verified_by", "is", null);
-      if (certError) throw certError;
+      if (certError) {
+        safeDetail = { code: String(certError.code ?? "unknown").slice(0, 40), message: String(certError.message ?? "Unknown database error").slice(0, 250) };
+        throw certError;
+      }
       const today = new Date().toISOString().slice(0, 10);
       const valid = (credentials ?? []).filter(c => !c.expires || /^\d{4}-\d{2}-\d{2}$/.test(c.expires) && c.expires >= today);
       const ids = [...new Set(valid.map(c => c.user_id))];
@@ -22,7 +26,10 @@ export const Route = createFileRoute("/api/public/trainers")({
       stage = "profiles";
       const { data: profiles, error: profileError } = await db.from("profiles")
         .select("id,name,role,extra,avatar_url").in("id", ids).eq("role", "trainer");
-      if (profileError) throw profileError;
+      if (profileError) {
+        safeDetail = { code: String(profileError.code ?? "unknown").slice(0, 40), message: String(profileError.message ?? "Unknown database error").slice(0, 250) };
+        throw profileError;
+      }
       const trainers = (profiles ?? []).map(p => {
         const extra = p.extra && typeof p.extra === "object" && !Array.isArray(p.extra) ? p.extra as Record<string, unknown> : {};
         const trainer = extra.trainer && typeof extra.trainer === "object" && !Array.isArray(extra.trainer) ? extra.trainer as Record<string, unknown> : {};
@@ -34,7 +41,7 @@ export const Route = createFileRoute("/api/public/trainers")({
       return Response.json({ trainers }, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       console.error("Public trainer directory failed", error);
-      return Response.json({ error: "Directory unavailable", stage }, { status: 500 });
+      return Response.json({ error: "Directory unavailable", stage, detail: safeDetail ?? { code: "runtime_error", message: "Non-database failure" } }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
   } } },
 });
