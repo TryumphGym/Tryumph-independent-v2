@@ -22,9 +22,13 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrybesRouteImport } from './routes/trybes'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as ApiBunnyUploadRouteImport } from './routes/api/bunny-upload'
 import { Route as TrainersIndexRouteImport } from './routes/trainers.index'
 import { Route as TrainersIdRouteImport } from './routes/trainers.$id'
+import { Route as ApiPublicTrainersRouteImport } from './routes/api/public/trainers'
 import { Route as ApiPublicHooksPushRemindersRouteImport } from './routes/api/public/hooks/push-reminders'
+import { Route as ApiPublicWebhooksAdsRouteImport } from './routes/api/public/webhooks/ads'
+import { Route as ApiPublicWebhooksLivekitRouteImport } from './routes/api/public/webhooks/livekit'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 
 const IndexRoute = IndexRouteImport.update({
@@ -92,6 +96,11 @@ const WelcomeRoute = WelcomeRouteImport.update({
   path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBunnyUploadRoute = ApiBunnyUploadRouteImport.update({
+  id: '/api/bunny-upload',
+  path: '/api/bunny-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainersIndexRoute = TrainersIndexRouteImport.update({
   id: '/trainers/',
   path: '/trainers/',
@@ -102,10 +111,26 @@ const TrainersIdRoute = TrainersIdRouteImport.update({
   path: '/trainers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTrainersRoute = ApiPublicTrainersRouteImport.update({
+  id: '/api/public/trainers',
+  path: '/api/public/trainers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPushRemindersRoute =
   ApiPublicHooksPushRemindersRouteImport.update({
     id: '/api/public/hooks/push-reminders',
     path: '/api/public/hooks/push-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicWebhooksAdsRoute = ApiPublicWebhooksAdsRouteImport.update({
+  id: '/api/public/webhooks/ads',
+  path: '/api/public/webhooks/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicWebhooksLivekitRoute =
+  ApiPublicWebhooksLivekitRouteImport.update({
+    id: '/api/public/webhooks/livekit',
+    path: '/api/public/webhooks/livekit',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
@@ -128,9 +153,13 @@ export interface FileRoutesByFullPath {
   '/trybes': typeof TrybesRoute
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
+  '/api/bunny-upload': typeof ApiBunnyUploadRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/trainers/': typeof TrainersIndexRoute
+  '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
+  '/api/public/webhooks/ads': typeof ApiPublicWebhooksAdsRoute
+  '/api/public/webhooks/livekit': typeof ApiPublicWebhooksLivekitRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRoutesByTo {
@@ -147,9 +176,13 @@ export interface FileRoutesByTo {
   '/trybes': typeof TrybesRoute
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
+  '/api/bunny-upload': typeof ApiBunnyUploadRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/trainers': typeof TrainersIndexRoute
+  '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
+  '/api/public/webhooks/ads': typeof ApiPublicWebhooksAdsRoute
+  '/api/public/webhooks/livekit': typeof ApiPublicWebhooksLivekitRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRoutesById {
@@ -167,9 +200,13 @@ export interface FileRoutesById {
   '/trybes': typeof TrybesRoute
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
+  '/api/bunny-upload': typeof ApiBunnyUploadRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/trainers/': typeof TrainersIndexRoute
+  '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
+  '/api/public/webhooks/ads': typeof ApiPublicWebhooksAdsRoute
+  '/api/public/webhooks/livekit': typeof ApiPublicWebhooksLivekitRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRouteTypes {
@@ -188,9 +225,13 @@ export interface FileRouteTypes {
     | '/trybes'
     | '/wallet'
     | '/welcome'
+    | '/api/bunny-upload'
     | '/trainers/$id'
     | '/trainers/'
+    | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
+    | '/api/public/webhooks/ads'
+    | '/api/public/webhooks/livekit'
     | '/api/public/webhooks/stripe'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,9 +248,13 @@ export interface FileRouteTypes {
     | '/trybes'
     | '/wallet'
     | '/welcome'
+    | '/api/bunny-upload'
     | '/trainers/$id'
     | '/trainers'
+    | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
+    | '/api/public/webhooks/ads'
+    | '/api/public/webhooks/livekit'
     | '/api/public/webhooks/stripe'
   id:
     | '__root__'
@@ -226,9 +271,13 @@ export interface FileRouteTypes {
     | '/trybes'
     | '/wallet'
     | '/welcome'
+    | '/api/bunny-upload'
     | '/trainers/$id'
     | '/trainers/'
+    | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
+    | '/api/public/webhooks/ads'
+    | '/api/public/webhooks/livekit'
     | '/api/public/webhooks/stripe'
   fileRoutesById: FileRoutesById
 }
@@ -246,9 +295,13 @@ export interface RootRouteChildren {
   TrybesRoute: typeof TrybesRoute
   WalletRoute: typeof WalletRoute
   WelcomeRoute: typeof WelcomeRoute
+  ApiBunnyUploadRoute: typeof ApiBunnyUploadRoute
   TrainersIdRoute: typeof TrainersIdRoute
   TrainersIndexRoute: typeof TrainersIndexRoute
+  ApiPublicTrainersRoute: typeof ApiPublicTrainersRoute
   ApiPublicHooksPushRemindersRoute: typeof ApiPublicHooksPushRemindersRoute
+  ApiPublicWebhooksAdsRoute: typeof ApiPublicWebhooksAdsRoute
+  ApiPublicWebhooksLivekitRoute: typeof ApiPublicWebhooksLivekitRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
 }
 
@@ -345,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/bunny-upload': {
+      id: '/api/bunny-upload'
+      path: '/api/bunny-upload'
+      fullPath: '/api/bunny-upload'
+      preLoaderRoute: typeof ApiBunnyUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trainers/': {
       id: '/trainers/'
       path: '/trainers'
@@ -359,11 +419,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/trainers': {
+      id: '/api/public/trainers'
+      path: '/api/public/trainers'
+      fullPath: '/api/public/trainers'
+      preLoaderRoute: typeof ApiPublicTrainersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/push-reminders': {
       id: '/api/public/hooks/push-reminders'
       path: '/api/public/hooks/push-reminders'
       fullPath: '/api/public/hooks/push-reminders'
       preLoaderRoute: typeof ApiPublicHooksPushRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/webhooks/ads': {
+      id: '/api/public/webhooks/ads'
+      path: '/api/public/webhooks/ads'
+      fullPath: '/api/public/webhooks/ads'
+      preLoaderRoute: typeof ApiPublicWebhooksAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/webhooks/livekit': {
+      id: '/api/public/webhooks/livekit'
+      path: '/api/public/webhooks/livekit'
+      fullPath: '/api/public/webhooks/livekit'
+      preLoaderRoute: typeof ApiPublicWebhooksLivekitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/webhooks/stripe': {
@@ -390,9 +471,13 @@ const rootRouteChildren: RootRouteChildren = {
   TrybesRoute: TrybesRoute,
   WalletRoute: WalletRoute,
   WelcomeRoute: WelcomeRoute,
+  ApiBunnyUploadRoute: ApiBunnyUploadRoute,
   TrainersIdRoute: TrainersIdRoute,
   TrainersIndexRoute: TrainersIndexRoute,
+  ApiPublicTrainersRoute: ApiPublicTrainersRoute,
   ApiPublicHooksPushRemindersRoute: ApiPublicHooksPushRemindersRoute,
+  ApiPublicWebhooksAdsRoute: ApiPublicWebhooksAdsRoute,
+  ApiPublicWebhooksLivekitRoute: ApiPublicWebhooksLivekitRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
 }
 export const routeTree = rootRouteImport

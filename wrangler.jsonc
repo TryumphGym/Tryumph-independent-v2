@@ -1,11 +1,40 @@
 {
   "name": "tryumph-independent-v2",
   "compatibility_date": "2026-10-24",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "main": "src/worker.ts",
   "vars": {
     "BUNNY_STREAM_LIBRARY_ID": "789649",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ET9tIaYl29uw2m6k5TOzMQ_CymEECMF",
     "SUPABASE_URL": "https://ptdoswinanmsldyefsjs.supabase.co"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "RECORDING_IMPORTS",
+        "queue": "tryumph-recording-imports"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "tryumph-recording-imports",
+        "max_batch_size": 1,
+        "max_retries": 8,
+        "dead_letter_queue": "tryumph-recording-failures"
+      }
+    ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "R2_RECORDINGS",
+      "bucket_name": "tryumph-recordings"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
   }
 }

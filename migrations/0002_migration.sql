@@ -107,12 +107,4 @@ $$;
 REVOKE ALL ON FUNCTION public.partner_reservations() FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.partner_reservations() TO authenticated;
 
-INSERT INTO public.posts (author_name, trybe, kind, text, created_at) VALUES
-('Jess R.', 'g-postpartum', 'Win', 'Six weeks postpartum and finished my first full core session. Gap is closing!', now() - interval '2 days'),
-('Leo M.', 'dre', 'Goal', 'Aiming for 4 HIIT classes this week. Who''s in?', now() - interval '1 day'),
-('Priya K.', 'g-lowimpact', 'Fail', 'Skipped yesterday, but I''m back today with a gentle mobility flow.', now() - interval '20 hours'),
-('Ana T.', 'g-parents', 'Win', 'Squeezed in a 20-min workout during nap time. Small wins count!', now() - interval '6 hours');
-
-INSERT INTO public.reviews (trainer_id, author_name, text, stars) VALUES
-('maya', 'Jess R.', 'Patient, kind and knows postpartum bodies.', 5),
-('dre', 'Leo M.', 'Tough but encouraging. Great cues.', 5);
+-- Historical fictional post/review seeds removed. Launch content must come from real users or clearly attributed Tryumph Gym posts.
