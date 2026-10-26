@@ -273,7 +273,7 @@ function Home() {
         </div>
       </section>
 
-      <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
+      {!(s.signedIn && s.role === "trainer") && <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
         <div>
           <p className="eyebrow">For coaches</p>
           <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
@@ -285,7 +285,7 @@ function Home() {
         <Link to="/for-trainers" className="btn btn-primary">
           Become a coach
         </Link>
-      </section>
+      </section>}
     </div>
   );
 }
