@@ -298,7 +298,7 @@ function Trybes() {
       .from("friendships")
       .insert({ user_id: me!, friend_id: id, friend_name: name });
     if (error) {
-      toast.error("Couldn't add friend.");
+      toast.error(`Couldn't add friend: ${error.message}`);
       return;
     }
     toast.success(`${name} added as a friend`);
@@ -541,7 +541,7 @@ function Trybes() {
                         Friend
                       </span>
                     )}
-                    <span className="chip">{p.kind}</span>
+                    <span className="chip">{p.kind.toLowerCase() === "text" ? "Post" : p.kind}</span>
                     {p.is_pinned && (
                       <span className="chip chip-active">📌 Pinned</span>
                     )}
