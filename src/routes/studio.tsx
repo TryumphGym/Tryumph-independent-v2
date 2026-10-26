@@ -42,7 +42,16 @@ function Studio() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
   const [certStatus, setCertStatus] = useState<CredentialRecord[]>([]);
   useEffect(() => {
-    supabase.from("certifications").select("name,status,expires,verified_at,verified_by").then(({ data }) => setCertStatus((data ?? []) as CredentialRecord[]));
+    let active = true;
+    if (!s.signedIn) { setCertStatus([]); return; }
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { if (active) setCertStatus([]); return; }
+      const { data } = await supabase.from("certifications")
+        .select("name,status,expires,verified_at,verified_by")
+        .eq("user_id", user.id);
+      if (active) setCertStatus((data ?? []) as CredentialRecord[]);
+    });
+    return () => { active = false; };
   }, [s.signedIn]);
   if (!s.signedIn || s.role !== "trainer") {
     return (
@@ -88,17 +97,23 @@ function Overview() {
   const [f, setF] = useState({ title: "", category: "Strength", level: "Beginner", when: "", description: "" });
   const [live, setLive] = useState(false);
   const [approvedCount, setApprovedCount] = useState(0);
+  const [cprApproved, setCprApproved] = useState(false);
   const [countLoaded, setCountLoaded] = useState(false);
   useEffect(() => {
     let active = true;
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       const result = await supabase.from("trainer_videos").select("id", { count: "exact", head: true }).eq("user_id", data.user.id).eq("review_status", "approved");
-      if (active) { setApprovedCount(result.error ? 0 : (result.count ?? 0)); setCountLoaded(!result.error); }
+      const certs = await supabase.from("certifications").select("name,status,expires,verified_at,verified_by").eq("user_id", data.user.id);
+      if (active) {
+        setApprovedCount(result.error ? 0 : (result.count ?? 0));
+        setCprApproved(!certs.error && hasVerifiedCpr((certs.data ?? []) as CredentialRecord[]));
+        setCountLoaded(!result.error && !certs.error);
+      }
     });
     return () => { active = false; };
   }, [s.signedIn, s.extra.trainer.videos.length]);
-  const unlocked = countLoaded && approvedCount >= UNLOCK;
+  const unlocked = countLoaded && approvedCount >= UNLOCK && cprApproved;
   const [st, setSt] = useState<Awaited<ReturnType<typeof getPayoutStatus>> | null>(null);
   useEffect(() => { getPayoutStatus().then(setSt).catch(() => setSt(null)); }, []);
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -125,9 +140,9 @@ function Overview() {
           <h2 className="text-xl font-bold">Schedule a live class</h2>
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
-              <p className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" />Lives unlock after {UNLOCK} approved on-demand videos</p>
+              <p className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" />Lives unlock after {UNLOCK} approved on-demand videos and verified, current CPR</p>
               <div className="mt-2 h-2 rounded-full bg-background"><div className="h-2 rounded-full bg-brand" style={{ width: `${Math.min(100, (approvedCount / UNLOCK) * 100)}%` }} /></div>
-              <p className="mt-2 text-muted-foreground">Approved videos: {countLoaded ? approvedCount : "Checking…"}/{UNLOCK}</p>
+              <p className="mt-2 text-muted-foreground">Approved videos: {countLoaded ? approvedCount : "Checking…"}/{UNLOCK} · CPR: {cprApproved ? "Verified" : "Required"}</p>
             </div>
           ) : (
             <>
@@ -139,7 +154,7 @@ function Overview() {
               <input type="datetime-local" className="field" value={f.when} onChange={(e) => setF({ ...f, when: e.target.value })} />
               <textarea className="field" placeholder="Description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
               <button className="btn btn-primary w-full" disabled={!f.title || !f.when || !unlocked} onClick={async () => {
-                if (!me || !unlocked) { toast.error("Five approved videos are required to schedule."); return; }
+                if (!me || !unlocked) { toast.error("Five approved videos and verified CPR are required to schedule."); return; }
                 const when = new Date(f.when);
                 if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) { toast.error("Choose a future class time."); return; }
                 const { error } = await supabase.from("live_sessions").insert({ trainer_id: me, trainer_name: s.name, title: f.title, category: f.category, level: f.level, starts_at: when.toISOString(), description: f.description });
@@ -440,6 +455,7 @@ function TrainerProfileTab() {
   const update = (patch: Partial<typeof trainer>) => setExtra((x) => ({ ...x, trainer: { ...x.trainer, ...patch } }));
   return <section className="card space-y-4 p-6">
     <h2 className="text-xl font-bold">My Trainer Profile</h2>
+    <p className="text-sm text-muted-foreground">To upload or change your profile photo, open <Link to="/account" className="text-primary underline">Account → Profile photo</Link>. The same photo is used for your coaching profile.</p>
     <p className="text-sm text-muted-foreground">Manage your coaching details in one place. Your member account remains available for taking classes.</p>
     <label className="block text-sm font-medium">Display name<input className="field mt-1 w-full" value={s.name} onChange={(e) => set((x) => ({ ...x, name: e.target.value }))} /></label>
     <label className="block text-sm font-medium">Trainer bio<textarea className="field mt-1 w-full" rows={5} maxLength={2000} placeholder="Introduce yourself, your approach and who you help" value={trainer.bio} onChange={(e) => update({ bio: e.target.value })} /></label>
@@ -455,6 +471,10 @@ function StoreTab() {
   const { s, setExtra, uid } = useStore();
   const [f, setF] = useState({ name: "", price: "", url: "", image: "", description: "" });
   const items = s.extra.trainer.store;
+  const validExternalUrl = (value: string) => {
+    try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:"; }
+    catch { return false; }
+  };
   return (
     <section className="card space-y-3 p-6">
       <h2 className="text-xl font-bold">Your Trybe Store</h2>
@@ -464,7 +484,7 @@ function StoreTab() {
         <input className="field flex-1" placeholder="Link to your shop (optional — Solin, your site…)" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} />
         <input className="field flex-1" placeholder="Product image URL (https://...)" type="url" value={f.image} onChange={(e) => setF({ ...f, image: e.target.value })} />
         <input className="field flex-1" placeholder="Product description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-        <button className="btn btn-primary" disabled={!f.name || (!f.url.trim() && !+f.price)} onClick={() => { setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: [...x.trainer.store, { id: uid(), name: f.name, price: +f.price, ...(f.url.trim() ? { url: f.url.trim() } : {}), ...(f.image.trim() ? { image: f.image.trim() } : {}), ...(f.description.trim() ? { description: f.description.trim() } : {}) }] } })); setF({ name: "", price: "", url: "", image: "", description: "" }); }}>Add product</button>
+        <button className="btn btn-primary" disabled={!f.name || (!f.url.trim() && !+f.price)} onClick={() => { if (f.url.trim() && !validExternalUrl(f.url.trim())) { toast.error("Use a valid https:// shop or affiliate link."); return; } if (f.image.trim() && !validExternalUrl(f.image.trim())) { toast.error("Use a valid https:// product image link."); return; } setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: [...x.trainer.store, { id: uid(), name: f.name, price: +f.price, ...(f.url.trim() ? { url: f.url.trim() } : {}), ...(f.image.trim() ? { image: f.image.trim() } : {}), ...(f.description.trim() ? { description: f.description.trim() } : {}) }] } })); setF({ name: "", price: "", url: "", image: "", description: "" }); }}>Add product</button>
       </div>
       <ul className="space-y-2 text-sm">{items.map((i) => <li key={i.id} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2"><span className="flex items-center gap-2">{i.image && <img src={i.image} alt="" className="h-12 w-12 rounded object-cover" />}{i.name}{i.url && <span className="ml-2 text-xs text-primary">↗ linked</span>}</span><span className="flex items-center gap-3">${i.price}<button className="text-destructive" onClick={() => setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: x.trainer.store.filter((y) => y.id !== i.id) } }))}>Remove</button></span></li>)}</ul>
       <p className="text-xs text-muted-foreground">Use an image URL for now; direct image uploads require storage integration. Your products appear in the Store & Merch section of your coach profile. Add a link to send buyers to your own shop — sales there are 100% yours. An affiliate disclosure is shown next to linked products automatically.</p>

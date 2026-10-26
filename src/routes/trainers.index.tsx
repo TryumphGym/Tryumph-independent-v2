@@ -42,7 +42,7 @@ function Trainers() {
     {error && <p className="card p-8 text-center">Unable to load trainers right now. Please try again.</p>}
     {!loading && !error && list.length === 0 && <p className="card p-8 text-center text-muted-foreground">No verified coaches match those filters yet.</p>}
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{list.map(t => <Link key={t.id} to="/trainers/$id" params={{ id: t.id }} className="card p-6 transition hover:border-primary">
-      <Avatar initials={t.name.split(/\s+/).map(x => x[0] ?? "").join("").slice(0, 2).toUpperCase()} size="lg" />
+      {t.avatarUrl ? <img src={t.avatarUrl} alt={`${t.name} profile`} className="h-16 w-16 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" /> : <Avatar initials={t.name.split(/\s+/).map(x => x[0] ?? "").join("").slice(0, 2).toUpperCase()} size="lg" />}
       <p className="mt-4 font-display text-lg font-bold">{t.name}</p><p className="text-sm text-primary">Verified trainer</p>
       <p className="mt-2 text-sm text-muted-foreground">{t.specialties.join(" · ")}</p>
       <div className="mt-4 text-sm font-semibold">${t.rate}/session</div>

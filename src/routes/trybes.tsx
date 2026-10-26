@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Pin, Send, Trash2, UserPlus, Bell } from "lucide-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { coachTrybeNames, goalTrybes, isPrivateTrybe, liveClasses, trainers, trybeName } from "@/lib/data";
+import { coachTrybeNames, goalTrybes, isPrivateTrybe, liveClasses, trybeName } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,7 +116,6 @@ function Trybes() {
       <PageHeader eyebrow="Community" title={trybe === "all" ? "Your Trybe feed" : trybeName(trybe)} sub={trybe === "all" ? "Updates from the Trybes you've joined." : goalTrybes.find((g) => g.id === trybe)?.desc ?? "Classes, tips and encouragement with your coach."} />
       {trybe === "all" ? <>
         <div className="mb-6 flex flex-wrap gap-2">
-          {trainers.filter((x) => x.role === "Trainer").map((x) => <Button key={x.id} asChild variant="outline"><Link to="/trybes" search={{ t: x.id }}>{trybeName(x.id)}</Link></Button>)}
           {coaches.map((c) => <Button key={c.id} asChild variant="outline"><Link to="/trybes" search={{ t: c.id }}>{c.name}</Link></Button>)}
           {goalTrybes.map((g) => <Button key={g.id} asChild variant="outline"><Link to="/trybes" search={{ t: g.id }}>{g.private ? "🔒 " : ""}{g.name}</Link></Button>)}
         </div>

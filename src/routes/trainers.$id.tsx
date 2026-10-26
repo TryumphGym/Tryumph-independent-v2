@@ -29,7 +29,7 @@ function TrainerProfile() {
     {error && <p className="card p-8">Unable to load this profile right now.</p>}
     {!loading && !error && !trainer && <p className="card p-8">Trainer not found or not currently verified.</p>}
     {trainer && <section className="card flex flex-wrap items-center gap-6 p-6">
-      <Avatar initials={trainer.name.split(/\s+/).map(x => x[0] ?? "").join("").slice(0, 2).toUpperCase()} size="lg" />
+      {trainer.avatarUrl ? <img src={trainer.avatarUrl} alt={`${trainer.name} profile`} className="h-20 w-20 rounded-full object-cover" referrerPolicy="no-referrer" /> : <Avatar initials={trainer.name.split(/\s+/).map(x => x[0] ?? "").join("").slice(0, 2).toUpperCase()} size="lg" />}
       <div className="flex-1"><p className="eyebrow">Verified trainer</p><h1 className="mt-1 text-3xl font-bold">{trainer.name}</h1>
         <p className="mt-2 text-muted-foreground">{trainer.bio || "This trainer has not added a bio yet."}</p>
         <div className="mt-3 flex flex-wrap gap-2">{[...trainer.qualifications, ...trainer.specialties].map(q => <span key={q} className="chip">{q}</span>)}</div>
