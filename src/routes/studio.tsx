@@ -34,7 +34,7 @@ export const Route = createFileRoute("/studio")({
 });
 
 const UNLOCK = 5;
-const TABS = ["Overview", "Calendar", "On-demand", "Store", "Credentials"] as const;
+const TABS = ["Overview", "My Profile", "Calendar", "On-demand", "Store", "Credentials"] as const;
 
 function Studio() {
   const { s } = useStore();
@@ -61,6 +61,7 @@ function Studio() {
       </PageHeader>
       <div className="flex flex-wrap gap-2">{TABS.filter((t) => tr.kind !== "Nutritionist" || t !== "On-demand").map((t) => <button key={t} className={`chip ${tab === t ? "chip-active" : ""}`} onClick={() => setTab(t)}>{t}</button>)}</div>
       {tab === "Overview" && <Overview />}
+      {tab === "My Profile" && <TrainerProfileTab />}
       {tab === "Calendar" && <CalendarTab />}
       {tab === "On-demand" && tr.kind !== "Nutritionist" && <Uploads />}
       {tab === "Store" && <StoreTab />}
@@ -389,9 +390,27 @@ function Uploads() {
   );
 }
 
+
+function TrainerProfileTab() {
+  const { s, setExtra, set } = useStore();
+  const trainer = s.extra.trainer;
+  const update = (patch: Partial<typeof trainer>) => setExtra((x) => ({ ...x, trainer: { ...x.trainer, ...patch } }));
+  return <section className="card space-y-4 p-6">
+    <h2 className="text-xl font-bold">My Trainer Profile</h2>
+    <p className="text-sm text-muted-foreground">Manage your coaching details in one place. Your member account remains available for taking classes.</p>
+    <label className="block text-sm font-medium">Display name<input className="field mt-1 w-full" value={s.name} onChange={(e) => set((x) => ({ ...x, name: e.target.value }))} /></label>
+    <label className="block text-sm font-medium">Trainer bio<textarea className="field mt-1 w-full" rows={5} maxLength={2000} placeholder="Introduce yourself, your approach and who you help" value={trainer.bio} onChange={(e) => update({ bio: e.target.value })} /></label>
+    <label className="block text-sm font-medium">Specialties (comma-separated)<input className="field mt-1 w-full" placeholder="Postpartum strength, low-impact fitness" value={trainer.specialties.join(', ')} onChange={(e) => update({ specialties: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} /></label>
+    <label className="block text-sm font-medium">Website<input className="field mt-1 w-full" type="url" placeholder="https://yourwebsite.com" value={trainer.website ?? ''} onChange={(e) => update({ website: e.target.value })} /></label>
+    <label className="block text-sm font-medium">Instagram profile<input className="field mt-1 w-full" type="url" placeholder="https://instagram.com/yourhandle" value={trainer.instagram ?? ''} onChange={(e) => update({ instagram: e.target.value })} /></label>
+    <p className="text-xs text-muted-foreground">Changes save with your account. Public trainer profile synchronization must be verified before inviting trainers.</p>
+    <Link to="/trybes" className="btn btn-outline inline-flex">Manage My Trybe</Link>
+  </section>;
+}
+
 function StoreTab() {
   const { s, setExtra, uid } = useStore();
-  const [f, setF] = useState({ name: "", price: "", url: "" });
+  const [f, setF] = useState({ name: "", price: "", url: "", image: "", description: "" });
   const items = s.extra.trainer.store;
   return (
     <section className="card space-y-3 p-6">
@@ -400,10 +419,12 @@ function StoreTab() {
         <input className="field flex-1" placeholder="Product (tee, band set, recipe guide…)" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
         <input type="number" className="field w-28" placeholder="$" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
         <input className="field flex-1" placeholder="Link to your shop (optional — Solin, your site…)" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} />
-        <button className="btn btn-primary" disabled={!f.name || !+f.price} onClick={() => { setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: [...x.trainer.store, { id: uid(), name: f.name, price: +f.price, ...(f.url.trim() ? { url: f.url.trim() } : {}) }] } })); setF({ name: "", price: "", url: "" }); }}>Add product</button>
+        <input className="field flex-1" placeholder="Product image URL (https://...)" type="url" value={f.image} onChange={(e) => setF({ ...f, image: e.target.value })} />
+        <input className="field flex-1" placeholder="Product description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+        <button className="btn btn-primary" disabled={!f.name || (!f.url.trim() && !+f.price)} onClick={() => { setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: [...x.trainer.store, { id: uid(), name: f.name, price: +f.price, ...(f.url.trim() ? { url: f.url.trim() } : {}), ...(f.image.trim() ? { image: f.image.trim() } : {}), ...(f.description.trim() ? { description: f.description.trim() } : {}) }] } })); setF({ name: "", price: "", url: "", image: "", description: "" }); }}>Add product</button>
       </div>
-      <ul className="space-y-2 text-sm">{items.map((i) => <li key={i.id} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2"><span>{i.name}{i.url && <span className="ml-2 text-xs text-primary">↗ linked</span>}</span><span className="flex items-center gap-3">${i.price}<button className="text-destructive" onClick={() => setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: x.trainer.store.filter((y) => y.id !== i.id) } }))}>Remove</button></span></li>)}</ul>
-      <p className="text-xs text-muted-foreground">Your products appear in the Store & Merch section of your coach profile. Add a link to send buyers to your own shop — sales there are 100% yours. An affiliate disclosure is shown next to linked products automatically.</p>
+      <ul className="space-y-2 text-sm">{items.map((i) => <li key={i.id} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2"><span className="flex items-center gap-2">{i.image && <img src={i.image} alt="" className="h-12 w-12 rounded object-cover" />}{i.name}{i.url && <span className="ml-2 text-xs text-primary">↗ linked</span>}</span><span className="flex items-center gap-3">${i.price}<button className="text-destructive" onClick={() => setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: x.trainer.store.filter((y) => y.id !== i.id) } }))}>Remove</button></span></li>)}</ul>
+      <p className="text-xs text-muted-foreground">Use an image URL for now; direct image uploads require storage integration. Your products appear in the Store & Merch section of your coach profile. Add a link to send buyers to your own shop — sales there are 100% yours. An affiliate disclosure is shown next to linked products automatically.</p>
     </section>
   );
 }

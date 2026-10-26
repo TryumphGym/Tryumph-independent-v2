@@ -10,7 +10,7 @@ export type PlanMeal = { id: string; title: string; kcal: number; protein: numbe
 export type MealPlan = Record<string, Record<string, PlanMeal[]>>;
 export type Cert = { id: string; name: string; credentialId: string; expires: string; status: "Pending review" | "Verified" };
 export type TrainerVideo = { id: string; title: string; category: string; level: string; minutes: number; path?: string; equipment?: string; pregnancySafe?: boolean; playlist?: string; goals?: string[] };
-export type StoreItem = { id: string; name: string; price: number; url?: string };
+export type StoreItem = { id: string; name: string; price: number; url?: string; image?: string; description?: string };
 export type CalBlock = { id: string; date: string; label: string; kind: "personal" | "live" | "oneonone"; time?: string | undefined };
 export type Alert = { id: string; text: string; date: string };
 export type Extra = {
@@ -20,7 +20,7 @@ export type Extra = {
   friends: string[]; chats: Record<string, { from: string; text: string }[]>;
   joinedTrybes: string[]; alerts: Alert[];
   pregnant?: boolean; dueDate?: string; followed?: string[];
-  trainer: { kind: "Trainer" | "Nutritionist" | "Both"; certs: Cert[]; specialties: string[]; rate: number; bio: string; videos: TrainerVideo[]; store: StoreItem[]; blocks: CalBlock[]; agreed: boolean; pinned: string[]; removed: string[] };
+  trainer: { kind: "Trainer" | "Nutritionist" | "Both"; certs: Cert[]; specialties: string[]; rate: number; bio: string; website?: string; instagram?: string; videos: TrainerVideo[]; store: StoreItem[]; blocks: CalBlock[]; agreed: boolean; pinned: string[]; removed: string[] };
 };
 export const emptyExtra: Extra = {
   onboarded: false, conditions: [], goals: [], why: "",
