@@ -1,3 +1,4 @@
+import { credentialLabel, hasVerifiedCpr, type CredentialRecord } from "@/lib/cpr";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -187,6 +188,17 @@ const tog = (a: string[], v: string) => (a.includes(v) ? a.filter((x) => x !== v
 function SignedInAccount() {
   const { s, set, saveProfile, signOut } = useStore();
   const [units, setUnits] = useUnits();
+  const [verifiedCerts, setVerifiedCerts] = useState<CredentialRecord[]>([]);
+  useEffect(() => {
+    if (!s.signedIn || s.role !== "trainer") return;
+    let active = true;
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const result = await supabase.from("certifications").select("id,name,status,expires,verified_at,verified_by").eq("user_id", data.user.id);
+      if (active && !result.error) setVerifiedCerts((result.data ?? []) as CredentialRecord[]);
+    });
+    return () => { active = false; };
+  }, [s.signedIn, s.role]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => ({ name: s.name, profile: s.profile, goals: s.extra.goals, conditions: s.extra.conditions, dueDate: s.extra.dueDate ?? "" }));
   const [w, setW] = useState("");
@@ -250,7 +262,8 @@ function SignedInAccount() {
         <div className="card space-y-3 p-6">
           <h2 className="text-xl font-bold">Coaching profile</h2>
           <p className="text-sm text-muted-foreground">{s.extra.trainer.kind === "Both" ? "Trainer & Nutritionist" : s.extra.trainer.kind} · ${s.extra.trainer.rate}/session · {s.extra.trainer.specialties.join(", ") || "No specialties yet"}</p>
-          <ul className="space-y-1 text-sm">{s.extra.trainer.certs.map((c) => <li key={c.id}>{c.name} — <span className="text-warning">{c.status}</span></li>)}</ul>
+          <p className={hasVerifiedCpr(verifiedCerts) ? "text-success text-sm" : "text-warning text-sm"}>{hasVerifiedCpr(verifiedCerts) ? "Verified Pro · CPR current" : "CPR verification required for Verified Pro"}</p>
+          <ul className="space-y-1 text-sm">{verifiedCerts.map((c) => <li key={c.id}>{c.name} — <span className={credentialLabel(c) === "Verified" ? "text-success" : "text-warning"}>{credentialLabel(c)}</span>{c.expires ? ` · Expires ${c.expires}` : ""}</li>)}</ul>
           <div className="flex gap-2"><Link to="/welcome" className="btn btn-primary">Edit certifications & specialties</Link><Link to="/studio" className="btn btn-ghost">Open Studio</Link></div>
         </div>
       ) : (

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
+import { hasVerifiedCpr, isCurrentVerified } from "@/lib/cpr";
 
 // Public, allowlisted trainer directory. Never return certification documents or private profile JSON.
 export const Route = createFileRoute("/api/public/trainers")({
@@ -14,14 +15,13 @@ export const Route = createFileRoute("/api/public/trainers")({
       const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
       stage = "certifications";
       const { data: credentials, error: certError } = await db.from("certifications")
-        .select("user_id,name,expires").eq("status", "verified").not("verified_at", "is", null).not("verified_by", "is", null);
+        .select("user_id,name,expires,status,verified_at,verified_by").eq("status", "verified").not("verified_at", "is", null).not("verified_by", "is", null);
       if (certError) {
         safeDetail = { code: String(certError.code ?? "unknown").slice(0, 40), message: String(certError.message ?? "Unknown database error").slice(0, 250) };
         throw certError;
       }
-      const today = new Date().toISOString().slice(0, 10);
-      const valid = (credentials ?? []).filter(c => !c.expires || /^\d{4}-\d{2}-\d{2}$/.test(c.expires) && c.expires >= today);
-      const ids = [...new Set(valid.map(c => c.user_id))];
+      const valid = (credentials ?? []).filter(c => isCurrentVerified(c));
+      const ids = [...new Set(valid.filter(c => hasVerifiedCpr(valid.filter(x => x.user_id === c.user_id))).map(c => c.user_id))];
       if (!ids.length) return Response.json({ trainers: [] });
       stage = "profiles";
       const { data: profiles, error: profileError } = await db.from("profiles")
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/trainers")({
       return Response.json({ trainers }, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       console.error("Public trainer directory failed", error);
-      return Response.json({ error: "Directory unavailable", stage, detail: safeDetail ?? { code: "runtime_error", message: "Non-database failure" } }, { status: 500, headers: { "Cache-Control": "no-store" } });
+      return Response.json({ error: "Directory unavailable" }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
   } } },
 });

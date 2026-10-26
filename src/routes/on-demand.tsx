@@ -130,10 +130,12 @@ function TrainerUploads({ accepts }: { accepts: (video: WorkoutMatch & { minutes
       .then(({ data }) => setRows((data ?? []) as Uploaded[]));
   }, []);
   const matching = rows.filter((x) => accepts({ ...x, pregnancySafe: x.pregnancy_safe, postpartum: x.level === "Postpartum" }));
-  if (!matching.length) return null;
+  const other = rows.filter((x) => !matching.includes(x) && !((preferences.pregnant || preferences.needs.includes("Pregnant") || preferences.needs.includes("Pregnancy safe")) && !x.pregnancy_safe));
+  if (!rows.length) return null;
   return (
     <section className="mb-8">
-      <h2 className="mb-3 text-xl font-bold">New from trainers</h2>
+      <h2 className="mb-3 text-xl font-bold">Best matches from verified uploads</h2>
+      {!matching.length && <p className="mb-3 text-sm text-muted-foreground">No exact matches yet. Explore other approved workouts below; check equipment and safety labels before starting.</p>}
       {open && <RealPlayer video={open} onClose={() => setOpen(null)} />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {matching.map((x) => (
@@ -143,6 +145,11 @@ function TrainerUploads({ accepts }: { accepts: (video: WorkoutMatch & { minutes
           </button>
         ))}
       </div>
+      {other.length > 0 && <div className="mt-6">
+        <h3 className="mb-2 text-lg font-semibold">Explore other approved workouts</h3>
+        <p className="mb-3 text-sm text-muted-foreground">These don't match all your selected preferences. Check the equipment and safety details before starting.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{other.map(x => <button key={x.id} onClick={() => setOpen(x)} className="card p-4 text-left"><p className="font-semibold">{x.title}</p><p className="text-sm text-muted-foreground">{x.category} · {x.level} · {x.equipment || "No equipment listed"}</p></button>)}</div>
+      </div>}
     </section>
   );
 }

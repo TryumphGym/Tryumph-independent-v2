@@ -1,3 +1,4 @@
+import { hasVerifiedCpr, type CredentialRecord } from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -39,9 +40,9 @@ const TABS = ["Overview", "My Profile", "Calendar", "On-demand", "Store", "Crede
 function Studio() {
   const { s } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
-  const [certStatus, setCertStatus] = useState<string[]>([]);
+  const [certStatus, setCertStatus] = useState<CredentialRecord[]>([]);
   useEffect(() => {
-    supabase.from("certifications").select("status").then(({ data }) => setCertStatus((data ?? []).map((r) => r.status)));
+    supabase.from("certifications").select("name,status,expires,verified_at,verified_by").then(({ data }) => setCertStatus((data ?? []) as CredentialRecord[]));
   }, [s.signedIn]);
   if (!s.signedIn || s.role !== "trainer") {
     return (
@@ -53,11 +54,11 @@ function Studio() {
     );
   }
   const tr = s.extra.trainer;
-  const verified = certStatus.includes("verified") || tr.certs.some((c) => c.status === "Verified");
+  const verified = hasVerifiedCpr(certStatus);
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Trainer Studio" title="Your business at a glance" sub="Sample numbers shown until real payouts are connected.">
-        <span className={`chip ${verified ? "chip-active" : ""}`}><ShieldCheck className="mr-1 inline h-4 w-4" />{verified ? "Verified Pro" : tr.certs.length ? "Certifications pending review" : "Add certifications"}</span>
+        <span className={`chip ${verified ? "chip-active" : ""}`}><ShieldCheck className="mr-1 inline h-4 w-4" />{verified ? "Verified Pro" : certStatus.length ? "CPR verification required" : "Add CPR certification"}</span>
       </PageHeader>
       <div className="flex flex-wrap gap-2">{TABS.filter((t) => tr.kind !== "Nutritionist" || t !== "On-demand").map((t) => <button key={t} className={`chip ${tab === t ? "chip-active" : ""}`} onClick={() => setTab(t)}>{t}</button>)}</div>
       {tab === "Overview" && <Overview />}
@@ -86,7 +87,18 @@ function Overview() {
   const me = useUserId();
   const [f, setF] = useState({ title: "", category: "Strength", level: "Beginner", when: "", description: "" });
   const [live, setLive] = useState(false);
-  const unlocked = s.extra.trainer.videos.length >= UNLOCK;
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [countLoaded, setCountLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const result = await supabase.from("trainer_videos").select("id", { count: "exact", head: true }).eq("user_id", data.user.id).eq("review_status", "approved");
+      if (active) { setApprovedCount(result.error ? 0 : (result.count ?? 0)); setCountLoaded(!result.error); }
+    });
+    return () => { active = false; };
+  }, [s.signedIn, s.extra.trainer.videos.length]);
+  const unlocked = countLoaded && approvedCount >= UNLOCK;
   const [st, setSt] = useState<Awaited<ReturnType<typeof getPayoutStatus>> | null>(null);
   useEffect(() => { getPayoutStatus().then(setSt).catch(() => setSt(null)); }, []);
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -100,7 +112,7 @@ function Overview() {
     ["1-on-1 sessions", String(st?.stats.oneononeSessions ?? 0)],
     ["Followers", String(st?.stats.followers ?? 0)],
     ["Trybe members", String(st?.stats.trybeMembers ?? 0)],
-    ["On-demand videos", String(s.extra.trainer.videos.length)],
+    ["Approved on-demand videos", countLoaded ? String(approvedCount) : "…"],
   ];
   return (
     <div className="space-y-6">
@@ -113,9 +125,9 @@ function Overview() {
           <h2 className="text-xl font-bold">Schedule a live class</h2>
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
-              <p className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" />Lives unlock after {UNLOCK} on-demand videos</p>
-              <div className="mt-2 h-2 rounded-full bg-background"><div className="h-2 rounded-full bg-brand" style={{ width: `${(s.extra.trainer.videos.length / UNLOCK) * 100}%` }} /></div>
-              <p className="mt-2 text-muted-foreground">Videos uploaded: {s.extra.trainer.videos.length}/{UNLOCK}</p>
+              <p className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" />Lives unlock after {UNLOCK} approved on-demand videos</p>
+              <div className="mt-2 h-2 rounded-full bg-background"><div className="h-2 rounded-full bg-brand" style={{ width: `${Math.min(100, (approvedCount / UNLOCK) * 100)}%` }} /></div>
+              <p className="mt-2 text-muted-foreground">Approved videos: {countLoaded ? approvedCount : "Checking…"}/{UNLOCK}</p>
             </div>
           ) : (
             <>
@@ -126,13 +138,17 @@ function Overview() {
               </div>
               <input type="datetime-local" className="field" value={f.when} onChange={(e) => setF({ ...f, when: e.target.value })} />
               <textarea className="field" placeholder="Description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-              <button className="btn btn-primary w-full" disabled={!f.title || !f.when} onClick={() => {
+              <button className="btn btn-primary w-full" disabled={!f.title || !f.when || !unlocked} onClick={async () => {
+                if (!me || !unlocked) { toast.error("Five approved videos are required to schedule."); return; }
+                const when = new Date(f.when);
+                if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) { toast.error("Choose a future class time."); return; }
+                const { error } = await supabase.from("live_sessions").insert({ trainer_id: me, trainer_name: s.name, title: f.title, category: f.category, level: f.level, starts_at: when.toISOString(), description: f.description });
+                if (error) { toast.error("Couldn't schedule this class. Please try again."); return; }
                 set((x) => ({ ...x, scheduled: [...x.scheduled, { ...f, id: uid() }], extra: { ...x.extra, trainer: { ...x.extra.trainer, blocks: [...x.extra.trainer.blocks, { id: uid(), date: f.when.slice(0, 10), label: `Live: ${f.title}`, kind: "live", time: f.when.slice(11, 16) || undefined }] } } }));
-                if (me) void supabase.from("live_sessions").insert({ trainer_id: me, trainer_name: s.name, title: f.title, category: f.category, level: f.level, starts_at: new Date(f.when).toISOString(), description: f.description }).then(({ error }) => { if (error) toast.error("Couldn't publish to the Live page."); });
-                if (me) void supabase.from("trainer_busy").upsert({ trainer_id: me, day: f.when.slice(0, 10), time: f.when.slice(11, 16) || "ALL", source: "live" }).then(() => {});
+                void supabase.from("trainer_busy").upsert({ trainer_id: me, day: f.when.slice(0, 10), time: f.when.slice(11, 16) || "ALL", source: "live" });
+                void supabase.from("posts").insert({ author_id: me, author_name: s.name, trybe: `coach-${me}`, kind: "New live", text: `New live class: ${f.title} · ${when.toLocaleString()}${f.description ? ` — ${f.description}` : ""}` });
                 setF({ title: "", category: "Strength", level: "Beginner", when: "", description: "" });
-                supabase.auth.getUser().then(({ data: u }) => { if (u.user) supabase.from("posts").insert({ author_id: u.user.id, author_name: s.name, trybe: `coach-${u.user.id}`, kind: "New live", text: `New live class: ${f.title} · ${new Date(f.when).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}${f.description ? ` — ${f.description}` : ""}` }).then(() => {}); });
-                toast.success("Class scheduled — your Trybe has been notified");
+                toast.success("Class scheduled");
               }}>Schedule</button>
               <button className={`btn w-full ${live ? "btn-outline" : "btn-ghost"}`} onClick={() => setLive(!live)}>{live ? "End broadcast" : "Go live now"}</button>
             </>
