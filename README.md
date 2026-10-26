@@ -36,3 +36,4 @@ The local app can start without private provider credentials. Real directory dat
 - [End-to-end verification checklist](docs/launch/INTEGRATION_TESTING.md)
 
 Work belongs on `codex/tryumph-january-launch`. Do not merge, deploy, execute hosted SQL, change DNS or process real payments without explicit authorization. Existing history remains intact for the connected source editor; the production app does not depend on Lovable hosting.
+
