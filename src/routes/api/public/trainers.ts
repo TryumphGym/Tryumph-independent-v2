@@ -5,11 +5,13 @@ import { createClient } from "@supabase/supabase-js";
 // Public, allowlisted trainer directory. Never return certification documents or private profile JSON.
 export const Route = createFileRoute("/api/public/trainers")({
   server: { handlers: { GET: async () => {
+    let stage = "configuration";
     try {
       const url = env.SUPABASE_URL;
       const key = env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!url || !key) return Response.json({ error: "Directory unavailable" }, { status: 503 });
+      if (!url || !key) return Response.json({ error: "Directory unavailable", stage: "configuration" }, { status: 503 });
       const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+      stage = "certifications";
       const { data: credentials, error: certError } = await db.from("certifications")
         .select("user_id,name,expires").eq("status", "verified").not("verified_at", "is", null).not("verified_by", "is", null);
       if (certError) throw certError;
@@ -17,6 +19,7 @@ export const Route = createFileRoute("/api/public/trainers")({
       const valid = (credentials ?? []).filter(c => !c.expires || /^\d{4}-\d{2}-\d{2}$/.test(c.expires) && c.expires >= today);
       const ids = [...new Set(valid.map(c => c.user_id))];
       if (!ids.length) return Response.json({ trainers: [] });
+      stage = "profiles";
       const { data: profiles, error: profileError } = await db.from("profiles")
         .select("id,name,role,extra,avatar_url").in("id", ids).eq("role", "trainer");
       if (profileError) throw profileError;
@@ -31,7 +34,7 @@ export const Route = createFileRoute("/api/public/trainers")({
       return Response.json({ trainers }, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       console.error("Public trainer directory failed", error);
-      return Response.json({ error: "Directory unavailable" }, { status: 500 });
+      return Response.json({ error: "Directory unavailable", stage }, { status: 500 });
     }
   } } },
 });
