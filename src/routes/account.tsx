@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { Avatar, PageHeader } from "@/components/Avatar";
@@ -29,7 +29,41 @@ function Account() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signup" | "signin">("signup");
+  const [mode, setMode] = useState<"signup" | "signin" | "forgot" | "reset">("signup");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setMode("reset");
+    });
+    if (typeof window !== "undefined" && (window.location.hash.includes("type=recovery") || new URLSearchParams(window.location.search).get("type") === "recovery")) setMode("reset");
+    return () => subscription.unsubscribe();
+  }, []);
+  const sendReset = async () => {
+    if (!email.trim()) return toast.error("Enter your email address.");
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/account` });
+      if (error) throw error;
+      toast.success("If an account exists for that email, a password reset link will arrive shortly.");
+      setMode("signin");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not send reset email."); }
+    finally { setBusy(false); }
+  };
+  const saveNewPassword = async () => {
+    if (newPassword.length < 8) return toast.error("Use at least 8 characters.");
+    if (newPassword !== confirmPassword) return toast.error("Passwords do not match.");
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success("Password updated. You can now sign in.");
+      await supabase.auth.signOut();
+      setNewPassword(""); setConfirmPassword(""); setMode("signin");
+      window.history.replaceState({}, "", "/account");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not reset password."); }
+    finally { setBusy(false); }
+  };
   const [busy, setBusy] = useState(false);
   const [role, setRole] = useState<"member" | "trainer">("member");
 
@@ -62,8 +96,28 @@ function Account() {
     }
   };
 
-  if (!s.signedIn) {
+  if (!s.signedIn || mode === "reset") {
     const isSignup = mode === "signup";
+    if (mode === "forgot" || mode === "reset") return (
+      <div className="mx-auto max-w-md">
+        <PageHeader eyebrow="Account security" title={mode === "forgot" ? "Forgot password?" : "Set a new password"} sub={mode === "forgot" ? "Enter your email and we'll send a reset link." : "Choose a new password to secure your account."} />
+        <div className="card space-y-4 p-6">
+          {mode === "forgot" ? (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void sendReset(); }}>
+              <input className="field" type="email" autoComplete="email" required placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <button className="btn btn-primary w-full" type="submit" disabled={busy}>{busy ? "Sending…" : "Send reset link"}</button>
+            </form>
+          ) : (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void saveNewPassword(); }}>
+              <input className="field" type="password" autoComplete="new-password" required minLength={8} placeholder="New password (8+ characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <input className="field" type="password" autoComplete="new-password" required placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <button className="btn btn-primary w-full" type="submit" disabled={busy}>{busy ? "Saving…" : "Update password"}</button>
+            </form>
+          )}
+          <button type="button" className="w-full text-center text-sm text-primary" onClick={() => setMode("signin")}>Back to sign in</button>
+        </div>
+      </div>
+    );
     const canSubmit = isSignup
       ? Boolean(name.trim() && email.trim() && password.length >= 6)
       : Boolean(email.trim() && password.length >= 1);
@@ -111,6 +165,7 @@ function Account() {
             <button type="submit" className="btn btn-primary w-full" disabled={busy || !canSubmit}>
               {busy ? "One moment…" : isSignup ? "Create account" : "Sign in"}
             </button>
+            {!isSignup && <button type="button" className="w-full text-right text-sm text-primary" onClick={() => setMode("forgot")}>Forgot password?</button>}
             <button type="button" className="w-full text-center text-sm text-primary" onClick={() => setMode(isSignup ? "signin" : "signup")}>
               {isSignup ? "Already have an account? Sign in" : "New here? Create an account"}
             </button>
