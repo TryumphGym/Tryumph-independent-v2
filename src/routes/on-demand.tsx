@@ -1,3 +1,4 @@
+import { WaterBreakSponsor } from '@/components/WaterBreakSponsor';
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Bookmark, BookmarkCheck, Droplets, Pause, Play, X } from "lucide-react";
@@ -12,7 +13,7 @@ import { getVideoUrl } from "@/lib/videos.functions";
 import { PageHeader } from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { ChoiceDropdown, MultiDropdown } from "@/components/WorkoutFilters";
-import { matchesWorkout, SAFETY_OPTIONS, type WorkoutMatch } from "@/lib/workout-preferences";
+import { matchesWorkout, isSafetyCompatible, SAFETY_OPTIONS, type WorkoutMatch, type WorkoutPreferences } from "@/lib/workout-preferences";
 
 export const Route = createFileRoute("/on-demand")({
   validateSearch: z.object({ v: z.string().optional() }),
@@ -80,7 +81,7 @@ function OnDemand() {
         <ChoiceDropdown label="Time" value={dur} options={["Any length", ...DURATIONS.map((d) => d.label)]} onChange={setDur} />
         {s.signedIn && <div className="flex items-end"><Button asChild variant="ghost"><Link to="/account">Workout preferences</Link></Button></div>}
       </div>
-      {tab === "all" && <TrainerUploads accepts={accepts} />}
+      {tab === "all" && <TrainerUploads accepts={accepts} preferences={preferences} />}
       {tab === "playlists" && (
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           {playlists.map((name) => { const vs = videos.filter((x) => x.playlist === name); return (
@@ -122,36 +123,45 @@ function OnDemand() {
 
 type Uploaded = { id: string; title: string; category: string; level: string; path: string; minutes: number; breaks: number[]; equipment: string; pregnancy_safe: boolean; playlist: string; break_seconds: number; required_equipment?: string[]; optional_equipment?: string[] };
 
-function TrainerUploads({ accepts }: { accepts: (video: WorkoutMatch & { minutes: number }) => boolean }) {
+function TrainerUploads({ accepts, preferences }: { accepts: (video: WorkoutMatch & { minutes: number }) => boolean; preferences: WorkoutPreferences }) {
   const [rows, setRows] = useState<Uploaded[]>([]);
   const [open, setOpen] = useState<Uploaded | null>(null);
   useEffect(() => {
-    supabase.from("trainer_videos").select("id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment").eq("review_status", "approved").order("created_at", { ascending: false }).limit(24)
+    supabase.from("trainer_videos").select("id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment").eq("review_status", "approved").order("created_at", { ascending: false }).limit(100)
       .then(({ data }) => setRows((data ?? []) as Uploaded[]));
   }, []);
-  const matching = rows.filter((x) => accepts({ ...x, pregnancySafe: x.pregnancy_safe, postpartum: x.level === "Postpartum" }));
-  const other = rows.filter((x) => !matching.includes(x) && !((preferences.pregnant || preferences.needs.includes("Pregnant") || preferences.needs.includes("Pregnancy safe")) && !x.pregnancy_safe));
-  if (!rows.length) return null;
-  return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-xl font-bold">Best matches from verified uploads</h2>
-      {!matching.length && <p className="mb-3 text-sm text-muted-foreground">No exact matches yet. Explore other approved workouts below; check equipment and safety labels before starting.</p>}
-      {open && <RealPlayer video={open} onClose={() => setOpen(null)} />}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {matching.map((x) => (
+  const normalized = (x: Uploaded): WorkoutMatch & { minutes: number } => ({ ...x, pregnancySafe: x.pregnancy_safe, postpartum: x.level === "Postpartum" });
+  const safe = rows.filter(x => isSafetyCompatible(normalized(x), preferences));
+  const best = safe.filter(x => accepts(normalized(x)));
+  const close = safe.filter(x => !best.includes(x) && (
+    (!preferences.styles.length || preferences.styles.includes(x.category)) ||
+    (preferences.gear.length === 0 || (x.required_equipment ?? []).every(g => preferences.gear.includes(g)))
+  ));
+  const explore = safe.filter(x => !best.includes(x) && !close.includes(x));
+  if (!rows.length) return <p className="card mb-8 p-6 text-muted-foreground">Approved trainer workouts will appear here once available.</p>;
+  const renderGroup = (title: string, description: string, group: Uploaded[]) => (
+    <section className="mb-7" key={title}>
+      <h2 className="mb-2 text-xl font-bold">{title} ({group.length})</h2>
+      <p className="mb-3 text-sm text-muted-foreground">{description}</p>
+      {group.length === 0 ? <p className="text-sm text-muted-foreground">No workouts in this group yet.</p> :
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{group.map(x => (
           <button key={x.id} onClick={() => setOpen(x)} className="card overflow-hidden text-left">
             <div className="bg-brand grid aspect-video w-full place-items-center"><Play className="h-8 w-8 text-primary-foreground" /></div>
-            <div className="p-4"><p className="eyebrow">{x.category} · {x.level}{x.pregnancy_safe ? " · Pregnancy safe" : ""}</p><p className="mt-1 font-semibold">{x.title}</p>{x.playlist && <p className="text-xs text-accent">Playlist: {x.playlist}</p>}<p className="text-sm text-muted-foreground">{x.minutes ? `${x.minutes} min · ` : ""}{x.breaks.length ? `${x.breaks.length} water break${x.breaks.length > 1 ? "s" : ""}` : "Ad-free"}</p></div>
+            <div className="p-4"><p className="eyebrow">{x.category} · {x.level}{x.pregnancy_safe ? " · Pregnancy safe" : ""}</p>
+              <p className="mt-1 font-semibold">{x.title}</p>
+              {x.playlist && <p className="text-xs text-accent">Playlist: {x.playlist}</p>}
+              <p className="text-sm text-muted-foreground">{x.minutes} min · {x.equipment || "No equipment listed"} · {(x.breaks ?? []).length ? `${x.breaks.length} water breaks` : "Ad-free"}</p>
+            </div>
           </button>
-        ))}
-      </div>
-      {other.length > 0 && <div className="mt-6">
-        <h3 className="mb-2 text-lg font-semibold">Explore other approved workouts</h3>
-        <p className="mb-3 text-sm text-muted-foreground">These don't match all your selected preferences. Check the equipment and safety details before starting.</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{other.map(x => <button key={x.id} onClick={() => setOpen(x)} className="card p-4 text-left"><p className="font-semibold">{x.title}</p><p className="text-sm text-muted-foreground">{x.category} · {x.level} · {x.equipment || "No equipment listed"}</p></button>)}</div>
-      </div>}
+        ))}</div>}
     </section>
   );
+  return <section className="mb-8">
+    {open && <RealPlayer video={open} onClose={() => setOpen(null)} />}
+    {renderGroup("Best Matches", "Workouts matching your selected preferences and safety filters.", best)}
+    {renderGroup("Close Matches", "Some preferences differ; review the equipment and level before starting.", close)}
+    {renderGroup("Explore All", "More approved workouts that pass your selected safety filters.", explore)}
+  </section>;
 }
 
 // Plays the real file. Ads appear only when playback reaches a trainer-marked rest/water break.
@@ -183,7 +193,7 @@ function RealPlayer({ video, onClose }: { video: Uploaded; onClose: () => void }
         {url?.startsWith("https://iframe.mediadelivery.net/") ? <iframe src={url} title={video.title} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen className="aspect-video w-full" /> : url ? <video ref={ref} src={url} controls={ad === 0} autoPlay onTimeUpdate={onTime} className="aspect-video w-full" /> : <div className="grid aspect-video place-items-center text-muted-foreground">Loading…</div>}
         {ad > 0 && (
           <div className="absolute inset-0 grid place-items-center bg-background/95 text-center">
-            <div><Droplets className="mx-auto h-10 w-10 text-primary" /><p className="mt-3 font-display text-2xl font-bold">Water break 💧</p><p className="text-muted-foreground">Grab some water — resuming in {ad}s</p><button className="btn btn-ghost mt-3" onClick={() => { setAd(0); void ref.current?.play(); }}>Resume now</button></div>
+            <div><Droplets className="mx-auto h-10 w-10 text-primary" /><p className="mt-3 font-display text-2xl font-bold">Water break 💧</p><p className="text-muted-foreground">Grab some water — resuming in {ad}s</p><WaterBreakSponsor /><button className="btn btn-ghost mt-3" onClick={() => { setAd(0); void ref.current?.play(); }}>Resume now</button></div>
           </div>
         )}
         {soon && ad === 0 && <div className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground">💧 Water break in a few seconds</div>}

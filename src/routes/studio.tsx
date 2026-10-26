@@ -1,3 +1,4 @@
+import { TrainerStoreManager, TrainerProgramManager } from '@/components/TrainerLaunchTools';
 import { hasVerifiedCpr, type CredentialRecord } from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
@@ -73,7 +74,7 @@ function Studio() {
       {tab === "Overview" && <Overview />}
       {tab === "My Profile" && <TrainerProfileTab />}
       {tab === "Calendar" && <CalendarTab />}
-      {tab === "On-demand" && tr.kind !== "Nutritionist" && <Uploads />}
+      {tab === "On-demand" && tr.kind !== "Nutritionist" && <><Uploads /><TrainerProgramManager /></>}
       {tab === "Store" && <StoreTab />}
       {tab === "Credentials" && <div className="card space-y-6 p-6"><RolePicker /><CertManager /><p className="text-xs text-muted-foreground">Finished a new course? Add it here — we review it and it shows on your profile once verified.</p></div>}
     </div>
@@ -467,30 +468,7 @@ function TrainerProfileTab() {
   </section>;
 }
 
-function StoreTab() {
-  const { s, setExtra, uid } = useStore();
-  const [f, setF] = useState({ name: "", price: "", url: "", image: "", description: "" });
-  const items = s.extra.trainer.store;
-  const validExternalUrl = (value: string) => {
-    try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:"; }
-    catch { return false; }
-  };
-  return (
-    <section className="card space-y-3 p-6">
-      <h2 className="text-xl font-bold">Your Trybe Store</h2>
-      <div className="flex flex-wrap gap-2">
-        <input className="field flex-1" placeholder="Product (tee, band set, recipe guide…)" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <input type="number" className="field w-28" placeholder="$" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
-        <input className="field flex-1" placeholder="Link to your shop (optional — Solin, your site…)" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} />
-        <input className="field flex-1" placeholder="Product image URL (https://...)" type="url" value={f.image} onChange={(e) => setF({ ...f, image: e.target.value })} />
-        <input className="field flex-1" placeholder="Product description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-        <button className="btn btn-primary" disabled={!f.name || (!f.url.trim() && !+f.price)} onClick={() => { if (f.url.trim() && !validExternalUrl(f.url.trim())) { toast.error("Use a valid https:// shop or affiliate link."); return; } if (f.image.trim() && !validExternalUrl(f.image.trim())) { toast.error("Use a valid https:// product image link."); return; } setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: [...x.trainer.store, { id: uid(), name: f.name, price: +f.price, ...(f.url.trim() ? { url: f.url.trim() } : {}), ...(f.image.trim() ? { image: f.image.trim() } : {}), ...(f.description.trim() ? { description: f.description.trim() } : {}) }] } })); setF({ name: "", price: "", url: "", image: "", description: "" }); }}>Add product</button>
-      </div>
-      <ul className="space-y-2 text-sm">{items.map((i) => <li key={i.id} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2"><span className="flex items-center gap-2">{i.image && <img src={i.image} alt="" className="h-12 w-12 rounded object-cover" />}{i.name}{i.url && <span className="ml-2 text-xs text-primary">↗ linked</span>}</span><span className="flex items-center gap-3">${i.price}<button className="text-destructive" onClick={() => setExtra((x) => ({ ...x, trainer: { ...x.trainer, store: x.trainer.store.filter((y) => y.id !== i.id) } }))}>Remove</button></span></li>)}</ul>
-      <p className="text-xs text-muted-foreground">Use an image URL for now; direct image uploads require storage integration. Your products appear in the Store & Merch section of your coach profile. Add a link to send buyers to your own shop — sales there are 100% yours. An affiliate disclosure is shown next to linked products automatically.</p>
-    </section>
-  );
-}
+function StoreTab() { return <TrainerStoreManager />; }
 
 const sampleClients: { name: string; note: string; plan: MealPlan }[] = [
   { name: "Jess R.", note: "Postpartum 14 weeks · 2 finger DR gap · low impact · breastfeeding", plan: { Mon: { Breakfast: [{ id: "a", title: "Overnight Protein Oats", kcal: 380, protein: 28, carbs: 48, fat: 9 }] } } },
