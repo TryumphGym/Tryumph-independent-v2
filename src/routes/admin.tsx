@@ -36,9 +36,12 @@ function Admin() {
   const me = useUserId();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  const [reviewVideos, setReviewVideos] = useState<{id:string;user_id:string;title:string;path:string;review_status:string;created_at:string}[]>([]);
   const [wl, setWl] = useState<WaitlistEntry[]>([]);
   const [youth, setYouth] = useState<{ id: string; contributor_name: string; contributor_age: number; guardian_name: string; guardian_email: string; guardian_signature: string; status: string; created_at: string }[]>([]);
   const load = useCallback(async () => {
+    const videoResult = await supabase.from("trainer_videos").select("id,user_id,title,path,review_status,created_at").order("created_at", { ascending: false }).limit(100);
+    setReviewVideos((videoResult.data ?? []) as typeof reviewVideos);
     const y = await supabase.from("youth_consents").select("*").order("created_at", { ascending: false });
     setYouth(y.data ?? []);
     const { data } = await supabase.from("certifications").select("*").order("created_at", { ascending: false });
@@ -46,6 +49,10 @@ function Admin() {
     const w = await supabase.from("waitlist_entries").select("email,role,created_at,heard_from,live_class_interest,notify_new_coaches").order("created_at", { ascending: false });
     setWl(w.data ?? []);
   }, []);
+  const reviewVideo = async (id: string, status: "approved" | "rejected") => {
+    const { error } = await supabase.rpc("review_trainer_video", { p_video_id: id, p_status: status, p_note: "" });
+    if (error) toast.error(error.message); else { toast.success(`Video ${status}`); void load(); }
+  };
   const exportWl = () => {
     const csv = waitlistCsv(wl);
     const a = document.createElement("a");
@@ -119,6 +126,16 @@ function Admin() {
             </>}
           </div>
         ))}
+      </section>
+      <section className="card space-y-3 p-5">
+        <h2 className="text-xl font-bold">Video approval queue</h2>
+        <p className="text-sm text-muted-foreground">Review the video in Bunny's private dashboard before approving. Do not approve until trainer credentials are verified. Public playback is blocked until approved.</p>
+        {reviewVideos.filter(v => v.review_status === "pending").map(v => <div key={v.id} className="flex flex-wrap items-center gap-3 border-b border-border py-3 text-sm">
+          <div className="flex-1"><p className="font-semibold">{v.title}</p><p className="text-xs text-muted-foreground">Trainer {v.user_id} · {v.path}</p></div>
+          <button className="btn btn-primary" onClick={() => void reviewVideo(v.id,"approved")}>Approve</button>
+          <button className="btn btn-ghost" onClick={() => void reviewVideo(v.id,"rejected")}>Reject</button>
+        </div>)}
+        {!reviewVideos.some(v => v.review_status === "pending") && <p className="text-sm text-muted-foreground">No pending videos.</p>}
       </section>
       <PageHeader eyebrow="Admin" title="Certification review" sub={`${pending.length} waiting for review`} />
       <div className="space-y-3">

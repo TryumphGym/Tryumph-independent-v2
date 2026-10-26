@@ -13,7 +13,7 @@ export const getVideoUrl = createServerFn({ method: "GET" })
     const key = env.SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) throw new Error("Supabase server settings missing");
     const publicDb = createClient(url, key);
-    const { data: row, error: lookupError } = await publicDb.from("trainer_videos").select("path").eq("id", data.id).maybeSingle();
+    const { data: row, error: lookupError } = await publicDb.from("trainer_videos").select("path").eq("id", data.id).eq("review_status", "approved").maybeSingle();
     if (lookupError) throw new Error(`Video lookup failed: ${lookupError.message}`);
     if (!row?.path) throw new Error("Video not found");
     if (row.path.startsWith("bunny:")) {
