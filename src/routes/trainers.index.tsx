@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import type { PublicTrainer } from "@/lib/public-trainers";
+import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/trainers/")({
   head: () => ({ meta: [{ title: "Fitness Trainers — Tryumph Gym" }, { name: "description", content: "Meet verified fitness trainers on Tryumph Gym." }] }),
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/trainers/")({
 const SPECS = ["Postpartum", "Prenatal", "Core", "Pilates", "Strength", "HIIT", "Yoga", "Mobility", "Low impact"];
 const PRICES = [{ label: "Any price", max: Infinity }, { label: "Under $50", max: 50 }, { label: "Under $60", max: 60 }, { label: "Under $75", max: 75 }];
 function Trainers() {
+  const { s } = useStore();
   const [trainers, setTrainers] = useState<PublicTrainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -30,10 +32,10 @@ function Trainers() {
     .filter(t => t.rate < max).sort((a, b) => sort === "low" ? a.rate - b.rate : sort === "high" ? b.rate - a.rate : a.name.localeCompare(b.name));
   return <div>
     <PageHeader eyebrow="Directory" title="Fitness Trainers" sub="Verified independent trainers, custom rates, private 1-on-1 sessions." />
-    <div className="card mb-6 flex flex-col gap-3 border-primary/40 bg-primary/5 p-5 sm:flex-row sm:items-center">
+    {!(s.signedIn && s.role === "trainer") && <div className="card mb-6 flex flex-col gap-3 border-primary/40 bg-primary/5 p-5 sm:flex-row sm:items-center">
       <div className="flex-1"><p className="font-display text-lg font-bold">Are you a certified fitness trainer?</p><p className="text-sm text-muted-foreground">Set your own rates, teach from home, and host live classes on your schedule.</p></div>
       <Link to="/for-trainers" className="btn btn-primary">Apply to Teach</Link>
-    </div>
+    </div>}
     <div className="mb-3 flex flex-wrap gap-2">{["All", ...SPECS].map(r => <button key={r} className={`chip ${spec === r ? "chip-active" : ""}`} onClick={() => setSpec(r)}>{r === "All" ? "All specialties" : r}</button>)}</div>
     <div className="mb-6 flex flex-wrap items-center gap-2">{PRICES.map(p => <button key={p.label} className={`chip ${price === p.label ? "chip-active" : ""}`} onClick={() => setPrice(p.label)}>{p.label}</button>)}
       <select className="field ml-auto w-auto" value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort"><option value="name">Name</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select>
