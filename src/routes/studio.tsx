@@ -269,6 +269,8 @@ function Uploads() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [playlistName, setPlaylistName] = useState("");
+  const [playlistBusy, setPlaylistBusy] = useState(false);
   const vids = s.extra.trainer.videos.filter(isLaunchWorkout);
   useEffect(() => {
     if (!me) return;
@@ -328,6 +330,22 @@ function Uploads() {
     setF({ ...f, title: "", breaks: "", newPl: "", goals: [], optionalGear: [], gear: [], playlist }); setFile(null); setBusy(false);
     toast.success("Video uploaded and published");
   };
+  const assignPlaylist = async (video: TrainerVideo, playlist: string) => {
+    if (!me) return;
+    const { error } = await supabase.from("trainer_videos").update({ playlist }).eq("id", video.id).eq("user_id", me);
+    if (error) { toast.error(`Could not update playlist: ${error.message}`); return; }
+    setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: x.trainer.videos.map((v) => v.id === video.id ? { ...v, playlist } : v) } }));
+    toast.success("Playlist updated");
+  };
+  const renamePlaylist = async (oldName: string, newName: string) => {
+    if (!me || !newName.trim() || oldName === newName.trim()) return;
+    setPlaylistBusy(true);
+    const { error } = await supabase.from("trainer_videos").update({ playlist: newName.trim() }).eq("user_id", me).eq("playlist", oldName);
+    setPlaylistBusy(false);
+    if (error) { toast.error(`Could not rename playlist: ${error.message}`); return; }
+    setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: x.trainer.videos.map((v) => v.playlist === oldName ? { ...v, playlist: newName.trim() } : v) } }));
+    toast.success("Playlist renamed");
+  };
   const drop = async (v: TrainerVideo) => {
     if (!me) return;
     let ids: string[] = [];
@@ -341,7 +359,10 @@ function Uploads() {
       ids = (data ?? []).map((r) => r.id);
       obj = obj ?? data?.[0]?.path;
     }
-    if (ids.length) await supabase.from("trainer_videos").delete().in("id", ids);
+    if (ids.length) {
+      const { error } = await supabase.from("trainer_videos").delete().eq("user_id", me).in("id", ids);
+      if (error) { toast.error(`Could not delete video: ${error.message}`); return; }
+    }
     if (obj && !obj.startsWith("bunny:")) await supabase.storage.from("videos").remove([obj]);
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, videos: x.trainer.videos.filter((y) => y.id !== v.id) } }));
     toast.success("Video removed from your library");
@@ -379,12 +400,18 @@ function Uploads() {
         </label>
         <div className="flex items-center gap-2 text-sm">Break length {BREAK_LENGTHS.map((n) => <button key={n} type="button" className={`chip ${f.breakSecs === n ? "chip-active" : ""}`} onClick={() => setF({ ...f, breakSecs: n })}>{n}s</button>)}</div>
         {breakErr && f.breaks && <p className="text-sm text-destructive">{breakErr}</p>}
-        <p className="text-xs text-muted-foreground">Rules: no breaks in the first 3 or last 2 minutes, and at least 5 minutes apart. Ads only ever play at the moments you mark here — never mid-set. Leave blank for an ad-free video. Your 50% ad share is paid after fees.</p>
+        <p className="text-xs text-muted-foreground">Rules: no breaks in the first 3 or last 2 minutes, and at least 5 minutes apart. Ads only ever play at the moments you mark here — never mid-set. Leave blank for an Ad-Free video: no ads will play and no ad revenue share is earned from that video. When ads run at your marked water breaks, your 50% share is calculated after payment-processing fees.</p>
         <button className="btn btn-primary w-full" disabled={!f.title || !file || busy || (!!f.breaks && !!breakErr)} onClick={publish}>{busy ? "Uploading…" : "Upload & publish"}</button>
       </section>
       <section className="card p-6">
         <h2 className="text-xl font-bold">Your library ({vids.length})</h2>
-        <ul className="mt-3 space-y-2 text-sm">{vids.map((v) => <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary px-3 py-2"><span>{v.title}{goalsOf(v).length > 0 && <span className="block text-xs text-muted-foreground">{goalsOf(v).join(" · ")}</span>}</span><span className="flex items-center gap-3 text-muted-foreground">{v.category} · {v.level} · {v.minutes}m<button className="text-destructive" onClick={() => drop(v)}>Remove</button></span></li>)}</ul>
+        <div className="mt-4 rounded-lg border p-3 space-y-2">
+          <h3 className="font-semibold">Organize workout playlists</h3>
+          <p className="text-xs text-muted-foreground">Create a playlist by entering a name below, then assign your existing workouts. You can change a workout's playlist without re-uploading it.</p>
+          <div className="flex gap-2"><input className="field flex-1" placeholder="Playlist name (e.g. 4-Week Beginner Strength)" value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} /><button type="button" className="btn btn-outline" onClick={() => { if (playlistName.trim()) { setF((old) => ({ ...old, playlist: "__new", newPl: playlistName.trim() })); toast("Playlist name prepared for your next upload. You can also assign this name below."); } }}>Use for next upload</button></div>
+          {myPlaylists.map((name) => <div key={name} className="flex items-center gap-2 text-xs"><span className="flex-1 truncate">{name} ({vids.filter((v) => v.playlist === name).length})</span><button className="text-primary underline" disabled={playlistBusy} onClick={() => { const next = window.prompt("Rename playlist", name); if (next) void renamePlaylist(name, next); }}>Rename</button></div>)}
+        </div>
+        <ul className="mt-3 space-y-2 text-sm">{vids.map((v) => <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary px-3 py-2"><span>{v.title}<label className="mt-1 block text-xs">Playlist <select className="field mt-1 max-w-56" value={v.playlist ?? ""} onChange={(e) => void assignPlaylist(v, e.target.value)}><option value="">None</option>{[...new Set([...myPlaylists, playlistName.trim()].filter(Boolean))].map((name) => <option key={name} value={name}>{name}</option>)}</select></label>{goalsOf(v).length > 0 && <span className="block text-xs text-muted-foreground">{goalsOf(v).join(" · ")}</span>}</span><span className="flex items-center gap-3 text-muted-foreground">{v.category} · {v.level} · {v.minutes}m<button className="text-destructive" onClick={() => drop(v)}>Remove</button></span></li>)}</ul>
       </section>
     </div>
   );
