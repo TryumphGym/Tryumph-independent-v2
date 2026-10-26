@@ -119,11 +119,18 @@ function OnDemand() {
     postpartum: x.level === "Postpartum",
   });
   const duration = DURATIONS.find((d) => d.label === dur);
+  const preciseDuration = /^((?:Up to|Exactly)) (\d+) min$/.exec(dur);
+  const matchesDuration = (minutes: number) =>
+    preciseDuration
+      ? preciseDuration[1] === "Exactly"
+        ? minutes === Number(preciseDuration[2])
+        : minutes <= Number(preciseDuration[2])
+      : !duration || (minutes >= duration.min && minutes <= duration.max);
   const safe = rows.filter(
     (x) =>
       isLaunchWorkout(x) &&
       isSafetyCompatible(norm(x), preferences) &&
-      (!duration || (x.minutes >= duration.min && x.minutes <= duration.max)),
+      matchesDuration(x.minutes),
   );
   const visible =
     tab === "later"
@@ -303,7 +310,7 @@ function OnDemand() {
         <ChoiceDropdown
           label="Time"
           value={dur}
-          options={["Any length", ...DURATIONS.map((d) => d.label)]}
+          options={["Any length", ...DURATIONS.map((d) => d.label), ...[5, 10, 15, 20, 30, 45, 60, 90].flatMap((min) => [`Up to ${min} min`, `Exactly ${min} min`])]}
           onChange={setDur}
         />
         {s.signedIn && (
