@@ -1,3 +1,4 @@
+import { runtimeEnv } from "../../../../lib/runtime-env.server";
 import { createFileRoute } from "@tanstack/react-router";
 import Stripe from "stripe";
 
@@ -7,8 +8,8 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secretKey = process.env["STRIPE_SECRET_KEY"];
-        const webhookSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+        const secretKey = runtimeEnv("STRIPE_SECRET_KEY");
+        const webhookSecret = runtimeEnv("STRIPE_WEBHOOK_SECRET");
         if (!secretKey || !webhookSecret) return new Response("Stripe not configured", { status: 500 });
 
         const signature = request.headers.get("stripe-signature") ?? "";

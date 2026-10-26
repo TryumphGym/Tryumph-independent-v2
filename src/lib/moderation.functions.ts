@@ -1,3 +1,4 @@
+import { runtimeEnv } from "./runtime-env.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -6,7 +7,7 @@ import { z } from "zod";
 export const moderateReview = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ text: z.string().min(1).max(2000) }).parse(d))
   .handler(async ({ data }) => {
-    const key = process.env["LOVABLE_API_KEY"];
+    const key = runtimeEnv("LOVABLE_API_KEY");
     if (!key) return { ok: true, note: "", ai: false };
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",

@@ -1,3 +1,4 @@
+import { runtimeEnv } from "./runtime-env.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -7,13 +8,13 @@ import { TOKEN_PRICE, trainers } from "./data";
 import { isTaken, type BusyRow } from "./availability";
 
 function stripe() {
-  const key = process.env["STRIPE_SECRET_KEY"];
+  const key = runtimeEnv("STRIPE_SECRET_KEY");
   if (!key) throw new Error("Stripe is not configured yet.");
   return new Stripe(key);
 }
 
 function appOrigin() {
-  if (process.env["APP_ORIGIN"]) return process.env["APP_ORIGIN"];
+  if (runtimeEnv("APP_ORIGIN")) return runtimeEnv("APP_ORIGIN");
   try {
     return new URL(getRequest().url).origin;
   } catch {

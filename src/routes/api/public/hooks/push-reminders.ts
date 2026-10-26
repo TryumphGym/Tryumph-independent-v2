@@ -1,3 +1,4 @@
+import { runtimeEnv } from "../../../../lib/runtime-env.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { buildPushHTTPRequest } from "@pushforge/builder";
 
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/api/public/hooks/push-reminders")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: t } = await supabaseAdmin.from("cron_tokens").select("token").eq("name", "push").single();
         if (!t || !token || token !== t.token) return new Response("Unauthorized", { status: 401 });
-        const jwk = process.env["VAPID_PRIVATE_JWK"];
+        const jwk = runtimeEnv("VAPID_PRIVATE_JWK");
         if (!jwk) return new Response("Push not configured", { status: 500 });
         const privateJWK = JSON.parse(jwk);
 

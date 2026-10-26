@@ -1,3 +1,4 @@
+import { runtimeEnv } from "./lib/runtime-env.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import Stripe from "stripe";
@@ -6,7 +7,7 @@ import { liveClasses } from "./data";
 import { split } from "./payouts.server";
 
 function stripe() {
-  const key = process.env["STRIPE_SECRET_KEY"];
+  const key = runtimeEnv("STRIPE_SECRET_KEY");
   if (!key) throw new Error("Stripe is not configured yet.");
   return new Stripe(key);
 }
@@ -16,7 +17,7 @@ export const startPayoutOnboarding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const s = stripe();
-    const origin = process.env["APP_ORIGIN"] ?? "http://localhost:8080";
+    const origin = runtimeEnv("APP_ORIGIN") ?? "http://localhost:8080";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: prof } = await supabaseAdmin.from("profiles").select("role").eq("id", context.userId).single();
     if (prof?.role !== "trainer") throw new Error("Only trainers can set up payouts.");
