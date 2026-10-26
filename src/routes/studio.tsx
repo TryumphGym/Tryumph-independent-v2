@@ -806,6 +806,22 @@ function Uploads() {
   ];
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
   const [file, setFile] = useState<File | null>(null);
+  // Fill duration from the actual video metadata; trainers can correct it.
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const media = document.createElement("video");
+    media.preload = "metadata";
+    media.onloadedmetadata = () => {
+      if (Number.isFinite(media.duration) && media.duration > 0)
+        setF((current) => ({ ...current, minutes: String(Math.ceil(media.duration / 60)) }));
+    };
+    media.src = url;
+    return () => {
+      media.removeAttribute("src");
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playlistName, setPlaylistName] = useState("");
