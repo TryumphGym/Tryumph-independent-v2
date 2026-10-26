@@ -8,9 +8,12 @@ CREATE TABLE IF NOT EXISTS public.trybe_memberships (
 ALTER TABLE public.trybe_memberships ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, DELETE ON public.trybe_memberships TO authenticated;
 DROP POLICY IF EXISTS trybe_memberships_own_select ON public.trybe_memberships;
+DROP POLICY IF EXISTS trybe_memberships_own_select ON public.trybe_memberships;
 CREATE POLICY trybe_memberships_own_select ON public.trybe_memberships FOR SELECT TO authenticated USING (user_id=auth.uid());
 DROP POLICY IF EXISTS trybe_memberships_own_insert ON public.trybe_memberships;
+DROP POLICY IF EXISTS trybe_memberships_own_insert ON public.trybe_memberships;
 CREATE POLICY trybe_memberships_own_insert ON public.trybe_memberships FOR INSERT TO authenticated WITH CHECK (user_id=auth.uid());
+DROP POLICY IF EXISTS trybe_memberships_own_delete ON public.trybe_memberships;
 DROP POLICY IF EXISTS trybe_memberships_own_delete ON public.trybe_memberships;
 CREATE POLICY trybe_memberships_own_delete ON public.trybe_memberships FOR DELETE TO authenticated USING (user_id=auth.uid());
 -- Backfill existing memberships before switching RLS.
@@ -40,13 +43,22 @@ DO $$ DECLARE r record; BEGIN
   EXECUTE format('DROP POLICY IF EXISTS %I ON public.post_likes',r.policyname);
  END LOOP;
 END $$;
+DROP POLICY IF EXISTS posts_member_read ON public.posts;
 CREATE POLICY posts_member_read ON public.posts FOR SELECT TO authenticated USING (public.can_see_trybe(trybe));
+DROP POLICY IF EXISTS posts_member_insert ON public.posts;
 CREATE POLICY posts_member_insert ON public.posts FOR INSERT TO authenticated WITH CHECK (author_id=auth.uid() AND public.can_see_trybe(trybe));
+DROP POLICY IF EXISTS posts_owner_delete ON public.posts;
 CREATE POLICY posts_owner_delete ON public.posts FOR DELETE TO authenticated USING (author_id=auth.uid());
+DROP POLICY IF EXISTS comments_member_read ON public.post_comments;
 CREATE POLICY comments_member_read ON public.post_comments FOR SELECT TO authenticated USING (EXISTS(SELECT 1 FROM public.posts p WHERE p.id=post_id));
+DROP POLICY IF EXISTS comments_member_insert ON public.post_comments;
 CREATE POLICY comments_member_insert ON public.post_comments FOR INSERT TO authenticated WITH CHECK (author_id=auth.uid() AND EXISTS(SELECT 1 FROM public.posts p WHERE p.id=post_id));
+DROP POLICY IF EXISTS comments_owner_delete ON public.post_comments;
 CREATE POLICY comments_owner_delete ON public.post_comments FOR DELETE TO authenticated USING (author_id=auth.uid());
+DROP POLICY IF EXISTS likes_member_read ON public.post_likes;
 CREATE POLICY likes_member_read ON public.post_likes FOR SELECT TO authenticated USING (EXISTS(SELECT 1 FROM public.posts p WHERE p.id=post_id));
+DROP POLICY IF EXISTS likes_member_insert ON public.post_likes;
 CREATE POLICY likes_member_insert ON public.post_likes FOR INSERT TO authenticated WITH CHECK (user_id=auth.uid() AND EXISTS(SELECT 1 FROM public.posts p WHERE p.id=post_id));
+DROP POLICY IF EXISTS likes_owner_delete ON public.post_likes;
 CREATE POLICY likes_owner_delete ON public.post_likes FOR DELETE TO authenticated USING (user_id=auth.uid());
 REVOKE SELECT ON public.posts, public.post_comments, public.post_likes FROM anon;

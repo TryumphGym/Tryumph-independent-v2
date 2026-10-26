@@ -1,2 +1,8 @@
-/** Hide paused launch offerings without removing stored content or contributor approvals. */
-export const isLaunchWorkout = (workout: { category: string }) => workout.category !== "Homeschool PE";
+/** Preserve paused sections in source, hide them in the January launch workflow. */
+export const LAUNCH = {
+  youth: false,
+  nutrition: false,
+  homeschool: false,
+} as const;
+export const isLaunchWorkout = (workout: { category: string }) =>
+  !/youth|homeschool|nutrition/i.test(workout.category);

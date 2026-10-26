@@ -12,6 +12,7 @@ create unique index if not exists live_room_access_checkout_unique
   on public.live_room_access(stripe_checkout_session_id) where stripe_checkout_session_id is not null;
 alter table public.live_room_access enable row level security;
 revoke all on public.live_room_access from anon, authenticated;
+DROP POLICY IF EXISTS "Members can see own room access" ON public.live_room_access;
 create policy "Members can see own room access" on public.live_room_access for select to authenticated
   using (user_id = (select auth.uid()));
 grant select on public.live_room_access to authenticated;

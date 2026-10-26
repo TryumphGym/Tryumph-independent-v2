@@ -12,15 +12,24 @@ export function dayName(iso: string): string {
 }
 
 /** Is this trainer's slot unavailable? Whole-day rows ("ALL"), a specific time, a paid booking, or the trainer's weekly pattern. */
-export function isTaken(trainerId: string, date: string, time: string, rows: BusyRow[]): boolean {
+export function isTaken(
+  trainerId: string,
+  date: string,
+  time: string,
+  rows: BusyRow[],
+): boolean {
   if (!date || !time) return true;
-  const t = trainers.find((x) => x.id === trainerId);
-  if (t && t.offDays.includes(dayName(date))) return true;
-  if (t && t.offTimes.includes(time)) return true;
-  return rows.some((r) => r.day === date && (r.time === "ALL" || r.time === time));
+  // Actual calendar records are the source of truth; no demo trainer schedules.
+  return rows.some(
+    (r) => r.day === date && (r.time === "ALL" || r.time === time),
+  );
 }
 
 /** Which of the trainer's bookable times are still open on a date. */
-export function openTimes(trainerId: string, date: string, rows: BusyRow[]): string[] {
+export function openTimes(
+  trainerId: string,
+  date: string,
+  rows: BusyRow[],
+): string[] {
   return TRAINING_TIMES.filter((x) => !isTaken(trainerId, date, x, rows));
 }

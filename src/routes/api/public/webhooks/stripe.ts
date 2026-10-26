@@ -1,85 +1,204 @@
-import { runtimeEnv } from "../../../../lib/runtime-env.server";
+import { runtimeEnv } from "@/lib/runtime-env.server";
 import { createFileRoute } from "@tanstack/react-router";
 import Stripe from "stripe";
+import { split, sessionFee } from "@/lib/payouts.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Stripe calls this when a payment completes. Verifies the signature, then
-// credits tokens or confirms the booking. No user session — verified by signature.
+const uuid =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const safeDay = /^\d{4}-\d{2}-\d{2}$/;
+const safeTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+async function settleCheckout(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+) {
+  if (session.currency !== "usd")
+    throw new Error("Unsupported checkout currency");
+  if (session.mode !== "payment" || session.payment_status !== "paid") return;
+  const disputed = await supabaseAdmin
+    .from("payment_disputes")
+    .select("id")
+    .eq("checkout_id", session.id)
+    .in("status", ["open", "lost"])
+    .limit(1);
+  if (disputed.error) throw disputed.error;
+  if (disputed.data?.length) return;
+  const meta = session.metadata ?? {};
+  if (!meta["userId"] || !uuid.test(meta["userId"]))
+    throw new Error("Invalid payment customer");
+  const { gross, fee } = await sessionFee(stripe, session);
+  if (!Number.isSafeInteger(gross) || !Number.isSafeInteger(fee) || fee > gross)
+    throw new Error("Invalid payment fee");
+  let result: { error: { message: string } | null };
+  if (meta["type"] === "tokens") {
+    const tokens = Number(meta["tokens"]);
+    if (!Number.isInteger(tokens) || tokens < 1 || tokens > 100)
+      throw new Error("Invalid token count");
+    result = await supabaseAdmin.rpc("apply_paid_token_checkout", {
+      p_checkout_id: session.id,
+      p_user_id: meta["userId"],
+      p_tokens: tokens,
+      p_gross_cents: gross,
+      p_fee_cents: fee,
+    });
+  } else if (meta["type"] === "booking") {
+    if (
+      !meta["trainerId"] ||
+      !uuid.test(meta["trainerId"]) ||
+      !meta["holdId"] ||
+      !uuid.test(meta["holdId"]) ||
+      !safeDay.test(meta["date"] ?? "") ||
+      !safeTime.test(meta["time"] ?? "")
+    )
+      throw new Error("Invalid booking");
+    result = await supabaseAdmin.rpc("apply_paid_private_booking", {
+      p_checkout_id: session.id,
+      p_user_id: meta["userId"],
+      p_trainer_id: meta["trainerId"],
+      p_day: meta["date"]!,
+      p_time: meta["time"]!,
+      p_gross_cents: gross,
+      p_fee_cents: fee,
+      p_trainer_cents: split(gross, fee, "oneonone").payout,
+      p_hold_id: meta["holdId"],
+    });
+  } else if (meta["type"] === "live") {
+    if (!meta["sessionId"] || !uuid.test(meta["sessionId"]))
+      throw new Error("Invalid class");
+    result = await supabaseAdmin.rpc("apply_paid_live_checkout", {
+      p_checkout_id: session.id,
+      p_user_id: meta["userId"],
+      p_session_id: meta["sessionId"],
+      p_gross_cents: gross,
+      p_fee_cents: fee,
+    });
+  } else {
+    return;
+  }
+  if (result.error) {
+    if (
+      (meta["type"] === "booking" || meta["type"] === "live") &&
+      "code" in result.error &&
+      result.error.code === "P0001"
+    ) {
+      const refund = await supabaseAdmin
+        .from("refund_jobs")
+        .upsert(
+          { checkout_id: session.id, reason: "paid_booking_unfulfillable" },
+          { onConflict: "checkout_id", ignoreDuplicates: true },
+        );
+      if (refund.error) throw refund.error;
+      return;
+    }
+    throw new Error(result.error.message);
+  }
+}
+
+async function handleRefund(stripe: Stripe, charge: Stripe.Charge) {
+  const paymentIntent =
+    typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : charge.payment_intent?.id;
+  if (!paymentIntent) return;
+  const sessions = await stripe.checkout.sessions.list({
+    payment_intent: paymentIntent,
+    limit: 10,
+  });
+  for (const session of sessions.data) {
+    const refunded = charge.amount_refunded ?? 0;
+    const { error } = await supabaseAdmin.rpc("apply_checkout_refund", {
+      p_checkout_id: session.id,
+      p_refund_cents: refunded,
+      p_fully_refunded: refunded >= (session.amount_total ?? charge.amount),
+    });
+    if (error) throw new Error(error.message);
+  }
+}
+
 export const Route = createFileRoute("/api/public/webhooks/stripe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secretKey = runtimeEnv("STRIPE_SECRET_KEY");
-        const webhookSecret = runtimeEnv("STRIPE_WEBHOOK_SECRET");
-        if (!secretKey || !webhookSecret) return new Response("Stripe not configured", { status: 500 });
-
-        const signature = request.headers.get("stripe-signature") ?? "";
-        const body = await request.text();
-
-        const stripe = new Stripe(secretKey);
+        const key = runtimeEnv("STRIPE_SECRET_KEY");
+        const secret = runtimeEnv("STRIPE_WEBHOOK_SECRET");
+        if (!key || !secret)
+          return new Response("Stripe not configured", { status: 503 });
+        const stripe = new Stripe(key);
         let event: Stripe.Event;
         try {
-          event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+          event = await stripe.webhooks.constructEventAsync(
+            await request.text(),
+            request.headers.get("stripe-signature") ?? "",
+            secret,
+          );
         } catch {
           return new Response("Invalid signature", { status: 401 });
         }
-
-        if (event.type === "checkout.session.completed") {
-          const session = event.data.object as Stripe.Checkout.Session;
-          const meta = session.metadata ?? {};
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-          const { sessionFee, split } = await import("@/lib/payouts.server");
-          const { gross, fee, chargeId } = await sessionFee(stripe, session);
-
-          if (meta["type"] === "tokens" && meta["userId"] && meta["tokens"]) {
-            const n = parseInt(meta["tokens"], 10);
-            const { data: profile } = await supabaseAdmin.from("profiles").select("tokens, ledger").eq("id", meta["userId"]).single();
-            const prior = (profile?.ledger as Record<string, unknown>[] | null) ?? [];
-            if (profile && !prior.some((e) => e["id"] === session.id)) {
-              const ledger: Record<string, unknown>[] = [
-                { id: session.id, label: `Bought ${n} token${n > 1 ? "s" : ""} ($${n * 5})`, tokens: n, date: new Date().toISOString().slice(0, 10), netPerToken: Math.floor((gross - fee) / n) },
-                ...prior,
-              ];
-              await supabaseAdmin.from("profiles").update({ tokens: (profile.tokens ?? 0) + n, ledger: ledger as never }).eq("id", meta["userId"]);
+        try {
+          if (
+            event.type === "checkout.session.completed" ||
+            event.type === "checkout.session.async_payment_succeeded"
+          ) {
+            await settleCheckout(
+              stripe,
+              event.data.object as Stripe.Checkout.Session,
+            );
+          }
+          if (event.type === "charge.refunded")
+            await handleRefund(stripe, event.data.object as Stripe.Charge);
+          if (
+            event.type === "charge.dispute.created" ||
+            event.type === "charge.dispute.closed"
+          ) {
+            const dispute = event.data.object as Stripe.Dispute;
+            const charge =
+              typeof dispute.charge === "string"
+                ? await stripe.charges.retrieve(dispute.charge)
+                : dispute.charge;
+            const intent =
+              typeof charge.payment_intent === "string"
+                ? charge.payment_intent
+                : charge.payment_intent?.id;
+            if (intent) {
+              const sessions = await stripe.checkout.sessions.list({
+                payment_intent: intent,
+                limit: 10,
+              });
+              for (const session of sessions.data) {
+                const status =
+                  event.type === "charge.dispute.created"
+                    ? "open"
+                    : dispute.status === "won"
+                      ? "won"
+                      : "lost";
+                const applied = await supabaseAdmin.rpc(
+                  "apply_payment_dispute",
+                  {
+                    p_id: dispute.id,
+                    p_checkout_id: session.id,
+                    p_status: status,
+                  },
+                );
+                if (applied.error) throw applied.error;
+                if (status === "won") {
+                  await settleCheckout(stripe, session);
+                  const restored = await supabaseAdmin.rpc(
+                    "restore_won_disputes",
+                    {},
+                  );
+                  if (restored.error) throw restored.error;
+                }
+              }
             }
           }
-
-          if (meta["type"] === "booking" && meta["userId"] && meta["trainerId"]) {
-            // Hold the slot on the trainer's calendar so nobody else can book the same time.
-            const tSlug = meta["trainerId"] ?? "";
-            const tDay = meta["date"] ?? "";
-            const tTime = meta["time"] ?? "";
-            if (/^\d{4}-\d{2}-\d{2}$/.test(tDay) && /^\d{2}:\d{2}$/.test(tTime)) {
-              await supabaseAdmin.from("trainer_busy").upsert(
-                { trainer_id: tSlug, day: tDay, time: tTime, source: "booked" },
-                { onConflict: "trainer_id,day,time", ignoreDuplicates: true },
-              );
-            }
-            const { data: profile } = await supabaseAdmin.from("profiles").select("bookings").eq("id", meta["userId"]).single();
-            const prior = (profile?.bookings as Record<string, unknown>[] | null) ?? [];
-            if (profile && !prior.some((b) => b["id"] === session.id)) {
-              const bookings: Record<string, unknown>[] = [
-                { id: session.id, trainerId: meta["trainerId"], date: meta["date"], time: meta["time"], price: Number(meta["price"]), paid: true },
-                ...prior,
-              ];
-              await supabaseAdmin.from("profiles").update({ bookings: bookings as never }).eq("id", meta["userId"]);
-            }
-            // Trainer earns 90% of what's left after fees; paid straight to their bank if linked.
-            const slug = meta["trainerId"];
-            const sp = split(gross, fee, "oneonone");
-            const { data: inserted } = await supabaseAdmin.from("trainer_earnings").upsert(
-              { trainer_slug: slug, source: "oneonone", ref: session.id, gross_cents: gross, fee_cents: fee, net_cents: sp.net, share_pct: sp.pct, payout_cents: sp.payout },
-              { onConflict: "ref", ignoreDuplicates: true },
-            ).select("id");
-            const { data: acct } = await supabaseAdmin.from("trainer_accounts").select("stripe_account_id, payouts_enabled").or(`slug.eq.${slug},user_id.eq.${/^[0-9a-f-]{36}$/.test(slug) ? slug : "00000000-0000-0000-0000-000000000000"}`).maybeSingle();
-            if (inserted?.length && acct?.payouts_enabled && acct.stripe_account_id && sp.payout > 0) {
-              const tr = await stripe.transfers.create({ amount: sp.payout, currency: "usd", destination: acct.stripe_account_id, description: "1-on-1 session (after fees)", ...(chargeId ? { source_transaction: chargeId } : {}) });
-              await supabaseAdmin.from("trainer_earnings").update({ status: "paid", transfer_id: tr.id }).eq("ref", session.id);
-            }
-          }
+          return new Response("ok", { status: 200 });
+        } catch (error) {
+          console.error("Stripe event settlement failed", event.id, error);
+          return new Response("Settlement failed; retry event", {
+            status: 500,
+          });
         }
-
-        return new Response("ok");
       },
     },
   },
