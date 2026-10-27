@@ -162,7 +162,7 @@ describe("launch completion: safety, messaging and activity at the real SQL boun
       )[0]?.["sender_name"],
     ).toBe("member");
     await db.exec(
-      `INSERT INTO friendships(user_id,friend_id,friend_name,partner) VALUES('${member}','${stranger}','Friend',true)`,
+      `INSERT INTO friendships(user_id,friend_id,friend_name,partner) VALUES('${member}','${stranger}','Friend',true),('${stranger}','${member}','Member',false)`,
     );
     await acting(
       member,
@@ -725,5 +725,85 @@ describe("launch completion: deposit, attendance, refunds and transfer state mac
         "c".repeat(64),
       ]),
     ).rejects.toThrow("changed");
+  });
+  it("preserves accepted friend messages without requiring accountability-partner flags, and unfriends both sides", async () => {
+    await acting(
+      member,
+      `INSERT INTO friend_requests(requester_id,recipient_id,requester_name,recipient_name) VALUES('${member}','${stranger}','spoof','spoof')`,
+    );
+    await expect(
+      acting(admin, `SELECT accept_friend_request('${member}')`),
+    ).rejects.toThrow("No incoming request");
+    await acting(
+      stranger,
+      `SELECT accept_friend_request('${member}'); SELECT accept_friend_request('${member}')`,
+    );
+    expect((await row("SELECT count(*)::int n FROM friendships"))["n"]).toBe(2);
+    await acting(
+      member,
+      `INSERT INTO messages(sender_id,recipient_id,sender_name,text) VALUES('${member}','${stranger}','Member','Accepted friend message')`,
+    );
+    await acting(
+      stranger,
+      `INSERT INTO messages(sender_id,recipient_id,sender_name,text) VALUES('${stranger}','${member}','Member','Reply without partner')`,
+    );
+    await expect(
+      acting(
+        member,
+        `UPDATE friendships SET friend_id='${admin}' WHERE user_id='${member}'`,
+      ),
+    ).rejects.toThrow("immutable");
+    await acting(member, `SELECT unfriend_user('${stranger}')`);
+    expect((await row("SELECT count(*)::int n FROM friendships"))["n"]).toBe(0);
+    await expect(
+      acting(
+        stranger,
+        `INSERT INTO messages(sender_id,recipient_id,sender_name,text) VALUES('${stranger}','${member}','Member','After unfriend')`,
+      ),
+    ).rejects.toThrow();
+    expect(await acting(member, "SELECT * FROM messages")).toHaveLength(2);
+  });
+  it("cannot create a unilateral friendship to bypass inquiry permissions", async () => {
+    await expect(
+      acting(
+        member,
+        `INSERT INTO friendships(user_id,friend_id,friend_name,partner) VALUES('${member}','${stranger}','Fake friend',true)`,
+      ),
+    ).rejects.toThrow();
+    expect((await row("SELECT count(*)::int n FROM friendships"))["n"]).toBe(0);
+  });
+  it("preserves legacy partner messages during additive friendship migration replay", async () => {
+    await db.exec(
+      `INSERT INTO friendships(user_id,friend_id,friend_name,partner) VALUES('${member}','${stranger}','Legacy partner',true)`,
+    );
+    await db.exec(
+      await readFile(
+        new URL(
+          "../../migrations/0056_friendship_contract.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    await acting(
+      member,
+      `INSERT INTO messages(sender_id,recipient_id,sender_name,text) VALUES('${member}','${stranger}','Member','Legacy preserved')`,
+    );
+    expect(await acting(stranger, "SELECT * FROM messages")).toHaveLength(1);
+  });
+  it("permits a trainer to comment in their own private Trybe without a separate membership record", async () => {
+    const post = (
+      await acting(
+        trainer,
+        `INSERT INTO posts(author_id,author_name,trybe,text,visibility) VALUES('${trainer}','Trainer','coach-${trainer}','Owner post','private') RETURNING id`,
+      )
+    )[0]!["id"];
+    await acting(
+      trainer,
+      `INSERT INTO post_comments(post_id,author_id,author_name,text) VALUES('${post}','${trainer}','Trainer','Owner comment')`,
+    );
+    expect(await acting(stranger, "SELECT * FROM post_comments")).toHaveLength(
+      0,
+    );
   });
 });

@@ -343,6 +343,30 @@ export type Database = {
         Update: { name?: string; token?: string };
         Relationships: [];
       };
+      friend_requests: {
+        Row: {
+          requester_id: string;
+          recipient_id: string;
+          requester_name: string;
+          recipient_name: string;
+          created_at: string;
+        };
+        Insert: {
+          requester_id: string;
+          recipient_id: string;
+          requester_name: string;
+          recipient_name: string;
+          created_at?: string;
+        };
+        Update: {
+          requester_id?: string;
+          recipient_id?: string;
+          requester_name?: string;
+          recipient_name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       friendships: {
         Row: {
           user_id: string;
@@ -371,6 +395,12 @@ export type Database = {
         Row: { version: string; applied_at: string };
         Insert: { version: string; applied_at?: string };
         Update: { version?: string; applied_at?: string };
+        Relationships: [];
+      };
+      legacy_friendship_grants: {
+        Row: { user_id: string; friend_id: string };
+        Insert: { user_id: string; friend_id: string };
+        Update: { user_id?: string; friend_id?: string };
         Relationships: [];
       };
       live_checkout_intents: {
@@ -1834,6 +1864,10 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
+      accept_friend_request: {
+        Args: { p_requester_id: string };
+        Returns: undefined;
+      };
       account_can_act: {
         Args: { p_id: string; p_content?: boolean };
         Returns: boolean;
@@ -2152,6 +2186,7 @@ export type Database = {
         Args: { p_user_id: string; p_live?: boolean };
         Returns: boolean;
       };
+      unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
       valid_iso_date: { Args: { p_value: string }; Returns: boolean };
     };
     Enums: { app_role: "admin" | "moderator" | "user" };

@@ -9,7 +9,12 @@ import {
   TrainerStoreManager,
   TrainerProgramManager,
 } from "@/components/TrainerLaunchTools";
-import { hasVerifiedCpr, isExpired, isCurrentVerified, type CredentialRecord } from "@/lib/cpr";
+import {
+  hasVerifiedCpr,
+  isExpired,
+  isCurrentVerified,
+  type CredentialRecord,
+} from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -122,7 +127,16 @@ function Studio() {
   }
   const tr = s.extra.trainer;
   const verified = hasVerifiedCpr(certStatus);
-  const expiredUnreplaced = certStatus.filter(cert => isExpired(cert.expires) && cert.status === "verified" && !certStatus.some(current => current.name.toLowerCase() === cert.name.toLowerCase() && isCurrentVerified(current)));
+  const expiredUnreplaced = certStatus.filter(
+    (cert) =>
+      isExpired(cert.expires) &&
+      cert.status === "verified" &&
+      !certStatus.some(
+        (current) =>
+          current.name.toLowerCase() === cert.name.toLowerCase() &&
+          isCurrentVerified(current),
+      ),
+  );
   const credentialsPaused = expiredUnreplaced.length > 0;
   return (
     <div className="space-y-6">
@@ -140,7 +154,21 @@ function Studio() {
               : "Add CPR/AED certification"}
         </span>
       </PageHeader>
-      {credentialsPaused && <div role="alert" className="card border-amber-500/60 p-5"><p className="font-bold">Trainer certifications expired — activity paused</p><p className="text-sm">Please update your certification(s) in Credentials to continue uploading new content or hosting live classes. Previously approved videos remain available.</p><p className="mt-2 text-xs">{expiredUnreplaced.map(x => x.name).join(", ")}</p></div>}
+      {credentialsPaused && (
+        <div role="alert" className="card border-amber-500/60 p-5">
+          <p className="font-bold">
+            Trainer certifications expired — activity paused
+          </p>
+          <p className="text-sm">
+            Please update your certification(s) in Credentials to continue
+            uploading new content or hosting live classes. Previously approved
+            videos remain available.
+          </p>
+          <p className="mt-2 text-xs">
+            {expiredUnreplaced.map((x) => x.name).join(", ")}
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
@@ -152,7 +180,13 @@ function Studio() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && <><AccountNoticeCenter trainer /><ActiveMilestones days={s.activeDays} role="trainer" />{!credentialsPaused && <Overview />}</>}
+      {tab === "Overview" && (
+        <>
+          <AccountNoticeCenter trainer />
+          <ActiveMilestones days={s.activeDays} role="trainer" />
+          {!credentialsPaused && <Overview />}
+        </>
+      )}
       {tab === "My Profile" && <TrainerProfileTab />}
       {tab === "Calendar" && !credentialsPaused && (
         <>
@@ -170,7 +204,13 @@ function Studio() {
       )}
       {tab === "Store" && <StoreTab />}
       {tab === "Messages" && <TrainerMessages />}
-      {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && <p className="card p-6" role="alert">New uploads and live hosting are paused until expired required credentials are renewed and verified. Go to Credentials to submit updated proof.</p>}
+      {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && (
+        <p className="card p-6" role="alert">
+          New uploads and live hosting are paused until expired required
+          credentials are renewed and verified. Go to Credentials to submit
+          updated proof.
+        </p>
+      )}
       {tab === "Credentials" && (
         <div className="card space-y-6 p-6">
           <RolePicker />
@@ -797,7 +837,7 @@ function Uploads() {
     spotify: "",
     category: "Strength",
     level: "Beginner",
-    minutes: "20",
+    minutes: "",
     breaks: "",
     gear: [] as string[],
     optionalGear: [] as string[],
@@ -815,6 +855,25 @@ function Uploads() {
   ];
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
   const [file, setFile] = useState<File | null>(null);
+  // Fill duration from the actual video metadata; trainers can correct it.
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const media = document.createElement("video");
+    media.preload = "metadata";
+    media.onloadedmetadata = () => {
+      if (Number.isFinite(media.duration) && media.duration > 0)
+        setF((current) => ({
+          ...current,
+          minutes: String(Math.ceil(media.duration / 60)),
+        }));
+    };
+    media.src = url;
+    return () => {
+      media.removeAttribute("src");
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playlistName, setPlaylistName] = useState("");
@@ -1452,6 +1511,7 @@ function Uploads() {
 
 function TrainerProfileTab() {
   const { s, setExtra, set } = useStore();
+  const me = useUserId();
   const trainer = s.extra.trainer;
   const update = (patch: Partial<typeof trainer>) =>
     setExtra((x) => ({ ...x, trainer: { ...x.trainer, ...patch } }));
@@ -1528,7 +1588,11 @@ function TrainerProfileTab() {
         Changes save with your account. Public trainer profile synchronization
         must be verified before inviting trainers.
       </p>
-      <Link to="/trybes" className="btn btn-outline inline-flex">
+      <Link
+        to="/trybes"
+        search={{ t: me ? `coach-${me}` : undefined }}
+        className="btn btn-outline inline-flex"
+      >
         Manage My Trybe
       </Link>
     </section>

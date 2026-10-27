@@ -27,7 +27,7 @@ export function TrainerMessages({
     Record<string, { blocked: boolean; muted: boolean; read_at: string | null }>
   >({});
   const [busy, setBusy] = useState(false);
-  const msgs = useChat(me, selected);
+  const { msgs, refresh: refreshChat } = useChat(me, selected);
   const refresh = async () => {
     if (!me) return;
     const controlRows = await supabase
@@ -139,6 +139,7 @@ export function TrainerMessages({
       return;
     }
     setDraft("");
+    refreshChat();
     void refresh();
   }
   if (!me) return <p className="card p-5">Sign in to message trainers.</p>;

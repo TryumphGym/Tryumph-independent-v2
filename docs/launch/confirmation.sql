@@ -1,7 +1,7 @@
 -- READ ONLY after the entire staging transaction succeeds.
-SELECT version,applied_at FROM public.launch_schema_versions WHERE version IN ('0054_launch_completion','0055_contact_delivery');
+SELECT version,applied_at FROM public.launch_schema_versions WHERE version IN ('0054_launch_completion','0055_contact_delivery','0056_friendship_contract');
 SELECT name,to_regclass('public.'||name) IS NOT NULL AS present
-FROM unnest(ARRAY['content_reports','audience_announcements','moderation_actions','moderation_appeals','account_restrictions','message_controls','account_notifications','notification_preferences','account_activity_days','private_booking_payments','private_balance_operations','private_reschedule_requests','private_room_shutdown_jobs','contact_delivery_requests']) name;
+FROM unnest(ARRAY['content_reports','audience_announcements','moderation_actions','moderation_appeals','account_restrictions','message_controls','account_notifications','notification_preferences','account_activity_days','private_booking_payments','private_balance_operations','private_reschedule_requests','private_room_shutdown_jobs','contact_delivery_requests','friend_requests','legacy_friendship_grants']) name;
 SELECT NOT has_function_privilege('authenticated','public.consume_attended_live_token(uuid,uuid)','EXECUTE') AS member_cannot_spend_from_browser,
  NOT has_function_privilege('authenticated','public.apply_private_balance(text,text,integer,integer)','EXECUTE') AS member_cannot_settle_balance,
  NOT has_table_privilege('authenticated','public.private_payment_methods','SELECT') AS saved_payment_ids_private,

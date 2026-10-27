@@ -15,13 +15,18 @@ import {
   coachTrybeNames,
   goalTrybes,
   isPrivateTrybe,
-  liveClasses,
   trybeName,
 } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { useChat, useFriends, usePosts, useUserId } from "@/lib/community";
+import {
+  useChat,
+  useFriendRequests,
+  useFriends,
+  usePosts,
+  useUserId,
+} from "@/lib/community";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
@@ -56,6 +61,7 @@ function Trybes() {
   const me = useUserId();
   const { posts: all, reload } = usePosts(me);
   const { friends, reload: reloadFriends } = useFriends(me);
+  const { incoming, outgoing, reload: reloadRequests } = useFriendRequests(me);
   const [trybe, setTrybe] = useState(t ?? "all");
   const [postVisibility, setPostVisibility] = useState<"public" | "private">(
     "private",
@@ -112,14 +118,18 @@ function Trybes() {
     const result = join
       ? await supabase
           .from("trybe_memberships")
-          .upsert({ user_id: me, trybe_id: id })
+          .insert({ user_id: me, trybe_id: id })
       : await supabase
           .from("trybe_memberships")
           .delete()
           .eq("user_id", me)
           .eq("trybe_id", id);
     if (result.error) {
-      toast.error("Could not update Trybe membership.");
+      if (join && result.error.code === "23505") {
+        setJoinedIds((old) => [...new Set([...old, id])]);
+        return;
+      }
+      toast.error(`Could not update Trybe membership: ${result.error.message}`);
       return;
     }
     setJoinedIds((old) =>
@@ -135,13 +145,18 @@ function Trybes() {
   const [alerts, setAlerts] = useState<
     { name: string; title: string; when: string }[]
   >([]);
-  const msgs = useChat(me, chatWith);
+  const { msgs, refresh: refreshChat } = useChat(me, chatWith);
   const e = s.extra;
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
   // Private Trybes: posts are only ever visible to joined members.
-  const canSee = (id: string) => !isPrivateTrybe(id) || joinedIds.includes(id);
+  const canSee = (id: string) =>
+    id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
+  const effectiveMemberships =
+    s.signedIn && s.role === "trainer" && me
+      ? [...new Set([...joinedIds, `coach-${me}`])]
+      : joinedIds;
   const visible = all.filter(
     (p) => !p.is_hidden && (p.official === true || canSee(p.trybe)),
   );
@@ -149,16 +164,21 @@ function Trybes() {
     trybe === "discover"
       ? p.visibility === "public"
       : (p.official === true && trybe === "all") ||
-        inTrybeFeed(p.trybe, trybe, joinedIds),
+        inTrybeFeed(p.trybe, trybe, effectiveMemberships),
   );
   const posts = [...filtered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
   );
   const coaches = directoryCoaches;
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
-  const joined = joinedIds.includes(trybe);
+  const joined =
+    joinedIds.includes(trybe) ||
+    (s.signedIn && s.role === "trainer" && trybe === `coach-${me}`);
   const isFriend = (id: string | null) =>
-    !!id && friends.some((f) => f.friend_id === id);
+    !!id &&
+    (friends.some((f) => f.friend_id === id) ||
+      incoming.some((r) => r.requester_id === id) ||
+      outgoing.some((r) => r.recipient_id === id));
   // Never suggest partners based on private-Trybe activity.
   const suggestions = me
     ? [
@@ -195,21 +215,68 @@ function Trybes() {
       setAlerts([]);
       return;
     }
-    supabase.rpc("partner_reservations").then(({ data }) => {
-      const out: { name: string; title: string; when: string }[] = [];
-      for (const r of data ?? []) {
-        const ids = Array.isArray(r.reservations)
-          ? (r.reservations as string[])
+    let active = true;
+    const loadPartnerAlerts = async () => {
+      const { data: reservations, error } = await supabase.rpc(
+        "partner_reservations",
+      );
+      if (error) {
+        console.error("Partner reservations unavailable", error);
+        if (active) setAlerts([]);
+        return;
+      }
+      const partnerBySession = new Map<string, Set<string>>();
+      for (const partner of reservations ?? []) {
+        if (!partners.some((f) => f.friend_id === partner.friend_id)) continue;
+        const ids = Array.isArray(partner.reservations)
+          ? partner.reservations
           : [];
         for (const id of ids) {
-          const l = liveClasses.find((x) => x.id === id);
-          if (l)
-            out.push({ name: r.friend_name, title: l.title, when: l.when });
+          if (typeof id !== "string") continue;
+          if (!partnerBySession.has(id)) partnerBySession.set(id, new Set());
+          partnerBySession.get(id)!.add(partner.friend_name);
         }
       }
-      setAlerts(out);
-    });
-  }, [me, partners.length]);
+      const ids = [...partnerBySession.keys()];
+      if (!ids.length) {
+        if (active) setAlerts([]);
+        return;
+      }
+      const { data: sessions, error: sessionError } = await supabase
+        .from("live_sessions")
+        .select("id,title,starts_at,status")
+        .in("id", ids)
+        .eq("status", "scheduled")
+        .gte("starts_at", new Date().toISOString());
+      if (sessionError) {
+        console.error("Partner live sessions unavailable", sessionError);
+        if (active) setAlerts([]);
+        return;
+      }
+      const output = (sessions ?? []).flatMap((session) =>
+        [...(partnerBySession.get(session.id) ?? [])].map((name) => ({
+          name,
+          title: session.title,
+          when: new Date(session.starts_at).toLocaleString(),
+        })),
+      );
+      if (active) setAlerts(output);
+    };
+    void loadPartnerAlerts();
+    const poll = window.setInterval(() => {
+      void loadPartnerAlerts();
+    }, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(poll);
+    };
+  }, [
+    me,
+    partners
+      .map((p) => p.friend_id)
+      .sort()
+      .join(","),
+  ]);
 
   const needAuth = (what: string) => {
     if (!s.signedIn || !me) {
@@ -218,12 +285,12 @@ function Trybes() {
     }
     return false;
   };
-  const target = trybe === "all" ? joinedIds[0] : trybe;
+  const target = trybe === "all" ? effectiveMemberships[0] : trybe;
   const canPost =
     trybe !== "discover" &&
     membershipsReady &&
     (trybe === "all"
-      ? joinedIds.length > 0
+      ? effectiveMemberships.length > 0
       : joined || trybe === `coach-${me}`);
   const joinTrybe = () => {
     if (needAuth("join a Trybe")) return;
@@ -297,16 +364,60 @@ function Trybes() {
     else reload();
   };
   const addFriend = async (id: string, name: string) => {
-    if (needAuth("add friends") || id === me) return;
-    const { error } = await supabase
-      .from("friendships")
-      .insert({ user_id: me!, friend_id: id, friend_name: name });
+    if (needAuth("send friend requests") || id === me || isFriend(id)) return;
+    const { error } = await supabase.from("friend_requests").insert({
+      requester_id: me!,
+      recipient_id: id,
+      requester_name: s.name,
+      recipient_name: name,
+    });
     if (error) {
-      toast.error("Couldn't add friend.");
+      toast.error(`Couldn't send friend request: ${error.message}`);
       return;
     }
-    toast.success(`${name} added as a friend`);
-    reloadFriends();
+    toast.success(`Friend request sent to ${name}`);
+    void reloadRequests();
+  };
+  const respondToRequest = async (requesterId: string, accept: boolean) => {
+    if (!me) return;
+    const result = accept
+      ? await supabase.rpc("accept_friend_request", {
+          p_requester_id: requesterId,
+        })
+      : await supabase
+          .from("friend_requests")
+          .delete()
+          .eq("requester_id", requesterId)
+          .eq("recipient_id", me);
+    if (result.error) {
+      toast.error(
+        `Couldn't ${accept ? "accept" : "decline"} request: ${result.error.message}`,
+      );
+      return;
+    }
+    toast.success(
+      accept ? "Friend request accepted" : "Friend request declined",
+    );
+    void reloadRequests();
+    void reloadFriends();
+  };
+  const unfriend = async (id: string, name: string) => {
+    if (
+      !me ||
+      !window.confirm(
+        `Remove ${name} from your friends? This also ends your accountability partnership.`,
+      )
+    )
+      return;
+    const { error } = await supabase.rpc("unfriend_user", { p_friend_id: id });
+    if (error) {
+      toast.error(`Couldn't unfriend ${name}: ${error.message}`);
+      return;
+    }
+    if (chatWith === id) setChatWith(null);
+    toast.success(`${name} removed from friends`);
+    void reloadFriends();
+    void reloadRequests();
   };
   const togglePartner = async (id: string, on: boolean) => {
     await supabase
@@ -325,17 +436,24 @@ function Trybes() {
       text: msg.trim(),
     });
     if (error) {
-      toast.error("Couldn't send message.");
+      toast.error(`Couldn't send message: ${error.message}`);
       return;
     }
     setMsg("");
+    refreshChat();
   };
 
   return (
     <div>
       <PageHeader
         eyebrow="Community"
-        title={trybe === "all" ? "Your Trybe feed" : trybeName(trybe)}
+        title={
+          trybe === "all"
+            ? "Your Trybe feed"
+            : trybe === `coach-${me}` && s.role === "trainer"
+              ? "My Trybe"
+              : trybeName(trybe)
+        }
         sub={
           trybe === "all"
             ? "Updates from the Trybes you've joined."
@@ -564,7 +682,9 @@ function Trybes() {
                         Friend
                       </span>
                     )}
-                    <span className="chip">{p.kind}</span>
+                    <span className="chip">
+                      {p.kind.toLowerCase() === "text" ? "Post" : p.kind}
+                    </span>
                     {p.is_pinned && (
                       <span className="chip chip-active">📌 Pinned</span>
                     )}
@@ -725,12 +845,61 @@ function Trybes() {
             </ul>
           </div>
           <div className="card p-5">
+            <p className="eyebrow">
+              Friend requests{" "}
+              {incoming.length > 0 ? `(${incoming.length})` : ""}
+            </p>
+            {incoming.length === 0 && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                No pending requests.
+              </p>
+            )}
+            <ul className="mt-3 space-y-3">
+              {incoming.map((request) => (
+                <li
+                  key={request.requester_id}
+                  className="flex flex-wrap items-center gap-2 text-sm"
+                >
+                  <span className="flex-1">{request.requester_name}</span>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() =>
+                      void respondToRequest(request.requester_id, true)
+                    }
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() =>
+                      void respondToRequest(request.requester_id, false)
+                    }
+                  >
+                    Decline
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {outgoing.length > 0 && (
+              <>
+                <p className="eyebrow mt-4">Sent requests</p>
+                <ul className="mt-2 space-y-2 text-sm">
+                  {outgoing.map((request) => (
+                    <li key={request.recipient_id}>
+                      {request.recipient_name} · Pending
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+          <div className="card p-5">
             <p className="eyebrow">Friends</p>
             {friends.length === 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
-                Add friends from suggestions, posts and replies. Then tap "Make
-                partner" to get a private chat and alerts when they reserve a
-                live.
+                Send friend requests from suggestions, posts and replies. Once
+                accepted, tap "Make partner" to get a private chat and alerts
+                when they reserve a live.
               </p>
             )}
             <ul className="mt-3 space-y-2">
@@ -756,6 +925,13 @@ function Trybes() {
                     onClick={() => togglePartner(f.friend_id, f.partner)}
                   >
                     {f.partner ? "Partner ✓" : "Make partner"}
+                  </button>
+                  <button
+                    type="button"
+                    className="chip text-destructive"
+                    onClick={() => void unfriend(f.friend_id, f.friend_name)}
+                  >
+                    Unfriend
                   </button>
                 </li>
               ))}
@@ -785,17 +961,22 @@ function Trybes() {
               </ul>
             </div>
           )}
-          {partners.length > 0 && (
+          {friends.length > 0 && (
             <div className="card p-5">
-              <p className="eyebrow">Accountability chat</p>
+              <p className="eyebrow">Messages</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Private conversations with accepted friends. Accountability
+                partners are marked below.
+              </p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {partners.map((p) => (
+                {friends.map((p) => (
                   <button
                     key={p.friend_id}
                     className={`chip ${chatWith === p.friend_id ? "chip-active" : ""}`}
                     onClick={() => setChatWith(p.friend_id)}
                   >
                     {p.friend_name}
+                    {p.partner ? " · Partner" : ""}
                   </button>
                 ))}
               </div>
@@ -813,7 +994,7 @@ function Trybes() {
                   <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                     {msgs.length === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Say hi and set a goal together 💪
+                        Start your conversation 💪
                       </p>
                     )}
                     {msgs.map((c) => (

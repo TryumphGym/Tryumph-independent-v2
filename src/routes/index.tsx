@@ -62,18 +62,18 @@ function Home() {
         supabase
           .from("trainer_videos")
           .select(
-            "id,title,category,level,minutes,equipment,pregnancy_safe,required_equipment",
+            "id,user_id,title,category,level,minutes,equipment,pregnancy_safe,required_equipment",
           )
           .eq("review_status", "approved")
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
           .from("live_sessions")
-          .select("id,title,trainer_name,starts_at,minutes")
+          .select("id,title,trainer_id,trainer_name,starts_at,minutes")
           .eq("status", "scheduled")
           .gte("starts_at", new Date().toISOString())
           .order("starts_at")
-          .limit(1),
+          .limit(25),
       ]);
       if (!active) return;
       setFeatured(
@@ -105,7 +105,18 @@ function Home() {
           )
           .slice(0, 6),
       );
-      setUpNext(l.data?.[0] ?? null);
+      let nextEligible = null;
+      for (const session of l.data ?? []) {
+        const eligibility = await supabase.rpc("trainer_is_eligible", {
+          p_user_id: session.trainer_id,
+          p_live: true,
+        });
+        if (!eligibility.error && eligibility.data === true) {
+          nextEligible = session;
+          break;
+        }
+      }
+      if (active) setUpNext(nextEligible);
     })();
     return () => {
       active = false;
@@ -273,19 +284,21 @@ function Home() {
         </div>
       </section>
 
-      <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
-        <div>
-          <p className="eyebrow">For coaches</p>
-          <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
-          <p className="text-muted-foreground">
-            Reach families who need you — uncapped live classes, 1-on-1s at your
-            rate, and a community of your own.
-          </p>
-        </div>
-        <Link to="/for-trainers" className="btn btn-primary">
-          Become a coach
-        </Link>
-      </section>
+      {!(s.signedIn && s.role === "trainer") && (
+        <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <p className="eyebrow">For coaches</p>
+            <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
+            <p className="text-muted-foreground">
+              Reach families who need you — uncapped live classes, 1-on-1s at
+              your rate, and a community of your own.
+            </p>
+          </div>
+          <Link to="/for-trainers" className="btn btn-primary">
+            Become a coach
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

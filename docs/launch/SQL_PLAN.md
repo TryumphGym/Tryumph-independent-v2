@@ -5,8 +5,8 @@ Nothing in this engineering pass was executed against hosted Supabase. Read [FOU
 ## Few-step SQL Editor sequence
 
 1. Back up and restore a staging copy; run the complete [preflight.sql](preflight.sql). Inspect the manually installed message policy, actual columns/constraints, administrator grants, triggers and bucket limits. Missing required historical tables or incompatible definitions require reconciliation, never erasing data. Missing optional launch tables on the historical baseline selects the full upgrade.
-2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054 → 0055`.
-3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion` and `0055_contact_delivery`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
+2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054 → 0055 → 0056`.
+3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion`, `0055_contact_delivery` and `0056_friendship_contract`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
 
 `npm run db:bundle` only regenerates artifacts. `npm run db:check` and `npm run db:types` use isolated PostgreSQL, not Supabase. The full bundle includes every upgrade below in filename order. Do not rerun historical table-creation migrations on an existing database or run the obsolete root `0019_live_eligibility_guard.sql`.
 
@@ -52,10 +52,12 @@ Nothing in this engineering pass was executed against hosted Supabase. Read [FOU
 
 38. [`0055_contact_delivery.sql`](../../migrations/0055_contact_delivery.sql)
 
+39. [`0056_friendship_contract.sql`](../../migrations/0056_friendship_contract.sql)
+
 ## Data preservation and rollback
 
 The upgrade supplies the missing historical review contract; private submitted evidence/review history is immutable. It migrates membership and purchased-wallet authority without trusting editable profile JSON. Known purchased units and prior paid version-1 private bookings remain, and no second deposit/balance is added to legacy bookings. Profile-only purchases require actual Stripe reconciliation. Store/program data and participant-only friend messages remain.
 
-The old exact fictional seed cleanup remains in the inherited upgrade; no new test data or engagement is seeded. Review its identifiers in staging. New restrictive message/report/audience guards constrain an unexpected older permissive policy while preserving participant reads. New private reusable payment identifiers have no client SELECT grant. The moderator's account directory is allowlisted; administrators do not gain general access to private wellness profiles or DMs.
+The old exact fictional seed cleanup remains in the inherited upgrade; no new test data or engagement is seeded. Review its identifiers in staging. New restrictive message/report/audience guards constrain an unexpected older permissive policy while preserving participant reads. New private reusable payment identifiers have no client SELECT grant. Migration `0056` preserves any manually installed friend requests, creates the canonical accept/unfriend RPCs, and freezes friend identity so new unilateral inserts cannot bypass messaging permissions. Legacy partner messages remain usable; accepted friends can chat without a partnership flag. The moderator's account directory is allowlisted; administrators do not gain general access to private wellness profiles or DMs.
 
 A failed transaction rolls back; use `ROLLBACK;` if the editor still has an open transaction. After a successful apply, keep the additive schema and financial history. Pause checkout and prepare a reviewed forward fix. Dropping tables or reverting only the Worker cannot safely undo external Stripe events or new deposit states. Restoring a backup requires a coordinated, separately approved procedure and reconciliation of events received since that backup. No production apply, rollback, deployment or DNS change was performed.
