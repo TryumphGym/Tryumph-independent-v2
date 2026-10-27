@@ -279,7 +279,7 @@ function Home() {
           <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
           <p className="text-muted-foreground">
             Reach families who need you — uncapped live classes, 1-on-1s at your
-            rate, and a free storefront.
+            rate, and a community of your own.
           </p>
         </div>
         <Link to="/for-trainers" className="btn btn-primary">
