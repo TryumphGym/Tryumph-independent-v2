@@ -60,7 +60,12 @@ export async function deliverContactMessage(
     p_requester_hash: await digest(key, requesterIp),
     p_payload_hash: await digest(key, serialized),
   });
-  if (claim.error) throw new Error(claim.error.message);
+  if (claim.error)
+    throw new Error(
+      claim.error.code === "P0001"
+        ? claim.error.message
+        : `The contact form is temporarily unavailable. Please email ${CONTACT_EMAIL} directly.`,
+    );
   if (claim.data === "sent") return { ok: true };
   if (claim.data !== "claimed")
     throw new Error(
