@@ -160,6 +160,30 @@ export type Database = {
         Update: { name?: string; token?: string };
         Relationships: [];
       };
+      friend_requests: {
+        Row: {
+          requester_id: string;
+          recipient_id: string;
+          requester_name: string;
+          recipient_name: string;
+          created_at: string;
+        };
+        Insert: {
+          requester_id: string;
+          recipient_id: string;
+          requester_name: string;
+          recipient_name: string;
+          created_at?: string;
+        };
+        Update: {
+          requester_id?: string;
+          recipient_id?: string;
+          requester_name?: string;
+          recipient_name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       friendships: {
         Row: {
           user_id: string;
@@ -1339,6 +1363,7 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
+      accept_friend_request: { Args: { p_requester_id: string }; Returns: undefined };
       apply_checkout_refund: {
         Args: {
           p_checkout_id: string;
