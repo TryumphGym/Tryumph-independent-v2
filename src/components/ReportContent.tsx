@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 const db = supabase as unknown as SupabaseClient;
-export type ReportTarget = "trainer" | "post" | "comment";
+export type ReportTarget = "trainer" | "user" | "post" | "comment";
 export function ReportContent({ targetType, targetId, label = "Report" }: { targetType: ReportTarget; targetId: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("inappropriate_content");
