@@ -552,6 +552,7 @@ function Trybes() {
                       {trybeName(p.trybe)}
                     </span>
                   </div>
+                  {me && p.author_id && p.author_id !== me && <ReportContent targetType="user" targetId={p.author_id} label="Report user" />}
                   <p className="mt-3">{p.text}</p>
                   {me && p.author_id !== me && <ReportContent targetType="post" targetId={p.id} label="Report post" />}
                   <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
@@ -608,6 +609,7 @@ function Trybes() {
                       <span>
                         <b>{c.author_name}:</b> {c.text}
                       </span>
+                      {me && c.author_id !== me && <ReportContent targetType="user" targetId={c.author_id} label="Report user" />}
                       {me && c.author_id !== me && <ReportContent targetType="comment" targetId={c.id} label="Report comment" />}
                       {c.author_id !== me && !isFriend(c.author_id) && (
                         <button
@@ -698,6 +700,7 @@ function Trybes() {
                     initials={f.friend_name.slice(0, 2).toUpperCase()}
                   />
                   {f.friend_name}
+                  {me && f.friend_id !== me && <ReportContent targetType="user" targetId={f.friend_id} label="Report user" />}
                   <button
                     className={`ml-auto chip ${f.partner ? "chip-active" : ""}`}
                     onClick={() => togglePartner(f.friend_id, f.partner)}
@@ -748,6 +751,7 @@ function Trybes() {
               </div>
               {chatWith && (
                 <>
+                  {chatWith !== me && <div className="mt-2"><ReportContent targetType="user" targetId={chatWith} label="Report chat partner" /></div>}
                   <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                     {msgs.length === 0 && (
                       <p className="text-sm text-muted-foreground">
