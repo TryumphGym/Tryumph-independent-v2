@@ -145,7 +145,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             {[
               ...nav,
               { to: "/studio", label: "Trainer Studio" },
-              { to: "/shop", label: "Shop" },
             ].map((n) => (
               <Link
                 key={n.to}
@@ -155,9 +154,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 activeProps={{ className: "bg-secondary" }}
               >
                 {n.label}
-                {n.to === "/shop" && (
-                  <span className="chip ml-2 text-xs">Coming soon</span>
-                )}
               </Link>
             ))}
             {isAdmin && (
@@ -202,7 +198,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p>© 2026 Tryumph Gym — bring the gym home.</p>
           <div className="flex gap-4">
             <Link to="/terms">Terms & waiver</Link>
-            <Link to="/shop">Shop (coming soon)</Link>
             <Link to="/for-trainers">For trainers</Link>
           </div>
         </div>
