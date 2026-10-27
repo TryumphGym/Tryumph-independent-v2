@@ -324,7 +324,7 @@ function Trybes() {
       text: msg.trim(),
     });
     if (error) {
-      toast.error("Couldn't send message.");
+      toast.error(`Couldn't send message: ${error.message}`);
       return;
     }
     setMsg("");
