@@ -770,13 +770,13 @@ function Trybes() {
               <p className="eyebrow">Messages</p>
               <p className="mt-1 text-xs text-muted-foreground">Private conversations with accepted friends. Accountability partners are marked below.</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {partners.map((p) => (
+                {friends.map((p) => (
                   <button
                     key={p.friend_id}
                     className={`chip ${chatWith === p.friend_id ? "chip-active" : ""}`}
                     onClick={() => setChatWith(p.friend_id)}
                   >
-                    {p.friend_name}
+                    {p.friend_name}{p.partner ? " · Partner" : ""}
                   </button>
                 ))}
               </div>
@@ -785,7 +785,7 @@ function Trybes() {
                   <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                     {msgs.length === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Say hi and set a goal together 💪
+                        Start your conversation 💪
                       </p>
                     )}
                     {msgs.map((c) => (
