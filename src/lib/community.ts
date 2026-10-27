@@ -58,7 +58,11 @@ export function useFriendRequests(me: string | null) {
     setIncoming((data ?? []).filter((item) => item.recipient_id === me));
     setOutgoing((data ?? []).filter((item) => item.requester_id === me));
   }, [me]);
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    void reload();
+    const poll = window.setInterval(() => { void reload(); }, 5000);
+    return () => window.clearInterval(poll);
+  }, [reload]);
   return { incoming, outgoing, reload };
 }
 
@@ -116,7 +120,9 @@ export function useFriends(me: string | null) {
     setFriends(data ?? []);
   }, [me]);
   useEffect(() => {
-    load();
+    void load();
+    const poll = window.setInterval(() => { void load(); }, 5000);
+    return () => window.clearInterval(poll);
   }, [load]);
   return { friends, reload: load };
 }
