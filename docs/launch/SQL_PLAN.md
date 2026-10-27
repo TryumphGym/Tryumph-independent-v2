@@ -1,16 +1,19 @@
 # Ordered Supabase SQL — review and staging first
 
+> **Actual schema compared (October 27):** The 978-row hosted export matches neither historical bundle unchanged. Read [reconciliation/findings.md](reconciliation/findings.md). Missing application migration history did not select a baseline.
+
 Nothing in this engineering pass was executed against hosted Supabase. Read [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) for the exact dashboard, backup, acceptance and rollback sequence. Isolated PostgreSQL tests verify functions, constraints, grants, RLS and replay; they do not certify the hosted schema or Storage HTTP behavior.
 
-## Few-step SQL Editor sequence
+## Sequence for this inspected database
 
-1. Back up and restore a staging copy; run the complete [preflight.sql](preflight.sql). Inspect the manually installed message policy, actual columns/constraints, administrator grants, triggers and bucket limits. Missing required historical tables or incompatible definitions require reconciliation, never erasing data. Missing optional launch tables on the historical baseline selects the full upgrade.
-2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054 → 0055 → 0056`.
-3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion`, `0055_contact_delivery` and `0056_friendship_contract`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
+1. Restore independent Supabase staging including database and Storage backup; pause staging workers. Verify its application metadata matches the inspected snapshot.
+2. Run [reconciliation/00_readonly_preflight.sql](reconciliation/00_readonly_preflight.sql), requiring seven zero failure counts.
+3. Run the entire [reconciliation/01_stage_apply.sql](reconciliation/01_stage_apply.sql) transaction. It uses 785 exact metadata fingerprints, reviewed `0051–0056` with mutual-friend adaptation, `0057` compatibility and unchanged-original-row assertions. It refuses drift/replay; do not remove guards. No existing table/business row is deleted and legacy paid bookings remain version 1.
+4. Run [reconciliation/02_validate_staging.sql](reconciliation/02_validate_staging.sql), [confirmation.sql](confirmation.sql), a new inspection and actual JWT/browser/provider tests. [The optional platform inspection](reconciliation/03_inspect_platform_bindings.sql) supplies auth/event/publication facts absent from the original report.
 
-`npm run db:bundle` only regenerates artifacts. `npm run db:check` and `npm run db:types` use isolated PostgreSQL, not Supabase. The full bundle includes every upgrade below in filename order. Do not rerun historical table-creation migrations on an existing database or run the obsolete root `0019_live_eligibility_guard.sql`.
+`npm run db:reconcile:build` regenerates this path offline. `upgrade.sql` and `completion.sql` are retained historical reference artifacts through `0056`, **not apply instructions for this database**. The first tries to remove an existing RPC default; the second leaves a conflicting announcement trigger. Both failures are reproduced in isolated tests. Do not rerun historical table creation, pick a prefix from table existence, or use the obsolete root `0019_live_eligibility_guard.sql`.
 
-## Full upgrade order
+## Historical source order — not this database’s apply path
 
 1. [`0018a_review_contract.sql`](../../migrations/0018a_review_contract.sql)
 2. [`0019_launch_feature_data.sql`](../../migrations/0019_launch_feature_data.sql)
@@ -54,10 +57,12 @@ Nothing in this engineering pass was executed against hosted Supabase. Read [FOU
 
 39. [`0056_friendship_contract.sql`](../../migrations/0056_friendship_contract.sql)
 
+40. [`0057_hosted_compatibility.sql`](../../migrations/0057_hosted_compatibility.sql) supplies the new reviewed compatibility changes.
+
 ## Data preservation and rollback
 
 The upgrade supplies the missing historical review contract; private submitted evidence/review history is immutable. It migrates membership and purchased-wallet authority without trusting editable profile JSON. Known purchased units and prior paid version-1 private bookings remain, and no second deposit/balance is added to legacy bookings. Profile-only purchases require actual Stripe reconciliation. Store/program data and participant-only friend messages remain.
 
-The old exact fictional seed cleanup remains in the inherited upgrade; no new test data or engagement is seeded. Review its identifiers in staging. New restrictive message/report/audience guards constrain an unexpected older permissive policy while preserving participant reads. New private reusable payment identifiers have no client SELECT grant. Migration `0056` preserves any manually installed friend requests, creates the canonical accept/unfriend RPCs, and freezes friend identity so new unilateral inserts cannot bypass messaging permissions. Legacy partner messages remain usable; accepted friends can chat without a partnership flag. The moderator's account directory is allowlisted; administrators do not gain general access to private wellness profiles or DMs.
+The inherited full upgrade contains fictional seed cleanup and is not used here. The reconciled transaction contains no such row cleanup or fictional engagement. New restrictive message/report/audience guards constrain an unexpected older permissive policy while preserving participant reads. New private reusable payment identifiers have no client SELECT grant. Migration `0056` preserves any manually installed friend requests, creates the canonical accept/unfriend RPCs, and freezes friend identity so new unilateral inserts cannot bypass messaging permissions. Accepted friends can chat without a partnership flag. The hosted path grants legacy compatibility only to mutual friendships, preserving the actual hosted acceptance rule. The moderator's account directory is allowlisted; administrators do not gain general access to private wellness profiles or DMs.
 
 A failed transaction rolls back; use `ROLLBACK;` if the editor still has an open transaction. After a successful apply, keep the additive schema and financial history. Pause checkout and prepare a reviewed forward fix. Dropping tables or reverting only the Worker cannot safely undo external Stripe events or new deposit states. Restoring a backup requires a coordinated, separately approved procedure and reconciliation of events received since that backup. No production apply, rollback, deployment or DNS change was performed.

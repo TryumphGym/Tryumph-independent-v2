@@ -1,0 +1,17 @@
+{
+  "export_sha256": "ff398e74cff50c1315a3200a4b27e1a7ab0af13089feecabe434a61e1f7638f3",
+  "inspected_objects": 785,
+  "artifact_sha256": "f2b5580161f8f6cbf99f52c48e286e82949e7d993402d937961af3955725299f",
+  "adaptations": [
+    "0056 legacy friendship backfill requires both existing friendship rows"
+  ],
+  "sources": {
+    "0051_safety_and_messaging.sql": "ceaf593eac7a4246a6285f3b1300e879498191baf374eac30b9b0c7561006280",
+    "0052_notifications_and_eligibility.sql": "0fca12ed7d82c1de213b35a573c019c04c399bd76a831a0088e43e2b08bd69a7",
+    "0053_verified_live_attendance.sql": "0e7387ba1abef8f486cc4c467b5a144f9ff2a0e654b4432d7f312658664ffe3f",
+    "0054_private_deposits.sql": "38c35614f659e63161918f98341b7fc0c09bef1e0448e2648a7a577677bb2ca6",
+    "0055_contact_delivery.sql": "b4c979d8f6716e5924d95084f5de104ad066ad58d1ba24d0e374b282a142b807",
+    "0056_friendship_contract.sql": "dfc899ec1a57267289544cc52ef087324a0e28fcb05e462e11b28a83556b85ff",
+    "0057_hosted_compatibility.sql": "6635c180aec3b3660441c4c69f206a6463e8b5b0a0f8268f764a66b7ff3a3001"
+  }
+}

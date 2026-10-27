@@ -1,4 +1,4 @@
-> October 27 follow-up: see [the founder handoff](../launch/FOUNDER_HANDOFF.md) for the current implementation, SQL sequence and verification boundaries. The historical descriptions below are retained as context; use the handoff where they conflict, including deposits, attendance and messaging policy.
+> **October 27 actual-schema finding: do not run the historical SQL example below.** The hosted export confirms its incorrectly correlated reply subquery and profile-RLS dependency. The [reconciled staging path](../launch/reconciliation/findings.md) alters the existing policy to the checked helper and removes the redundant new permissive policy. See [the founder handoff](../launch/FOUNDER_HANDOFF.md) for acceptance and verification boundaries. The old example is retained only as audit context.
 
 # Trainer inquiries — security migration required
 

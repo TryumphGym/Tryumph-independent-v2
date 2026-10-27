@@ -1,5 +1,7 @@
 -- READ ONLY. Run in staging first. Missing required_historical tables or incompatible
--- definitions are a STOP. Missing later launch tables selects the full upgrade path.
+-- definitions require reconciliation. Missing later tables does NOT identify a baseline.
+-- This older partial check is superseded by inspect-hosted-schema.sql and
+-- reconciliation/00_readonly_preflight.sql. See reconciliation/findings.md; neither old bundle is safe unchanged.
 SELECT name,name NOT IN ('checkout_payment_state','wallet_token_units','private_session_access','friend_requests') AS required_historical,
  to_regclass('public.'||name) IS NOT NULL AS present
 FROM unnest(ARRAY['profiles','user_roles','messages','friendships','certifications','trainer_videos','trainer_earnings','trainer_accounts','trainer_busy','live_sessions','posts','post_comments','post_likes','checkout_payment_state','wallet_token_units','private_session_access','friend_requests']) name;

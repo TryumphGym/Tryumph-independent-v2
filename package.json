@@ -15,7 +15,9 @@
     "typecheck": "tsc --noEmit",
     "db:check": "node scripts/check-migrations.ts",
     "db:types": "node scripts/generate-database-types.ts",
-    "db:bundle": "node scripts/build-launch-sql.ts"
+    "db:bundle": "node scripts/build-launch-sql.ts",
+    "db:reconcile:build": "node scripts/build-reconciled-staging.ts",
+    "db:reconcile:compare": "node scripts/compare-hosted-schema.ts"
   },
   "overrides": {
     "rolldown": "1.2.1",

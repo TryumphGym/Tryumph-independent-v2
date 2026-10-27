@@ -1,5 +1,7 @@
 # Founder handoff — January 1, 2027 launch
 
+> **Reconciliation completed (October 27):** The actual 978-row hosted export has been compared. Neither old bundle is safe unchanged. Use only the new [reconciled staging sequence](reconciliation/findings.md); hosted business-data checks and real staging acceptance remain outstanding.
+
 Prepared October 27, 2026, America/Chicago. Repository `TryumphGym/Tryumph-independent-v2`, branch `codex/tryumph-january-launch`, [draft PR #2](https://github.com/TryumphGym/Tryumph-independent-v2/pull/2) for this continuation (original [PR #1](https://github.com/TryumphGym/Tryumph-independent-v2/pull/1) was merged October 26). **Do not launch from this report alone.** This pass implemented and tested code; it did not access hosted SQL, deploy, merge to main, change DNS/secrets, send an email, or activate live Stripe payments.
 
 The complete assignment in `CODEX_HANDOFF.md` was read, along with its referenced policy documents and migration history. This report supersedes their older descriptions of missing backends, full-price private checkout and token consumption at reservation. The original signup/session system, participant-only friend messaging, external trainer stores and fee/split rules were retained. Concurrent branch additions through `167532f` (Contact Us, privacy/terms/footer and AdSense ownership metadata) were merged with history preserved; terms were reconciled to the implemented deposit/refund policy. An ownership meta tag does not activate advertising or establish provider approval. Changes already on main through `4b2ddd1` (friend requests, unfriend, conversation refresh, own-Trybe navigation, upload duration detection and exact-duration filters) were also integrated into development. Missing friend-request/RPC migrations are now tracked in `0056`, existing manual data is retained, and expiry filters were reconciled so previously approved workouts remain available. No commit was made or merged to main by this task.
@@ -27,32 +29,20 @@ The complete assignment in `CODEX_HANDOFF.md` was read, along with its reference
 
 No mandatory recurring member or trainer subscription was added. Free Trybe membership and free on-demand content remain. Live classes stay $5. Private rates are trainer-defined; each installment must satisfy Stripe's minimum, so new private checkout requires a total of at least $2. Live/advertising shares remain 50/50 and private 90/10 **after actual processing fees and before hosting costs**. Advertising measurements alone never create earnings.
 
-## Exact SQL sequence — staging first
+## Exact SQL sequence — independent staging only
 
-1. Back up the actual Supabase database **and Storage files**, and retain the current Worker/version/configuration. Restore a separate staging project. Freeze checkout writes during the later authorized cutover; preserve in-flight provider events. Do not apply these migrations to production during this code review.
-2. Open [preflight.sql](preflight.sql), copy its entire SQL into the **staging** SQL Editor, and run it. Review core tables/columns, role grants, trigger definitions, private buckets and all message policies, including the policy you previously applied manually. The source snapshot cannot prove your hosted migration history. Missing required historical tables, incompatible columns, custom constraints or unexpected permissive policies require reconciliation before continuing. Missing optional later launch tables is expected on the historical baseline and selects the full upgrade path. Never drop accounts/messages/payments to force an apply.
-3. Choose **one** complete transaction:
-   - If historical `0000–0018` exists and later launch migrations have not been reconciled, copy **all of [upgrade.sql](upgrade.sql)**. It includes 39 ordered upgrades from `0018a` through `0056`.
-   - If staging already matches the prior `0050` launch baseline, copy **all of [completion.sql](completion.sql)**. It contains only `0051`, `0052`, `0053`, `0054`, `0055`, `0056`, with a baseline guard.
-   - Both artifacts begin with `BEGIN;`, stop on errors, and end with `COMMIT;`. Do not run both, run fragments, remove security checks, or rerun historical table-creation migrations. Both were tested for replay with an existing deposit and preserved its frozen price/payment history. `npm run db:bundle` regenerates them without contacting Supabase.
-4. Copy [confirmation.sql](confirmation.sql) into the staging editor. The version rows must include `0054_launch_completion`, `0055_contact_delivery` and `0056_friendship_contract`; all post-apply `present` and permission booleans must be true. Inspect existing version-1 paid bookings and pending refund/ambiguous payment counts before enabling checkout. The SQL Editor runs as an owner and does not prove RLS: perform the account tests below with real JWTs.
+1. Back up the database **and Storage files**, retain the current Worker/configuration and restore a separate Supabase staging project. Pause staging app/cron/provider workers and use sandbox credentials. Verify the dashboard project identity. Do not execute hosted migrations during this review.
+2. Read [the actual-schema findings](reconciliation/findings.md) and [per-object comparison](reconciliation/object-comparison.json). Optionally run [03_inspect_platform_bindings.sql](reconciliation/03_inspect_platform_bindings.sql) read-only on hosted to capture signup/event/publication facts outside the original export. Run the original inspection on the staging restore; application definitions/grants must match the supplied snapshot.
+3. Copy **all [00_readonly_preflight.sql](reconciliation/00_readonly_preflight.sql)** into the staging SQL Editor. All seven failure counts must be zero. These checks have not been run on hosted records. Investigate failures without deleting data, minting balances or relabeling reviews.
+4. Copy **all [01_stage_apply.sql](reconciliation/01_stage_apply.sql)** into staging. Its single transaction validates 785 inspected definitions/grants, repeats data checks, locks/captures preservation checksums, applies reviewed `0051–0056` with mutual-only friendship backfill and `0057` compatibility, and aborts if original public records changed. No purchases/charges are backfilled. Do not run `upgrade.sql`, `completion.sql`, historical table creation or fragments in addition. The new artifact deliberately refuses replay once the schema advances; do not remove that guard.
+5. Run **[02_validate_staging.sql](reconciliation/02_validate_staging.sql)**. Require `staging_catalog_validation_passed`; this validates the additive reviewer FK and key RLS/grants. Run [confirmation.sql](confirmation.sql), inspect actual legacy booking/payment/refund totals and export fresh metadata. The SQL Editor owner bypasses ordinary-user RLS; complete the separate-account acceptance below with real JWTs and sandbox providers before requesting production authorization.
 
-These are the small read-only checks to paste before/after the main transaction (the complete preflight/confirmation files add more inspection):
+A small additional read-only postcheck is:
 
 ```sql
--- BEFORE: an absent historical table is a stop, never permission to reset data.
-select name,to_regclass('public.'||name) is not null as present
-from unnest(array['profiles','messages','certifications','trainer_videos',
- 'live_sessions','trainer_earnings']) name;
-
-select policyname,permissive,cmd,qual,with_check
-from pg_policies where schemaname='public' and tablename='messages';
-```
-
-```sql
--- AFTER the selected complete transaction commits:
 select version,applied_at from public.launch_schema_versions
-where version in ('0054_launch_completion','0055_contact_delivery','0056_friendship_contract');
+where version in ('0054_launch_completion','0055_contact_delivery',
+ '0056_friendship_contract','0057_hosted_compatibility');
 select
  not has_function_privilege('authenticated',
   'public.consume_attended_live_token(uuid,uuid)','EXECUTE') as attendance_server_only,
@@ -62,9 +52,9 @@ select
   'public.private_payment_methods','SELECT') as reusable_payment_ids_private;
 ```
 
-**Rollback:** a failed whole transaction rolls back its changes; if the editor leaves a transaction open, run `ROLLBACK;` before investigating in staging. After a successful migration, do not drop tables/functions to simulate rollback: retain the additive schema and financial audit trail, pause new checkouts and use a reviewed forward fix. Restore an actual backup only through a separately approved incident procedure after reconciling provider events received since that backup. Previous application code may not understand new deposit states, so redeploying an old Worker alone is not a safe financial rollback.
+Markers are receipts, not proof of an otherwise unknown baseline. `npm run db:reconcile:build` regenerates the staging artifact and source hashes offline. Existing paid bookings stay version 1 and must never prompt another deposit/balance. Existing requests, accepted friendships, messages, videos, stores and financial records are retained. The actual manual inquiry policy is altered under its existing name to the checked helper, with the redundant new permissive policy removed. Do not paste the old policy example from `docs/admin/TRAINER_MESSAGES.md`.
 
-Do not use the obsolete standalone root `0019_live_eligibility_guard.sql`. Do not paste the old example inquiry policy from `docs/admin/TRAINER_MESSAGES.md` in addition to the new bundle. The new named permissive inquiry policy plus restrictive guard preserve friend access and constrain the manually installed policy without assuming its name.
+**Rollback:** on a failed transaction, issue `ROLLBACK;` if the editor leaves it open, retain the error and reinspect. Do not weaken snapshot/preservation checks to force an apply. After success retain additive schema/history, pause checkout and prepare a reviewed forward fix. Backup restoration requires a separately authorized incident procedure reconciling newer provider events. Redeploying old application code alone is not a safe financial rollback. Do not use the obsolete root `0019_live_eligibility_guard.sql`.
 
 ## Founder-only dashboard setup
 
@@ -97,7 +87,7 @@ Prepare one eligible trainer, a member, a second unrelated member/trainer and an
 9. **Notices/days/store:** inspect actual deduplicated expiry stages, session changes/cancellation/refund notices and local-day records on two tabs/devices across local midnight. Distinct visit days must not be called completed workouts. Without explicit two-way preferences, no friend attendance notification may appear. Open an existing external trainer product/store link, edit it as owner, deny another trainer's direct writes, and verify no Tryumph checkout or fee is introduced. Confirm paused navigation/direct routes and dormant Insights/merchandise flags stay off.
 10. **Recording/ads:** complete a real community class through Egress → private R2 → queue → Bunny → pending review; retry jobs and inspect dead letters. Private sessions never record automatically. Verify an authorized real water-break creative, visibility/dwell measurement, seek/replay safety and one genuine recognized-revenue event. No sponsor/provider approval means ads/revenue remain unverified and must not be marketed as operational.
 
-## Automated verification from this pass
+## Automated verification from the earlier engineering pass
 
 - `npm ci --cache /workspace/.cache/npm --no-audit --no-fund`: succeeded from the lockfile (609 packages).
 - `npm run typecheck`: passed.
@@ -106,6 +96,8 @@ Prepare one eligible trainer, a member, a second unrelated member/trainer and an
 - `npm run build`: passed for the Cloudflare Worker. Existing CSS sourcemap, lazy-chunk and `inputValidator` deprecation warnings remain.
 - `npm audit`: **0 vulnerabilities**, including development dependencies.
 - Final isolated schema check, generated-contract/bundle checks and local browser results are recorded in [VERIFICATION.md](VERIFICATION.md). Browser checks prove local rendering/navigation only.
+
+The actual-schema reconciliation follow-up and current test/build/lint results are recorded in [reconciliation/validation.md](reconciliation/validation.md). Its additional tests use the supplied hosted metadata, not a presumed baseline.
 
 ## Release gates and exact next action
 
