@@ -142,10 +142,13 @@ function Trybes() {
   const canSee = (id: string) => id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
   const visible = all.filter((p) => !p.is_hidden && canSee(p.trybe));
+  const effectiveMemberships = s.signedIn && s.role === "trainer" && me
+    ? [...new Set([...joinedIds, `coach-${me}`])]
+    : joinedIds;
   const filtered = visible.filter((p) =>
     trybe === "discover"
       ? p.visibility === "public"
-      : inTrybeFeed(p.trybe, trybe, joinedIds),
+      : inTrybeFeed(p.trybe, trybe, effectiveMemberships),
   );
   const posts = [...filtered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
@@ -214,12 +217,12 @@ function Trybes() {
     }
     return false;
   };
-  const target = trybe === "all" ? joinedIds[0] : trybe;
+  const target = trybe === "all" ? effectiveMemberships[0] : trybe;
   const canPost =
     trybe !== "discover" &&
     membershipsReady &&
     (trybe === "all"
-      ? joinedIds.length > 0
+      ? effectiveMemberships.length > 0
       : joined || trybe === `coach-${me}`);
   const joinTrybe = () => {
     if (needAuth("join a Trybe")) return;
