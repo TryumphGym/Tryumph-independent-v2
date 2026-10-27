@@ -1,4 +1,5 @@
 import { MemberSessions } from "@/components/MemberSessions";
+import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
 import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { RecordingManager } from "@/components/RecordingManager";
@@ -73,6 +74,7 @@ const TABS = [
   "On-demand",
   "Store",
   "Credentials",
+  "Messages",
 ] as const;
 
 function Studio() {
@@ -167,6 +169,7 @@ function Studio() {
         </>
       )}
       {tab === "Store" && <StoreTab />}
+      {tab === "Messages" && <TrainerMessages />}
       {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && <p className="card p-6" role="alert">New uploads and live hosting are paused until expired required credentials are renewed and verified. Go to Credentials to submit updated proof.</p>}
       {tab === "Credentials" && (
         <div className="card space-y-6 p-6">
