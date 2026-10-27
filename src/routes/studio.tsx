@@ -1,4 +1,5 @@
 import { MemberSessions } from "@/components/MemberSessions";
+import { ActiveMilestones } from "@/components/ActiveMilestones";
 import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { RecordingManager } from "@/components/RecordingManager";
 import { ClassManager } from "@/components/ClassManager";
@@ -7,7 +8,7 @@ import {
   TrainerStoreManager,
   TrainerProgramManager,
 } from "@/components/TrainerLaunchTools";
-import { hasVerifiedCpr, type CredentialRecord } from "@/lib/cpr";
+import { hasVerifiedCpr, isExpired, isCurrentVerified, type CredentialRecord } from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -119,6 +120,8 @@ function Studio() {
   }
   const tr = s.extra.trainer;
   const verified = hasVerifiedCpr(certStatus);
+  const expiredUnreplaced = certStatus.filter(cert => isExpired(cert.expires) && cert.status === "verified" && !certStatus.some(current => current.name.toLowerCase() === cert.name.toLowerCase() && isCurrentVerified(current)));
+  const credentialsPaused = expiredUnreplaced.length > 0;
   return (
     <div className="space-y-6">
       <PageHeader
@@ -135,6 +138,7 @@ function Studio() {
               : "Add CPR/AED certification"}
         </span>
       </PageHeader>
+      {credentialsPaused && <div role="alert" className="card border-amber-500/60 p-5"><p className="font-bold">Trainer certifications expired — activity paused</p><p className="text-sm">Please update your certification(s) in Credentials to continue uploading new content or hosting live classes. Previously approved videos remain available.</p><p className="mt-2 text-xs">{expiredUnreplaced.map(x => x.name).join(", ")}</p></div>}
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
@@ -146,9 +150,9 @@ function Studio() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && <><AccountNoticeCenter trainer /><Overview /></>}
+      {tab === "Overview" && <><AccountNoticeCenter trainer /><ActiveMilestones days={s.activeDays} role="trainer" />{!credentialsPaused && <Overview />}</>}
       {tab === "My Profile" && <TrainerProfileTab />}
-      {tab === "Calendar" && (
+      {tab === "Calendar" && !credentialsPaused && (
         <>
           <CalendarTab />
           <MemberSessions trainer />
@@ -156,13 +160,14 @@ function Studio() {
           <RecordingManager />
         </>
       )}
-      {tab === "On-demand" && (
+      {tab === "On-demand" && !credentialsPaused && (
         <>
           <Uploads />
           <TrainerProgramManager />
         </>
       )}
       {tab === "Store" && <StoreTab />}
+      {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && <p className="card p-6" role="alert">New uploads and live hosting are paused until expired required credentials are renewed and verified. Go to Credentials to submit updated proof.</p>}
       {tab === "Credentials" && (
         <div className="card space-y-6 p-6">
           <RolePicker />
