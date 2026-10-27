@@ -1,4 +1,5 @@
 import { MemberSessions } from "@/components/MemberSessions";
+import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { RecordingManager } from "@/components/RecordingManager";
 import { ClassManager } from "@/components/ClassManager";
 import { TrainerWorkoutEditor } from "@/components/TrainerWorkoutEditor";
@@ -145,7 +146,7 @@ function Studio() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && <Overview />}
+      {tab === "Overview" && <><AccountNoticeCenter trainer /><Overview /></>}
       {tab === "My Profile" && <TrainerProfileTab />}
       {tab === "Calendar" && (
         <>
