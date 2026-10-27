@@ -21,7 +21,7 @@ import {
 import { useStore } from "@/lib/store";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { useChat, useFriends, usePosts, useUserId } from "@/lib/community";
+import { useChat, useFriendRequests, useFriends, usePosts, useUserId } from "@/lib/community";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
@@ -55,6 +55,7 @@ function Trybes() {
   const me = useUserId();
   const { posts: all, reload } = usePosts(me);
   const { friends, reload: reloadFriends } = useFriends(me);
+  const { incoming, outgoing, reload: reloadRequests } = useFriendRequests(me);
   const [trybe, setTrybe] = useState(t ?? "all");
   const [postVisibility, setPostVisibility] = useState<"public" | "private">(
     "private",
@@ -134,7 +135,7 @@ function Trybes() {
   const [alerts, setAlerts] = useState<
     { name: string; title: string; when: string }[]
   >([]);
-  const msgs = useChat(me, chatWith);
+  const { msgs, refresh: refreshChat } = useChat(me, chatWith);
   const e = s.extra;
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
@@ -157,7 +158,7 @@ function Trybes() {
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
   const joined = joinedIds.includes(trybe) || (s.signedIn && s.role === "trainer" && trybe === `coach-${me}`);
   const isFriend = (id: string | null) =>
-    !!id && friends.some((f) => f.friend_id === id);
+    !!id && (friends.some((f) => f.friend_id === id) || incoming.some((r) => r.requester_id === id) || outgoing.some((r) => r.recipient_id === id));
   // Never suggest partners based on private-Trybe activity.
   const suggestions = me
     ? [
@@ -296,16 +297,28 @@ function Trybes() {
     else reload();
   };
   const addFriend = async (id: string, name: string) => {
-    if (needAuth("add friends") || id === me) return;
-    const { error } = await supabase
-      .from("friendships")
-      .insert({ user_id: me!, friend_id: id, friend_name: name });
-    if (error) {
-      toast.error(`Couldn't add friend: ${error.message}`);
+    if (needAuth("send friend requests") || id === me || isFriend(id)) return;
+    const { error } = await supabase.from("friend_requests").insert({
+      requester_id: me!, recipient_id: id,
+      requester_name: s.name, recipient_name: name,
+    });
+    if (error) { toast.error(`Couldn't send friend request: ${error.message}`); return; }
+    toast.success(`Friend request sent to ${name}`);
+    void reloadRequests();
+  };
+  const respondToRequest = async (requesterId: string, accept: boolean) => {
+    if (!me) return;
+    const result = accept
+      ? await supabase.rpc("accept_friend_request", { p_requester_id: requesterId })
+      : await supabase.from("friend_requests").delete()
+          .eq("requester_id", requesterId).eq("recipient_id", me);
+    if (result.error) {
+      toast.error(`Couldn't ${accept ? "accept" : "decline"} request: ${result.error.message}`);
       return;
     }
-    toast.success(`${name} added as a friend`);
-    reloadFriends();
+    toast.success(accept ? "Friend request accepted" : "Friend request declined");
+    void reloadRequests();
+    void reloadFriends();
   };
   const togglePartner = async (id: string, on: boolean) => {
     await supabase
@@ -328,6 +341,7 @@ function Trybes() {
       return;
     }
     setMsg("");
+    refreshChat();
   };
 
   return (
@@ -677,10 +691,31 @@ function Trybes() {
             </ul>
           </div>
           <div className="card p-5">
+            <p className="eyebrow">Friend requests {incoming.length > 0 ? `(${incoming.length})` : ""}</p>
+            {incoming.length === 0 && <p className="mt-2 text-sm text-muted-foreground">No pending requests.</p>}
+            <ul className="mt-3 space-y-3">
+              {incoming.map((request) => (
+                <li key={request.requester_id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="flex-1">{request.requester_name}</span>
+                  <button className="btn btn-primary" onClick={() => void respondToRequest(request.requester_id, true)}>Accept</button>
+                  <button className="btn btn-outline" onClick={() => void respondToRequest(request.requester_id, false)}>Decline</button>
+                </li>
+              ))}
+            </ul>
+            {outgoing.length > 0 && (
+              <>
+                <p className="eyebrow mt-4">Sent requests</p>
+                <ul className="mt-2 space-y-2 text-sm">
+                  {outgoing.map((request) => <li key={request.recipient_id}>{request.recipient_name} · Pending</li>)}
+                </ul>
+              </>
+            )}
+          </div>
+          <div className="card p-5">
             <p className="eyebrow">Friends</p>
             {friends.length === 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
-                Add friends from suggestions, posts and replies. Then tap "Make
+                Send friend requests from suggestions, posts and replies. Once accepted, tap "Make
                 partner" to get a private chat and alerts when they reserve a
                 live.
               </p>
@@ -730,9 +765,10 @@ function Trybes() {
               </ul>
             </div>
           )}
-          {partners.length > 0 && (
+          {friends.length > 0 && (
             <div className="card p-5">
-              <p className="eyebrow">Accountability chat</p>
+              <p className="eyebrow">Messages</p>
+              <p className="mt-1 text-xs text-muted-foreground">Private conversations with accepted friends. Accountability partners are marked below.</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {partners.map((p) => (
                   <button
