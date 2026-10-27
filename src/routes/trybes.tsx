@@ -25,6 +25,7 @@ import { useChat, useFriends, usePosts, useUserId } from "@/lib/community";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
+import { ReportContent } from "@/components/ReportContent";
 
 export const Route = createFileRoute("/trybes")({
   validateSearch: z.object({ t: z.string().optional() }),
@@ -368,7 +369,9 @@ function Trybes() {
       )}
       {trybe.startsWith("coach-") &&
         /^[0-9a-f-]{36}$/i.test(trybe.slice(6)) && (
-          <TrainerStorefront trainerId={trybe.slice(6)} />
+          <><TrainerStorefront trainerId={trybe.slice(6)} />
+            {me && me !== trybe.slice(6) && <div className="mb-4"><ReportContent targetType="trainer" targetId={trybe.slice(6)} label="Report this trainer" /></div>}
+          </>
         )}
       {trybe !== "all" && trybe !== "discover" && (
         <div className="card mb-6 flex flex-wrap items-center gap-3 p-4">
@@ -550,6 +553,7 @@ function Trybes() {
                     </span>
                   </div>
                   <p className="mt-3">{p.text}</p>
+                  {me && p.author_id !== me && <ReportContent targetType="post" targetId={p.id} label="Report post" />}
                   <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
                     <button
                       className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
@@ -604,6 +608,7 @@ function Trybes() {
                       <span>
                         <b>{c.author_name}:</b> {c.text}
                       </span>
+                      {me && c.author_id !== me && <ReportContent targetType="comment" targetId={c.id} label="Report comment" />}
                       {c.author_id !== me && !isFriend(c.author_id) && (
                         <button
                           className="ml-auto text-xs text-primary"
