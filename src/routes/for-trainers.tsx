@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BarChart3, CalendarDays, HeartHandshake, ShieldCheck, ShoppingBag, Users, Video } from "lucide-react";
+import { BarChart3, CalendarDays, HeartHandshake, ShieldCheck, Users, Video } from "lucide-react";
 import { PageHeader } from "@/components/Avatar";
 
 export const Route = createFileRoute("/for-trainers")({
@@ -23,7 +23,6 @@ const splits = [
 ];
 const perks = [
   { icon: Users, t: "Clients come to you", d: "Members find you through the library, live classes and Trybes." },
-  { icon: ShoppingBag, t: "Your own Trybe Store", d: "Sell merch, guides and gear with your brand on it." },
   { icon: HeartHandshake, t: "Moderated, kind community", d: "Run your own Trybe with moderator tools and review replies." },
   { icon: BarChart3, t: "Real analytics", d: "Live attendance, ad revenue, 1-on-1 earnings and follower growth." },
   { icon: CalendarDays, t: "Calendar that protects your time", d: "Block personal time so clients only book when you're available." },
