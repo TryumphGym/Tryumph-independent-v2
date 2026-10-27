@@ -324,6 +324,18 @@ function Trybes() {
     void reloadRequests();
     void reloadFriends();
   };
+  const unfriend = async (id: string, name: string) => {
+    if (!me || !window.confirm(`Remove ${name} from your friends? This also ends your accountability partnership.`)) return;
+    const { error } = await supabase.rpc("unfriend_user", { p_friend_id: id });
+    if (error) {
+      toast.error(`Couldn't unfriend ${name}: ${error.message}`);
+      return;
+    }
+    if (chatWith === id) setChatWith(null);
+    toast.success(`${name} removed from friends`);
+    void reloadFriends();
+    void reloadRequests();
+  };
   const togglePartner = async (id: string, on: boolean) => {
     await supabase
       .from("friendships")
@@ -740,6 +752,13 @@ function Trybes() {
                     onClick={() => togglePartner(f.friend_id, f.partner)}
                   >
                     {f.partner ? "Partner ✓" : "Make partner"}
+                  </button>
+                  <button
+                    type="button"
+                    className="chip text-destructive"
+                    onClick={() => void unfriend(f.friend_id, f.friend_name)}
+                  >
+                    Unfriend
                   </button>
                 </li>
               ))}
