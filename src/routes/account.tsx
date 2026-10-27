@@ -1,4 +1,5 @@
 import { MemberSessions } from "@/components/MemberSessions";
+import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { cancelPrivateSession } from "@/lib/session-management.functions";
 import {
   credentialLabel,
@@ -525,6 +526,7 @@ function SignedInAccount() {
           <GearPicker />
         </div>
       )}
+      {s.signedIn && <AccountNoticeCenter trainer={s.role === "trainer"} />}
       {s.signedIn && <MemberSessions />}
       <div className="card mb-6 flex flex-wrap items-center gap-4 p-6">
         <Avatar
