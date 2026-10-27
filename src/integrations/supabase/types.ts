@@ -232,6 +232,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      contact_delivery_requests: {
+        Row: {
+          request_id: string;
+          requester_hash: string;
+          payload_hash: string;
+          status: string;
+          attempts: number;
+          lease_until: string;
+          provider_id: string | null;
+          last_error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          request_id: string;
+          requester_hash: string;
+          payload_hash: string;
+          status?: string;
+          attempts?: number;
+          lease_until?: string;
+          provider_id?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          request_id?: string;
+          requester_hash?: string;
+          payload_hash?: string;
+          status?: string;
+          attempts?: number;
+          lease_until?: string;
+          provider_id?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       content_reports: {
         Row: {
           id: string;
@@ -1917,6 +1953,14 @@ export type Database = {
       cancel_private_session: {
         Args: { p_checkout_id: string; p_user_id: string };
         Returns: undefined;
+      };
+      claim_contact_delivery: {
+        Args: {
+          p_request: string;
+          p_requester_hash: string;
+          p_payload_hash: string;
+        };
+        Returns: string;
       };
       claim_earning_operation: {
         Args: { p_id: string };

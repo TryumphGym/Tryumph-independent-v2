@@ -669,4 +669,61 @@ describe("launch completion: deposit, attendance, refunds and transfer state mac
       )["n"],
     ).toBe(1);
   });
+  it("enforces durable public-contact quotas and forbids client quota bypass", async () => {
+    const hash = "a".repeat(64),
+      payload = "b".repeat(64);
+    for (let i = 0; i < 5; i++)
+      await db.query("SELECT claim_contact_delivery(gen_random_uuid(),$1,$2)", [
+        hash,
+        payload,
+      ]);
+    await expect(
+      acting(
+        member,
+        `SELECT claim_contact_delivery(gen_random_uuid(),'${hash}','${payload}')`,
+      ),
+    ).rejects.toThrow("permission denied");
+    await expect(
+      db.query("SELECT claim_contact_delivery(gen_random_uuid(),$1,$2)", [
+        hash,
+        payload,
+      ]),
+    ).rejects.toThrow("limit");
+  });
+  it("deduplicates concurrent contact sends and keeps a sent receipt immutable", async () => {
+    const request = "55555555-5555-4555-8555-555555555555",
+      hash = "a".repeat(64),
+      payload = "b".repeat(64);
+    expect(
+      (
+        await row(
+          `SELECT claim_contact_delivery('${request}','${hash}','${payload}') status`,
+        )
+      )["status"],
+    ).toBe("claimed");
+    expect(
+      (
+        await row(
+          `SELECT claim_contact_delivery('${request}','${hash}','${payload}') status`,
+        )
+      )["status"],
+    ).toBe("processing");
+    await db.exec(
+      `UPDATE contact_delivery_requests SET status='sent',provider_id='provider-confirmed' WHERE request_id='${request}'`,
+    );
+    expect(
+      (
+        await row(
+          `SELECT claim_contact_delivery('${request}','${hash}','${payload}') status`,
+        )
+      )["status"],
+    ).toBe("sent");
+    await expect(
+      db.query("SELECT claim_contact_delivery($1,$2,$3)", [
+        request,
+        hash,
+        "c".repeat(64),
+      ]),
+    ).rejects.toThrow("changed");
+  });
 });

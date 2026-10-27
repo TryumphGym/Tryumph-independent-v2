@@ -1,5 +1,7 @@
--- READ ONLY. Run in a staging copy first. Missing or incompatible schema is a STOP.
-SELECT name,to_regclass('public.'||name) IS NOT NULL AS present
+-- READ ONLY. Run in staging first. Missing required_historical tables or incompatible
+-- definitions are a STOP. Missing later launch tables selects the full upgrade path.
+SELECT name,name NOT IN ('checkout_payment_state','wallet_token_units','private_session_access') AS required_historical,
+ to_regclass('public.'||name) IS NOT NULL AS present
 FROM unnest(ARRAY['profiles','user_roles','messages','friendships','certifications','trainer_videos','trainer_earnings','trainer_accounts','trainer_busy','live_sessions','posts','post_comments','post_likes','checkout_payment_state','wallet_token_units','private_session_access']) name;
 SELECT table_name,column_name,data_type,is_nullable FROM information_schema.columns
 WHERE table_schema='public' AND table_name IN ('profiles','messages','certifications','trainer_videos','private_session_access','content_reports','audience_announcements') ORDER BY table_name,ordinal_position;

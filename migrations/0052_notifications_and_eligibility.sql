@@ -137,7 +137,8 @@ CREATE TRIGGER profile_role_guard BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE
 -- Old partner-reservation RPC must honor explicit sharing and receiving consent too.
 CREATE OR REPLACE FUNCTION public.partner_reservations()
 RETURNS TABLE(friend_id uuid,friend_name text,reservations jsonb) LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
- SELECT f.friend_id,f.friend_name,p.reservations FROM friendships f
+ SELECT f.friend_id,f.friend_name,coalesce((SELECT jsonb_agg(a.session_id) FROM live_room_access a
+ JOIN live_sessions s ON s.id=a.session_id WHERE a.user_id=f.friend_id AND a.status IN ('pending','paid') AND s.status IN ('scheduled','live')),'[]'::jsonb) FROM friendships f
  JOIN friendships back ON back.user_id=f.friend_id AND back.friend_id=f.user_id AND back.partner
  JOIN profiles p ON p.id=f.friend_id
  JOIN notification_preferences sharing ON sharing.user_id=f.friend_id AND sharing.share_live_activity

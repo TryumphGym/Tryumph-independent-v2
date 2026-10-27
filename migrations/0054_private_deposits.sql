@@ -257,9 +257,13 @@ END $$;
 
 CREATE OR REPLACE FUNCTION apply_checkout_refund(p_checkout_id text,p_refund_cents integer,p_fully_refunded boolean)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE b private_session_access%ROWTYPE;
+DECLARE b private_session_access%ROWTYPE; customer uuid;
 BEGIN
  PERFORM apply_checkout_refund_legacy(p_checkout_id,p_refund_cents,p_fully_refunded);
+ SELECT user_id INTO customer FROM checkout_payment_state WHERE checkout_id=p_checkout_id AND refunded_cents=p_refund_cents;
+ IF customer IS NOT NULL AND p_refund_cents>0 THEN
+  PERFORM notify_account(customer,'refund-confirmed:'||p_checkout_id||':'||p_refund_cents,'session','Refund confirmed: $'||(p_refund_cents/100.0)::text||' refunded in total for this payment.');
+ END IF;
  UPDATE private_booking_payments SET refunded_cents=greatest(refunded_cents,p_refund_cents) WHERE payment_id=p_checkout_id;
  FOR b IN SELECT * FROM private_session_access WHERE payment_version=2 AND delivered_at IS NULL AND status NOT IN ('transferred','refunded','cancelled')
  AND (deposit_origin=p_checkout_id OR checkout_id IN(SELECT booking_id FROM private_booking_payments WHERE payment_id=p_checkout_id)) FOR UPDATE LOOP

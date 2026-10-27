@@ -4,9 +4,9 @@ Nothing in this engineering pass was executed against hosted Supabase. Read [FOU
 
 ## Few-step SQL Editor sequence
 
-1. Back up and restore a staging copy; run the complete [preflight.sql](preflight.sql). Inspect the manually installed message policy, actual columns/constraints, administrator grants, triggers and bucket limits. Missing/incompatible schema is a stop requiring reconciliation, never a reason to erase data.
-2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054`.
-3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
+1. Back up and restore a staging copy; run the complete [preflight.sql](preflight.sql). Inspect the manually installed message policy, actual columns/constraints, administrator grants, triggers and bucket limits. Missing required historical tables or incompatible definitions require reconciliation, never erasing data. Missing optional launch tables on the historical baseline selects the full upgrade.
+2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054 → 0055`.
+3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion` and `0055_contact_delivery`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
 
 `npm run db:bundle` only regenerates artifacts. `npm run db:check` and `npm run db:types` use isolated PostgreSQL, not Supabase. The full bundle includes every upgrade below in filename order. Do not rerun historical table-creation migrations on an existing database or run the obsolete root `0019_live_eligibility_guard.sql`.
 
@@ -49,6 +49,8 @@ Nothing in this engineering pass was executed against hosted Supabase. Read [FOU
 35. [`0052_notifications_and_eligibility.sql`](../../migrations/0052_notifications_and_eligibility.sql)
 36. [`0053_verified_live_attendance.sql`](../../migrations/0053_verified_live_attendance.sql)
 37. [`0054_private_deposits.sql`](../../migrations/0054_private_deposits.sql)
+
+38. [`0055_contact_delivery.sql`](../../migrations/0055_contact_delivery.sql)
 
 ## Data preservation and rollback
 

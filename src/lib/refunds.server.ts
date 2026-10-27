@@ -8,7 +8,7 @@ export async function processRefundJobs() {
   const stripe = new Stripe(key);
   const jobs = await supabaseAdmin
     .from("refund_jobs")
-    .select("checkout_id,target_cents,attempts")
+    .select("checkout_id,target_cents,attempts,reason")
     .is("completed_at", null)
     .limit(100);
   if (jobs.error) throw jobs.error;
@@ -49,6 +49,23 @@ export async function processRefundJobs() {
         p_fully_refunded: target === intentRecord.amount_received,
       });
       if (saved.error) throw saved.error;
+      // Unfulfillable checkouts may have no settlement row; Stripe metadata still
+      // identifies the authenticated purchaser without trusting a browser claim.
+      const purchaser = session?.metadata?.["userId"];
+      if (
+        job.reason === "paid_booking_unfulfillable" &&
+        purchaser &&
+        /^[0-9a-f-]{36}$/i.test(purchaser)
+      ) {
+        const notice = await supabaseAdmin.rpc("notify_account", {
+          p_user: purchaser,
+          p_key: `refund-confirmed:${job.checkout_id}:${target}`,
+          p_category: "session",
+          p_body: `Refund confirmed: $${(target / 100).toFixed(2)} refunded in total for this payment.`,
+          p_href: "/account",
+        });
+        if (notice.error) throw notice.error;
+      }
       let doneQuery = supabaseAdmin
         .from("refund_jobs")
         .update({

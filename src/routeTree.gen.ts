@@ -12,10 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ForTrainersRouteImport } from './routes/for-trainers'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as NutritionRouteImport } from './routes/nutrition'
 import { Route as OnDemandRouteImport } from './routes/on-demand'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -46,6 +48,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForTrainersRoute = ForTrainersRouteImport.update({
   id: '/for-trainers',
   path: '/for-trainers',
@@ -64,6 +71,11 @@ const NutritionRoute = NutritionRouteImport.update({
 const OnDemandRoute = OnDemandRouteImport.update({
   id: '/on-demand',
   path: '/on-demand',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -143,10 +155,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -166,10 +180,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -190,10 +206,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -215,10 +233,12 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -238,10 +258,12 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -261,10 +283,12 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -285,10 +309,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
+  ContactRoute: typeof ContactRoute
   ForTrainersRoute: typeof ForTrainersRoute
   LiveRoute: typeof LiveRoute
   NutritionRoute: typeof NutritionRoute
   OnDemandRoute: typeof OnDemandRoute
+  PrivacyRoute: typeof PrivacyRoute
   ShopRoute: typeof ShopRoute
   StudioRoute: typeof StudioRoute
   TermsRoute: typeof TermsRoute
@@ -328,6 +354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/for-trainers': {
       id: '/for-trainers'
       path: '/for-trainers'
@@ -354,6 +387,13 @@ declare module '@tanstack/react-router' {
       path: '/on-demand'
       fullPath: '/on-demand'
       preLoaderRoute: typeof OnDemandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -461,10 +501,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
+  ContactRoute: ContactRoute,
   ForTrainersRoute: ForTrainersRoute,
   LiveRoute: LiveRoute,
   NutritionRoute: NutritionRoute,
   OnDemandRoute: OnDemandRoute,
+  PrivacyRoute: PrivacyRoute,
   ShopRoute: ShopRoute,
   StudioRoute: StudioRoute,
   TermsRoute: TermsRoute,
