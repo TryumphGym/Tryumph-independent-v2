@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/Avatar";
 import { payOutPending } from "@/lib/payouts.functions";
 import { PrivateVideoPreview } from "@/components/PrivateVideoPreview";
 import { AdminOperations } from "@/components/AdminOperations";
+import { AdminSafetyCenter } from "@/components/AdminSafetyCenter";
 import { AdminSponsorCampaigns } from "@/components/AdminSponsorCampaigns";
 import {
   interestLabel,
@@ -286,6 +287,7 @@ function Admin() {
       </section>
       <AdminSponsorCampaigns />
       <AdminOperations />
+      <AdminSafetyCenter />
       {LAUNCH.youth && (
         <section className="card space-y-3 p-5">
           <div>
