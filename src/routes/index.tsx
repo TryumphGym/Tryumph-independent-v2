@@ -69,11 +69,11 @@ function Home() {
           .limit(100),
         supabase
           .from("live_sessions")
-          .select("id,title,trainer_name,starts_at,minutes")
+          .select("id,title,trainer_id,trainer_name,starts_at,minutes")
           .eq("status", "scheduled")
           .gte("starts_at", new Date().toISOString())
           .order("starts_at")
-          .limit(1),
+          .limit(25),
       ]);
       if (!active) return;
       setFeatured(
@@ -105,7 +105,18 @@ function Home() {
           )
           .slice(0, 6),
       );
-      setUpNext(l.data?.[0] ?? null);
+      let nextEligible = null;
+      for (const session of l.data ?? []) {
+        const eligibility = await supabase.rpc("trainer_is_eligible", {
+          p_user_id: session.trainer_id,
+          p_live: true,
+        });
+        if (!eligibility.error && eligibility.data === true) {
+          nextEligible = session;
+          break;
+        }
+      }
+      if (active) setUpNext(nextEligible);
     })();
     return () => {
       active = false;
