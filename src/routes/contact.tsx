@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { sendContactMessage } from "@/lib/contact.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/contact")({ head: () => ({ meta: [
   { title: "Contact Us — Tryumph Gym" },
@@ -8,12 +9,13 @@ export const Route = createFileRoute("/contact")({ head: () => ({ meta: [
 ] }), component: Contact });
 
 const destination = "mackenzie@tryumphgym.com";
-const topics = ["General question","Trainer onboarding","Bookings or payments","Report safety or abuse","Privacy or data request","Accessibility","Advertising or partnerships"] as const;
+const topics = ["General question","Support request","Refund request","Feature request","Trainer onboarding","Report safety or abuse","Privacy or data request","Accessibility","Advertising or partnerships"] as const;
 type Topic = typeof topics[number];
 function Contact() {
   const [topic,setTopic]=useState<Topic>("General question");
   const [message,setMessage]=useState("");
   const [replyTo,setReplyTo]=useState("");
+  const [bookingReference,setBookingReference]=useState("");
   const [website,setWebsite]=useState(""); // Spam trap; kept out of normal view
   const [busy,setBusy]=useState(false);
   const [sent,setSent]=useState(false);
@@ -24,7 +26,9 @@ function Contact() {
     setBusy(true);
     setError("");
     try {
-      await sendContactMessage({ data: { topic, email: replyTo, message, website } });
+      const { data: auth } = await supabase.auth.getSession();
+      if (topic === "Refund request" && !auth.session?.access_token) { throw new Error("Please sign in to request a refund so we can identify the correct account."); }
+      await sendContactMessage({ data: { topic, email: replyTo, message, website, bookingReference: topic === "Refund request" ? bookingReference : undefined, accessToken: topic === "Refund request" ? auth.session?.access_token : undefined } });
       setSent(true);
       setMessage("");
     } catch (e) {
@@ -48,6 +52,7 @@ function Contact() {
           <label className="block text-sm font-medium">Reason for contacting us<select className="field mt-1" value={topic} onChange={e=>setTopic(e.target.value as Topic)}>
             {topics.map(x=><option key={x}>{x}</option>)}
           </select></label>
+          {topic === "Refund request" && <div className="space-y-2 rounded-lg border p-3"><p className="text-sm">For your security, refund requests must be sent while signed in. Your verified account ID is attached automatically. You do not need to enter it.</p><label className="block text-sm font-medium">Booking or transaction reference (optional)<input className="field mt-1" maxLength={150} value={bookingReference} onChange={e=>setBookingReference(e.target.value)} placeholder="Booking date or reference"/></label><Link className="text-sm text-primary underline" to="/account">Sign in or view your account</Link></div>}
           <label className="block text-sm font-medium">Message<textarea className="field mt-1 min-h-32" minLength={10} maxLength={4000} value={message} onChange={e=>setMessage(e.target.value)} required /></label>
           <div aria-hidden="true" className="absolute h-px w-px overflow-hidden opacity-0" style={{ left: "-9999px" }}>
             <label>Website<input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)} /></label>
