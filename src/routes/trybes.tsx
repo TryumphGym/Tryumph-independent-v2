@@ -149,6 +149,10 @@ function Trybes() {
   const e = s.extra;
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
+  const partnerIds = partners
+    .map((p) => p.friend_id)
+    .sort()
+    .join(",");
   // Private Trybes: posts are only ever visible to joined members.
   const canSee = (id: string) =>
     id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
@@ -211,11 +215,12 @@ function Trybes() {
   }, [t]);
 
   useEffect(() => {
-    if (!me || partners.length === 0) {
+    if (!me || !partnerIds) {
       setAlerts([]);
       return;
     }
     let active = true;
+    const authorizedPartners = new Set(partnerIds.split(","));
     const loadPartnerAlerts = async () => {
       const { data: reservations, error } = await supabase.rpc(
         "partner_reservations",
@@ -227,7 +232,7 @@ function Trybes() {
       }
       const partnerBySession = new Map<string, Set<string>>();
       for (const partner of reservations ?? []) {
-        if (!partners.some((f) => f.friend_id === partner.friend_id)) continue;
+        if (!authorizedPartners.has(partner.friend_id)) continue;
         const ids = Array.isArray(partner.reservations)
           ? partner.reservations
           : [];
@@ -270,13 +275,7 @@ function Trybes() {
       active = false;
       window.clearInterval(poll);
     };
-  }, [
-    me,
-    partners
-      .map((p) => p.friend_id)
-      .sort()
-      .join(","),
-  ]);
+  }, [me, partnerIds]);
 
   const needAuth = (what: string) => {
     if (!s.signedIn || !me) {

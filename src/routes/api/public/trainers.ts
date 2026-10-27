@@ -90,9 +90,13 @@ export const Route = createFileRoute("/api/public/trainers")({
                 .map((c) => c.name),
               avatarUrl:
                 typeof p.avatar_url === "string" &&
-                /^https:\/\//i.test(p.avatar_url)
-                  ? p.avatar_url
-                  : null,
+                p.avatar_url.startsWith(`${p.id}/`)
+                  ? db.storage.from("avatars").getPublicUrl(p.avatar_url).data
+                      .publicUrl
+                  : typeof p.avatar_url === "string" &&
+                      /^https:\/\//i.test(p.avatar_url)
+                    ? p.avatar_url
+                    : null,
             };
           });
           return Response.json(

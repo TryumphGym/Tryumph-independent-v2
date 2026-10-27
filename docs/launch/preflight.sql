@@ -11,7 +11,7 @@ SELECT schemaname,tablename,policyname,permissive,cmd,roles,qual,with_check
 FROM pg_policies WHERE (schemaname='public' AND tablename IN ('messages','profiles','posts','post_comments','certifications','trainer_videos','live_room_access','private_session_access','friend_requests','friendships')) OR schemaname='storage'
 ORDER BY schemaname,tablename,policyname;
 SELECT proname,prosecdef,proconfig,proacl FROM pg_proc JOIN pg_namespace n ON n.oid=pronamespace
-WHERE n.nspname='public' AND proname IN ('trainer_is_eligible','has_role','can_send_message','apply_paid_private_booking','apply_checkout_refund');
+WHERE n.nspname='public' AND proname IN ('trainer_is_eligible','has_role','can_send_message','apply_paid_private_booking','apply_checkout_refund','accept_friend_request','unfriend_user');
 SELECT user_id,role FROM public.user_roles WHERE role IN ('admin','moderator');
 SELECT id,public,file_size_limit,allowed_mime_types FROM storage.buckets
 WHERE id IN ('trainer-certificates','videos','avatars','trainer-store-images');
