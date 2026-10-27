@@ -406,6 +406,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Count one active day per signed-in local calendar day. Visit activity is
+  // distinct from completed-workout activity; do not count guests.
+  useEffect(() => {
+    if (!loaded || !s.signedIn || !userIdRef.current) return;
+    const day = today();
+    if (s.activeDays.includes(day)) return;
+    setS((prev) =>
+      prev.signedIn && !prev.activeDays.includes(day)
+        ? { ...prev, activeDays: [...prev.activeDays, day] }
+        : prev,
+    );
+  }, [loaded, s.signedIn, s.activeDays]);
+
   // Persist: localStorage for guests, cloud profile for signed-in users (debounced).
   useEffect(() => {
     if (!loaded) return;
@@ -555,13 +568,17 @@ export function useStore() {
   return c;
 }
 
-export function streak(days: string[]) {
-  const set = new Set(days);
+export function streak(days: string[], now = new Date()) {
+  // A daily streak stays visible until the end of the next local day.
+  const recorded = new Set(days);
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const localDay = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  if (!recorded.has(localDay(day))) day.setDate(day.getDate() - 1);
   let n = 0;
-  const d = new Date();
-  while (set.has(d.toISOString().slice(0, 10))) {
+  while (recorded.has(localDay(day))) {
     n++;
-    d.setDate(d.getDate() - 1);
+    day.setDate(day.getDate() - 1);
   }
   return n;
 }
