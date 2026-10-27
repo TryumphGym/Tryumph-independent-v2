@@ -1363,6 +1363,7 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
+      unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
       accept_friend_request: { Args: { p_requester_id: string }; Returns: undefined };
       apply_checkout_refund: {
         Args: {
