@@ -15,7 +15,6 @@ import {
   coachTrybeNames,
   goalTrybes,
   isPrivateTrybe,
-  liveClasses,
   trybeName,
 } from "@/lib/data";
 import { useStore } from "@/lib/store";
@@ -199,21 +198,53 @@ function Trybes() {
       setAlerts([]);
       return;
     }
-    supabase.rpc("partner_reservations").then(({ data }) => {
-      const out: { name: string; title: string; when: string }[] = [];
-      for (const r of data ?? []) {
-        const ids = Array.isArray(r.reservations)
-          ? (r.reservations as string[])
-          : [];
+    let active = true;
+    const loadPartnerAlerts = async () => {
+      const { data: reservations, error } = await supabase.rpc("partner_reservations");
+      if (error) {
+        console.error("Partner reservations unavailable", error);
+        if (active) setAlerts([]);
+        return;
+      }
+      const partnerBySession = new Map<string, Set<string>>();
+      for (const partner of reservations ?? []) {
+        if (!partners.some((f) => f.friend_id === partner.friend_id)) continue;
+        const ids = Array.isArray(partner.reservations) ? partner.reservations : [];
         for (const id of ids) {
-          const l = liveClasses.find((x) => x.id === id);
-          if (l)
-            out.push({ name: r.friend_name, title: l.title, when: l.when });
+          if (typeof id !== "string") continue;
+          if (!partnerBySession.has(id)) partnerBySession.set(id, new Set());
+          partnerBySession.get(id)!.add(partner.friend_name);
         }
       }
-      setAlerts(out);
-    });
-  }, [me, partners.length]);
+      const ids = [...partnerBySession.keys()];
+      if (!ids.length) {
+        if (active) setAlerts([]);
+        return;
+      }
+      const { data: sessions, error: sessionError } = await supabase
+        .from("live_sessions")
+        .select("id,title,starts_at,status")
+        .in("id", ids)
+        .eq("status", "scheduled")
+        .gte("starts_at", new Date().toISOString());
+      if (sessionError) {
+        console.error("Partner live sessions unavailable", sessionError);
+        if (active) setAlerts([]);
+        return;
+      }
+      const output = (sessions ?? []).flatMap((session) =>
+        [...(partnerBySession.get(session.id) ?? [])].map((name) => ({
+          name,
+          title: session.title,
+          when: new Date(session.starts_at).toLocaleString(),
+        })),
+      );
+      if (active) setAlerts(output);
+    };
+    void loadPartnerAlerts();
+    const poll = window.setInterval(() => { void loadPartnerAlerts(); }, 30000);
+    return () => { active = false; window.clearInterval(poll); };
+  }, [me, partners.map((p) => p.friend_id).sort().join(",")]);
 
   const needAuth = (what: string) => {
     if (!s.signedIn || !me) {
