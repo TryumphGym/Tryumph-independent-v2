@@ -112,14 +112,18 @@ function Trybes() {
     const result = join
       ? await supabase
           .from("trybe_memberships")
-          .upsert({ user_id: me, trybe_id: id })
+          .insert({ user_id: me, trybe_id: id })
       : await supabase
           .from("trybe_memberships")
           .delete()
           .eq("user_id", me)
           .eq("trybe_id", id);
     if (result.error) {
-      toast.error("Could not update Trybe membership.");
+      if (join && result.error.code === "23505") {
+        setJoinedIds((old) => [...new Set([...old, id])]);
+        return;
+      }
+      toast.error(`Could not update Trybe membership: ${result.error.message}`);
       return;
     }
     setJoinedIds((old) =>
