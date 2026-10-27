@@ -5,7 +5,6 @@ import { z } from "zod";
 import Stripe from "stripe";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TOKEN_PRICE } from "./data";
-import { hasVerifiedCpr } from "./cpr";
 import { isTaken, type BusyRow } from "./availability";
 
 function stripe() {
@@ -20,6 +19,12 @@ export const createTokenCheckout = createServerFn({ method: "POST" })
     z.object({ tokens: z.number().int().min(1).max(100) }).parse(data),
   )
   .handler(async ({ data, context }) => {
+    const active = await context.supabase.rpc("account_can_act", {
+      p_id: context.userId,
+      p_content: false,
+    });
+    if (active.error || !active.data)
+      throw new Error("This account cannot start a checkout.");
     const s = stripe();
     const origin = appOrigin();
     const session = await s.checkout.sessions.create({
@@ -58,6 +63,7 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
         trainerId: z.string().uuid(),
         date: z.string(),
         time: z.string(),
+        terms: z.literal("private-deposit-v1"),
       })
       .parse(data),
   )
@@ -73,12 +79,12 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
       .eq("role", "trainer")
       .maybeSingle();
     if (trainerError || !profile) throw new Error("Trainer is not available.");
-    const { data: credentials, error: credentialError } = await supabaseAdmin
-      .from("certifications")
-      .select("name,status,expires,verified_at,verified_by")
-      .eq("user_id", data.trainerId);
-    if (credentialError || !hasVerifiedCpr(credentials ?? []))
-      throw new Error("Trainer CPR/AED verification is required.");
+    const eligibility = await supabaseAdmin.rpc("trainer_is_eligible", {
+      p_user_id: data.trainerId,
+      p_live: false,
+    });
+    if (eligibility.error || !eligibility.data)
+      throw new Error("Trainer credentials are not current.");
     const extra =
       profile.extra &&
       typeof profile.extra === "object" &&
@@ -92,7 +98,7 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
         ? (extra["trainer"] as Record<string, unknown>)
         : {};
     const rate = Number(trainerData["rate"]);
-    if (!Number.isFinite(rate) || rate < 0.5 || rate > 1000)
+    if (!Number.isFinite(rate) || rate < 2 || rate > 1000)
       throw new Error(
         "This trainer has not published a valid private-session price.",
       );
@@ -129,10 +135,11 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
     }
     // Reserve the slot atomically before redirecting to paid checkout.
     const { data: holdId, error: holdError } = await supabaseAdmin.rpc(
-      "hold_private_booking",
+      "prepare_deposit_booking",
       {
-        p_trainer_id: data.trainerId,
-        p_member_id: context.userId,
+        p_trainer: data.trainerId,
+        p_member: context.userId,
+        p_terms: data.terms,
         p_day: data.date,
         p_time: data.time,
       },
@@ -143,7 +150,7 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
       );
     const hold = await supabaseAdmin
       .from("private_booking_holds")
-      .select("expires_at")
+      .select("expires_at,total_cents")
       .eq("id", holdId)
       .single();
     if (hold.error) throw hold.error;
@@ -154,6 +161,14 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
       session = await s.checkout.sessions.create(
         {
           mode: "payment",
+          customer_creation: "always",
+          payment_intent_data: { setup_future_usage: "off_session" },
+          custom_text: {
+            submit: {
+              message:
+                "25% deposit now; remaining 75% only when both participants enter the waiting room. Card saved for that balance. Full refund for any unfulfilled session under launch policy.",
+            },
+          },
           allowed_payment_method_types: ["card"],
           expires_at:
             Math.floor(new Date(hold.data.expires_at).getTime() / 1000) -
@@ -163,21 +178,22 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
               quantity: 1,
               price_data: {
                 currency: "usd",
-                unit_amount: Math.round(t.rate * 100),
+                unit_amount: Math.floor((hold.data.total_cents! + 2) / 4),
                 product_data: {
-                  name: `1-on-1 with ${t.name}`,
+                  name: `25% deposit · 1-on-1 with ${t.name}`,
                   description: `${data.date} at ${data.time} · private video room`,
                 },
               },
             },
           ],
           metadata: {
-            type: "booking",
+            type: "private_deposit",
             userId: context.userId,
             trainerId: t.id,
             date: data.date,
             time: data.time,
-            price: String(t.rate),
+            price: String(hold.data.total_cents),
+            termsVersion: data.terms,
             holdId,
           },
           success_url: `${origin}/trainers/${t.id}?booked=1&date=${encodeURIComponent(data.date)}&time=${encodeURIComponent(data.time)}`,

@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -7,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { changedFields, mergeSavedState } from "./profile-sync";
 import { seedPosts, TOKEN_PRICE } from "./data";
 
 export type Post = {
@@ -218,7 +220,10 @@ const initial: State = {
 };
 
 const KEY = "tryumph-state-v1";
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 type Ctx = {
@@ -227,7 +232,7 @@ type Ctx = {
   saveProfile: (fn: (s: State) => State) => Promise<void>;
   signIn: (name: string, role: State["role"]) => void;
   signOut: () => void;
-  reserve: (id: string) => void;
+  reserve: (id: string) => Promise<void>;
   markActive: () => void;
   watch: (videoId: string) => void;
   toggleWatchLater: (videoId: string) => void;
@@ -326,8 +331,6 @@ function stateToRow(userId: string, s: State) {
     dr_gap: s.profile.drGap,
     weeks_postpartum: s.profile.weeksPostpartum,
     avatar_url: s.profile.avatar || null,
-    active_days: s.activeDays,
-    reservations: s.reservations,
     watch_later: s.watchLater,
     history: s.history,
     partners: s.partners,
@@ -347,6 +350,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(s);
   stateRef.current = s;
   const profileLoadVersion = useRef(0);
+  const persistedRowRef = useRef<ReturnType<typeof stateToRow> | null>(null);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const writeProfile = useCallback(
+    (userId: string, patch: Partial<ReturnType<typeof stateToRow>>) => {
+      const write = writeQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          if (userIdRef.current !== userId)
+            throw new Error("Your session changed while saving.");
+          const result = await supabase
+            .from("profiles")
+            .update({ ...patch, updated_at: new Date().toISOString() })
+            .eq("id", userId)
+            .select("id");
+          if (result.error) throw new Error(result.error.message);
+          if (!result.data?.length)
+            throw new Error("Supabase did not update your profile.");
+          if (userIdRef.current !== userId)
+            throw new Error("Your session changed while saving.");
+          if (persistedRowRef.current)
+            persistedRowRef.current = { ...persistedRowRef.current, ...patch };
+        });
+      writeQueueRef.current = write;
+      return write;
+    },
+    [],
+  );
 
   // Load guest state from device, then attach to the cloud session if one exists.
   useEffect(() => {
@@ -377,7 +407,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         skipSave.current = true;
         userIdRef.current = userId;
-        setS(rowToState(data as ProfileRow));
+        const profile = rowToState(data as ProfileRow);
+        persistedRowRef.current = stateToRow(userId, profile);
+        setS(profile);
+        // SIGNED_IN can precede this response. Record immediately even if the
+        // signed-in boolean did not change again when the profile arrived.
+        void supabase
+          .rpc("record_account_activity", {
+            p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          })
+          .then((r) => {
+            if (
+              !r.error &&
+              userIdRef.current === userId &&
+              version === profileLoadVersion.current
+            )
+              setS((prev) => ({ ...prev, activeDays: arr(r.data) }));
+          });
       }
     };
 
@@ -388,12 +434,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")
+        if (event === "SIGNED_IN" && userIdRef.current !== session.user.id)
           loadProfile(session.user.id);
       } else if (event === "SIGNED_OUT") {
         profileLoadVersion.current++;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         userIdRef.current = null;
+        persistedRowRef.current = null;
         skipSave.current = true;
         setS({
           ...initial,
@@ -406,18 +453,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Count one active day per signed-in local calendar day. Visit activity is
-  // distinct from completed-workout activity; do not count guests.
+  // A server timestamp plus the device's IANA zone records only actual signed-in
+  // local days. Atomic union in SQL prevents two devices overwriting each other.
   useEffect(() => {
-    if (!loaded || !s.signedIn || !userIdRef.current) return;
-    const day = today();
-    if (s.activeDays.includes(day)) return;
-    setS((prev) =>
-      prev.signedIn && !prev.activeDays.includes(day)
-        ? { ...prev, activeDays: [...prev.activeDays, day] }
-        : prev,
-    );
-  }, [loaded, s.signedIn, s.activeDays]);
+    if (!loaded || !s.signedIn) return;
+    let active = true,
+      lastDay = "";
+    const record = async () => {
+      const id = userIdRef.current,
+        day = today();
+      if (!id || day === lastDay) return;
+      const result = await supabase.rpc("record_account_activity", {
+        p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      if (!result.error && active && userIdRef.current === id) {
+        lastDay = day;
+        setS((prev) => ({ ...prev, activeDays: arr(result.data) }));
+      }
+    };
+    void record();
+    const timer = setInterval(() => void record(), 60000);
+    window.addEventListener("focus", record);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", record);
+    };
+  }, [loaded, s.signedIn]);
 
   // Persist: localStorage for guests, cloud profile for signed-in users (debounced).
   useEffect(() => {
@@ -428,25 +490,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (userIdRef.current && s.signedIn) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      const snapshot = s;
       const userId = userIdRef.current;
+      const row = stateToRow(userId, s);
+      const patch = changedFields(persistedRowRef.current ?? row, row);
+      if (!Object.keys(patch).length) return;
       saveTimer.current = setTimeout(() => {
-        if (userIdRef.current !== userId) return;
-        void supabase
-          .from("profiles")
-          .update(stateToRow(userId, snapshot))
-          .eq("id", userId)
-          .then(({ error }) => {
-            if (error) {
-              console.error("[Tryumph] Automatic profile save failed:", error);
-              // Background saves must not falsely report success.
-            }
-          });
+        void writeProfile(userId, patch).catch((error) =>
+          console.error("[Tryumph] Automatic profile save failed:", error),
+        );
       }, 600);
     } else {
       localStorage.setItem(KEY, JSON.stringify(s));
     }
-  }, [s, loaded]);
+  }, [s, loaded, writeProfile]);
 
   useEffect(() => {
     const refresh = async () => {
@@ -485,12 +541,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   const set = (fn: (s: State) => State) => setS(fn);
-  const markActive = () =>
-    set((x) =>
-      x.activeDays.includes(today())
-        ? x
-        : { ...x, activeDays: [...x.activeDays, today()] },
-    );
+  const markActive = () => {
+    if (!userIdRef.current) return;
+    const id = userIdRef.current;
+    void supabase
+      .rpc("record_account_activity", {
+        p_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+      .then((r) => {
+        if (!r.error && userIdRef.current === id)
+          setS((prev) => ({ ...prev, activeDays: arr(r.data) }));
+      });
+  };
 
   const saveProfile = async (fn: (current: State) => State): Promise<void> => {
     const userId = userIdRef.current;
@@ -499,27 +561,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         "Your profile is still loading. Please try again in a moment.",
       );
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const next = fn(stateRef.current);
-    // Do not show success or update the local state until Supabase confirms the write.
-    const { data, error } = await supabase
-      .from("profiles")
-      .update(stateToRow(userId, next))
-      .eq("id", userId)
-      .select("id");
-    if (error) {
-      console.error("[Tryumph] Profile save failed:", error);
-      throw new Error(error.message);
-    }
-    if (!data?.length)
-      throw new Error(
-        "Supabase did not update your profile. Please check your account permissions.",
-      );
+    const before = stateRef.current;
+    const next = fn(before);
+    const patch = changedFields(
+      stateToRow(userId, before),
+      stateToRow(userId, next),
+    );
+    if (Object.keys(patch).length) await writeProfile(userId, patch);
     if (userIdRef.current !== userId)
-      throw new Error(
-        "Your session changed while saving. Please sign in again.",
-      );
-    skipSave.current = true;
-    setS(next);
+      throw new Error("Your session changed while saving.");
+    setS((current) => mergeSavedState(before, next, current));
   };
 
   const ctx: Ctx = {
@@ -532,13 +583,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     signOut: () => {
       void supabase.auth.signOut();
     },
-    reserve: (id) =>
-      set((x) => ({
-        ...x,
-        reservations: x.reservations.includes(id)
-          ? x.reservations.filter((r) => r !== id)
-          : [...x.reservations, id],
-      })),
+    reserve: async (id) => {
+      const reserved = !stateRef.current.reservations.includes(id),
+        user = userIdRef.current;
+      if (!user) return;
+      const r = await supabase.rpc("set_live_reservation", {
+        p_session: id,
+        p_reserved: reserved,
+      });
+      if (r.error)
+        throw new Error("Unable to save reservation. Please try again.");
+      if (userIdRef.current === user)
+        setS((x) => ({
+          ...x,
+          reservations: reserved
+            ? [...new Set([...x.reservations, id])]
+            : x.reservations.filter((r) => r !== id),
+        }));
+    },
     setExtra: (fn) => set((x) => ({ ...x, extra: fn(x.extra) })),
     watch: (videoId) =>
       set((x) => ({
@@ -547,9 +609,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           0,
           20,
         ),
-        activeDays: x.activeDays.includes(today())
-          ? x.activeDays
-          : [...x.activeDays, today()],
       })),
     toggleWatchLater: (v) =>
       set((x) => ({

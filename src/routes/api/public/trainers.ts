@@ -25,9 +25,20 @@ export const Route = createFileRoute("/api/public/trainers")({
             .not("verified_by", "is", null);
           if (certError) throw certError;
           const valid = (credentials ?? []).filter((c) => isCurrentVerified(c));
-          const ids = [...new Set(valid.map((c) => c.user_id))].filter((id) =>
+          let ids = [...new Set(valid.map((c) => c.user_id))].filter((id) =>
             hasVerifiedCpr(valid.filter((c) => c.user_id === id)),
           );
+          const eligibility = await Promise.all(
+            ids.map(async (id) => {
+              const r = await db.rpc("trainer_is_eligible", {
+                p_user_id: id,
+                p_live: false,
+              });
+              if (r.error) throw r.error;
+              return r.data ? id : null;
+            }),
+          );
+          ids = eligibility.filter((id): id is string => id !== null);
           if (!ids.length) return Response.json({ trainers: [] });
           const { data: profiles, error: profileError } = await db
             .from("profiles")

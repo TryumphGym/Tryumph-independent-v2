@@ -75,7 +75,7 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
       enabled = !!a.payouts_enabled;
       await supabaseAdmin
         .from("trainer_accounts")
-        .update({ payouts_enabled: true })
+        .update({ payouts_enabled: enabled })
         .eq("user_id", context.userId);
     }
     const slugs = [context.userId, acct?.slug].filter(Boolean) as string[];

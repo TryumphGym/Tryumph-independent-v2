@@ -61,3 +61,11 @@ For a local public-only setup, `.env.local` contains just the two existing publi
 ## Network
 
 The environment draft preserves package-manager presets and adds known destinations: the configured Supabase project, `video.bunnycdn.com`, `tus.bunnycdn.com`, `iframe.mediadelivery.net`, `api.stripe.com`, `api.github.com`, and existing Google font hosts. Fonts are now bundled, so they no longer require runtime Google requests. Add the exact LiveKit and R2 account hostnames after choosing those accounts; do not replace an unknown allowlist or add arbitrary wildcards. Native Git branch push and draft PR creation were verified. Saving the environment draft does not itself establish publication or apply runtime settings.
+
+## October 27 completion additions
+
+Use [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) as the current sequence. `VITE_STRIPE_PUBLISHABLE_KEY` is a public **test** key required to authenticate the existing private-balance intent; never use a secret key in that build setting. The same server-only Stripe keys cover deposits, the one balance intent and its verified events. Add `payment_intent.succeeded` and `account.updated` to the staging webhook event selection alongside the existing checkout/refund/dispute events. `account.updated` persists true or false payout status from Stripe rather than trusting the browser.
+
+LiveKit participant webhook handling now performs a fresh provider presence lookup before spending tokens or advancing private balances. Attendees awaiting a debit have no subscription permission; deposit participants have no audio/video delivery until successful balance settlement. The scheduled job processes early-arriving participants who remain present at scheduled start. Room tokens expire no later than the access window, and expired/cancelled private rooms have durable shutdown jobs. Real provider permission updates and webhook retry behavior remain staging gates.
+
+Resend contact/sender/reply-to target is `mackenzie@tryumphgym.com` / Tryumph Gym. The app continues to use Supabase Auth; configure Resend behind Supabase custom SMTP, not a second authentication flow. No Resend runtime key is required by the current app code. The requested setup guide could not be fetched because the network proxy returned 403; see [RESEND_SETUP.md](RESEND_SETUP.md). No provider setting or DNS was changed.

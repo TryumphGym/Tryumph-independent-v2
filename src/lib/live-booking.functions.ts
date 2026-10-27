@@ -14,14 +14,15 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
       await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("live_sessions")
-      .select("id,title,trainer_id,starts_at,status")
+      .select("id,title,trainer_id,starts_at,status,minutes")
       .eq("id", data.sessionId)
       .single();
     if (
       error ||
       !session ||
       !["scheduled", "live"].includes(session.status) ||
-      new Date(session.starts_at).getTime() <= Date.now()
+      new Date(session.starts_at).getTime() + session.minutes * 60000 <=
+        Date.now()
     )
       throw new Error("Class is unavailable");
     const eligible = await supabaseAdmin.rpc("trainer_is_eligible", {
@@ -74,7 +75,8 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
           },
         ],
         metadata: {
-          type: "live",
+          type: "tokens",
+          tokens: "1",
           userId: context.userId,
           sessionId: session.id,
         },

@@ -1,3 +1,5 @@
+> October 27 follow-up: see [the founder handoff](FOUNDER_HANDOFF.md) for the current implementation, SQL sequence and verification boundaries. The historical descriptions below are retained as context; use the handoff where they conflict, including deposits, attendance and messaging policy.
+
 # Later integration test sequence
 
 Use a staging Supabase copy, a separate Worker origin, Stripe **test mode**, test LiveKit/R2 resources, and actual provider test uploads. None of the steps below were represented as verified production behavior during coding. Preserve server logs privately and record provider event IDs without logging keys. Do not alter production DNS, apply production SQL or process real payments as part of this checklist without separate approval.

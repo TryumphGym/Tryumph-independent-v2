@@ -53,6 +53,15 @@ export const Route = createFileRoute("/api/bunny-upload")({
               { status: 403 },
             );
           }
+          const eligible = await supabase.rpc("trainer_is_eligible", {
+            p_user_id: auth.user.id,
+            p_live: false,
+          });
+          if (eligible.error || !eligible.data)
+            return Response.json(
+              { error: "Current verified trainer credentials are required" },
+              { status: 403 },
+            );
           const body = (await request.json()) as { title?: string };
           const title = body.title?.trim().slice(0, 180);
           if (!title)
@@ -83,13 +92,11 @@ export const Route = createFileRoute("/api/bunny-upload")({
             );
           const { supabaseAdmin } =
             await import("@/integrations/supabase/client.server");
-          const ownership = await supabaseAdmin
-            .from("video_uploads")
-            .insert({
-              guid: video.guid,
-              user_id: auth.user.id,
-              library_id: libraryId,
-            });
+          const ownership = await supabaseAdmin.from("video_uploads").insert({
+            guid: video.guid,
+            user_id: auth.user.id,
+            library_id: libraryId,
+          });
           if (ownership.error)
             return Response.json(
               { error: "Unable to register video ownership" },

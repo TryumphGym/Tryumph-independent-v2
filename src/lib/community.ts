@@ -18,6 +18,7 @@ export function useUserId() {
 export type CPost = {
   id: string;
   visibility: string;
+  official?: boolean;
   is_hidden?: boolean;
   is_pinned?: boolean;
   author_id: string | null;

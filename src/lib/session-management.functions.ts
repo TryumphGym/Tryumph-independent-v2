@@ -69,8 +69,13 @@ export const cancelPrivateSession = createServerFn({ method: "POST" })
       p_user_id: context.userId,
     });
     if (result.error) throw result.error;
+    const { closePrivateRooms } = await import("./maintenance.server");
+    await closePrivateRooms();
+    // Refund delivery is durable. A provider outage must not make a persisted cancellation look failed.
     const { processRefundJobs } = await import("./refunds.server");
-    await processRefundJobs();
+    await processRefundJobs().catch((error) =>
+      console.error("Refund queued for retry", error),
+    );
     return { ok: true };
   });
 export const retryPendingRefunds = createServerFn({ method: "POST" })

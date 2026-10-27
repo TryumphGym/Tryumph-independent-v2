@@ -529,8 +529,19 @@ function SignedInAccount() {
         </div>
       )}
       {s.signedIn && <AccountNoticeCenter trainer={s.role === "trainer"} />}
-      {s.signedIn && <div className="mb-6"><ActiveMilestones days={s.activeDays} role={s.role === "trainer" ? "trainer" : "member"} /></div>
-      {s.signedIn && s.role === "member" && <div className="mb-6"><TrainerMessages /></div>}
+      {s.signedIn && (
+        <div className="mb-6">
+          <ActiveMilestones
+            days={s.activeDays}
+            role={s.role === "trainer" ? "trainer" : "member"}
+          />
+        </div>
+      )}
+      {s.signedIn && s.role === "member" && (
+        <div className="mb-6">
+          <TrainerMessages />
+        </div>
+      )}
       {s.signedIn && <MemberSessions />}
       <div className="card mb-6 flex flex-wrap items-center gap-4 p-6">
         <Avatar

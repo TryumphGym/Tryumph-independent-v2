@@ -1,65 +1,16 @@
-# Ordered Supabase SQL execution plan — later phase
+# Ordered Supabase SQL — review and staging first
 
-**Nothing in this task was executed against hosted Supabase.** The code was tested with an isolated PostgreSQL engine and emulated Supabase platform schemas. That verifies migration syntax, constraints, transactions and RLS, while storage HTTP enforcement, the real schema history and production data still need staging verification.
+Nothing in this engineering pass was executed against hosted Supabase. Read [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) for the exact dashboard, backup, acceptance and rollback sequence. Isolated PostgreSQL tests verify functions, constraints, grants, RLS and replay; they do not certify the hosted schema or Storage HTTP behavior.
 
-## Files to use
+## Few-step SQL Editor sequence
 
-For an existing database with historical migrations **0000–0018 already reconciled**, use the complete generated [`upgrade.sql`](upgrade.sql). It contains the missing review contract followed by every launch migration through 0050, in a single transaction. It stops if core historical tables are missing. Inspect the preflight below first; take a backup and apply the bundle to a staging copy before the later authorized production SQL step.
+1. Back up and restore a staging copy; run the complete [preflight.sql](preflight.sql). Inspect the manually installed message policy, actual columns/constraints, administrator grants, triggers and bucket limits. Missing/incompatible schema is a stop requiring reconciliation, never a reason to erase data.
+2. Choose **one** complete atomic bundle: [upgrade.sql](upgrade.sql) for reconciled historical `0000–0018`, or [completion.sql](completion.sql) for the reconciled `0050` launch baseline. Both have baseline guards, `BEGIN`/`COMMIT`, and were replayed while preserving an existing deposit. Do not execute fragments or both bundles. The completion bundle is `0051 → 0052 → 0053 → 0054`.
+3. Run [confirmation.sql](confirmation.sql), check `0054_launch_completion`, then perform real JWT/browser/provider acceptance. Owner SQL Editor reads do not exercise RLS.
 
-`npm run db:bundle` rebuilds this file without executing SQL. `npm run db:check` runs the full migration history in an isolated engine. `npm run db:types` derives the application contracts from those same files. No GitHub push automatically applies SQL.
+`npm run db:bundle` only regenerates artifacts. `npm run db:check` and `npm run db:types` use isolated PostgreSQL, not Supabase. The full bundle includes every upgrade below in filename order. Do not rerun historical table-creation migrations on an existing database or run the obsolete root `0019_live_eligibility_guard.sql`.
 
-Do not run historical migrations 0000–0018 again on an existing database: they include initial table creation. Fictional seed declarations have been removed for new installations. The new upgrade removes only the specifically identified fictional seed rows from 0002; it preserves real user-authored data. Do not execute the obsolete root `0019_live_eligibility_guard.sql` separately: it competes with the current trigger and has a historical date-pattern defect. The ordered upgrade replaces that trigger safely.
-
-For a genuinely empty **Supabase** staging project, first run 0000–0018 in filename order, then `upgrade.sql`. Plain PostgreSQL lacks Supabase's `auth`, `storage`, platform roles and publication; the test harness emulates only those prerequisites.
-
-## Read-only preflight
-
-Run this in staging / the later SQL review, not during the coding task:
-
-```sql
-select name, to_regclass('public.' || name) is not null as present
-from unnest(array['profiles','user_roles','certifications','trainer_videos',
- 'trainer_earnings','trainer_accounts','trainer_busy','live_sessions',
- 'posts','post_comments','post_likes','waitlist_entries']) as name;
-
-select table_name,column_name,data_type,is_nullable
-from information_schema.columns
-where table_schema='public' and table_name in
- ('profiles','certifications','trainer_videos','live_sessions','trainer_earnings')
-order by table_name,ordinal_position;
-
-select schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
-from pg_policies where schemaname in ('public','storage')
-order by schemaname,tablename,policyname;
-
-select id,public,file_size_limit,allowed_mime_types
-from storage.buckets
-where id in ('trainer-certificates','videos','avatars','trainer-store-images');
-
-select tgname,pg_get_triggerdef(oid) from pg_trigger
-where not tgisinternal and tgrelid in
- ('public.profiles'::regclass,'public.certifications'::regclass,
-  'public.trainer_videos'::regclass,'public.live_sessions'::regclass);
-```
-
-If core historical tables or incompatible column types are missing, stop rather than running an incomplete prefix or deleting existing data. The hosted schema was not accessible with server credentials in this task, so its exact migration history cannot be certified. Reconcile the staging schema against the historical files and regenerate types after any intentional differences. The code does not assume that an existing production database is empty.
-
-## Compatibility and data preservation
-
-- `0018a_review_contract.sql` supplies the review/equipment/document fields already referenced by the source snapshot. Existing approved/rejected states are retained. When review status is entirely missing, existing videos default to pending; review them before public discovery.
-- Upgrade scripts add missing columns, recreate their named policies/triggers, and replace functions in deterministic order. Later definitions intentionally supersede earlier versions. Use the **whole transaction**: intermediate policies and financial functions must never become the live final state of a partial apply.
-- Existing membership JSON is backfilled into authoritative membership rows before RLS switches. It does not remain an ongoing authority for private posts. Public/private post visibility is added with private as the default; only the trainer leading that Trybe may publish public posts.
-- Submitted credentials and evidence remain auditable, with immutable files and append-only review decisions. Admins cannot review their own credentials/videos. Existing admin roles must be audited: historical migration 0005 granted the owner role from an email string at signup. The new signup handler does not do that.
-- Store listings and ordered programs retain their own tables. External store sales bypass Tryumph revenue sharing. Public program reads never expose unapproved videos or another trainer's video.
-- Wallet lots, individual units and immutable redemptions replace mutable profile balances as paid authority. Existing purchased lot balances are preserved; backfilled previously spent units do not create new spendable credits. Profile-only balances / legacy paid bookings need reconciliation against actual Stripe purchases before restoring entitlement. Preserve historical JSON and ledger rows as evidence; do not grant access from them alone.
-- Paid private reservations now use holds, participant access rows and the Central time zone. Paid class grants lock the class against concurrent cancellation. A refunded/cancelled slot can be booked again without deleting financial history.
-- Refunds retain original earnings, record cumulative reversal targets and preserve transfer operations through concurrent events. Disputes suspend access; won disputes can create recovery adjustments. Fractional token refunds queue completion of the affected whole $5 unit. Review these business rules with actual Stripe test-mode events.
-- The upgrade adds restrictive guards to protect private documents/video metadata even if an older permissive read policy remains. It revokes client financial writes. Review all other custom storage policies and unrelated grants during staging verification.
-- Tables and constraints that already exist with an incompatible definition require review; `IF NOT EXISTS` is not proof that a production table has the expected shape. Never fix a mismatch by dropping real account or financial data.
-
-## Exact upgrade order
-
-The generated transaction contains these files, in this order:
+## Full upgrade order
 
 1. [`0018a_review_contract.sql`](../../migrations/0018a_review_contract.sql)
 2. [`0019_launch_feature_data.sql`](../../migrations/0019_launch_feature_data.sql)
@@ -94,9 +45,15 @@ The generated transaction contains these files, in this order:
 31. [`0048_live_visibility.sql`](../../migrations/0048_live_visibility.sql)
 32. [`0049_wallet_units.sql`](../../migrations/0049_wallet_units.sql)
 33. [`0050_restrictive_guards.sql`](../../migrations/0050_restrictive_guards.sql)
+34. [`0051_safety_and_messaging.sql`](../../migrations/0051_safety_and_messaging.sql)
+35. [`0052_notifications_and_eligibility.sql`](../../migrations/0052_notifications_and_eligibility.sql)
+36. [`0053_verified_live_attendance.sql`](../../migrations/0053_verified_live_attendance.sql)
+37. [`0054_private_deposits.sql`](../../migrations/0054_private_deposits.sql)
 
-## Verify after staging apply
+## Data preservation and rollback
 
-Run the same role/row scenarios covered in `src/test/launch-security.test.ts` with real test accounts: member, trainer, second trainer, and independent admin. Confirm there is one active eligibility trigger, only approved public videos, no anonymous credential reads, no member finance/role writes, and no cross-Trybe mutations. Verify actual Storage MIME/size enforcement and signed file access through Supabase's HTTP APIs. Exercise webhook retries and a queue retry before any live payment.
+The upgrade supplies the missing historical review contract; private submitted evidence/review history is immutable. It migrates membership and purchased-wallet authority without trusting editable profile JSON. Known purchased units and prior paid version-1 private bookings remain, and no second deposit/balance is added to legacy bookings. Profile-only purchases require actual Stripe reconciliation. Store/program data and participant-only friend messages remain.
 
-Keep a backup and the precise reviewed SQL artifact. If the transaction fails, roll it back and investigate the reported incompatibility in staging; do not run a smaller suffix blindly or remove constraints to force success. Production application remains a separate explicitly approved step after code review, credentials, and test-mode verification.
+The old exact fictional seed cleanup remains in the inherited upgrade; no new test data or engagement is seeded. Review its identifiers in staging. New restrictive message/report/audience guards constrain an unexpected older permissive policy while preserving participant reads. New private reusable payment identifiers have no client SELECT grant. The moderator's account directory is allowlisted; administrators do not gain general access to private wellness profiles or DMs.
+
+A failed transaction rolls back; use `ROLLBACK;` if the editor still has an open transaction. After a successful apply, keep the additive schema and financial history. Pause checkout and prepare a reviewed forward fix. Dropping tables or reverting only the Worker cannot safely undo external Stripe events or new deposit states. Restoring a backup requires a coordinated, separately approved procedure and reconciliation of events received since that backup. No production apply, rollback, deployment or DNS change was performed.

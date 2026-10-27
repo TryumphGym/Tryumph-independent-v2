@@ -9,12 +9,18 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       const builder = {
         select: () => builder,
         eq: () => builder,
+        in: () => builder,
+        gt: () => builder,
+        limit: async () => ({ data: row, error: null }),
         single: async () => ({ data: row, error: null }),
         maybeSingle: async () => ({ data: row, error: null }),
       };
       return builder;
     },
-    rpc: async () => ({ data: state.eligible, error: null }),
+    rpc: async (name: string) => ({
+      data: name === "account_can_act" ? true : state.eligible,
+      error: null,
+    }),
   },
 }));
 vi.mock("./runtime-env.server", () => ({
@@ -54,6 +60,40 @@ describe("LiveKit authorization and actual signed token permissions", () => {
       canPublish: false,
       canSubscribe: true,
       canPublishData: false,
+      roomAdmin: false,
+      roomRecord: false,
+    });
+  });
+  it("locks pending community and deposit waiting-room media until verified settlement", async () => {
+    state.rows = [
+      session(),
+      { id: "reservation", status: "pending" },
+      [{ remaining: 1 }],
+    ];
+    const pending = await verify(
+      (await issueLiveRoomToken("member", `live-${id}`, "M")).token,
+    );
+    expect(pending.video).toMatchObject({
+      canSubscribe: false,
+      canPublish: false,
+      roomAdmin: false,
+    });
+    state.rows = [
+      {
+        trainer_id: id,
+        member_id: "member",
+        starts_at: new Date().toISOString(),
+        status: "deposit_paid",
+        payment_version: 2,
+      },
+    ];
+    const privateToken = await verify(
+      (await issueLiveRoomToken(id, `oneonone-${id}-2026-10-27-09:00`, "T"))
+        .token,
+    );
+    expect(privateToken.video).toMatchObject({
+      canSubscribe: false,
+      canPublish: false,
       roomAdmin: false,
       roomRecord: false,
     });
@@ -105,6 +145,7 @@ describe("LiveKit authorization and actual signed token permissions", () => {
         trainer_id: id,
         member_id: "member",
         starts_at: new Date().toISOString(),
+        status: "paid",
       },
     ];
     const token = await verify(

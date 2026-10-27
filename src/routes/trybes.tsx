@@ -142,11 +142,14 @@ function Trybes() {
   // Private Trybes: posts are only ever visible to joined members.
   const canSee = (id: string) => !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
-  const visible = all.filter((p) => !p.is_hidden && (p.trybe === "announcements" || canSee(p.trybe)));
+  const visible = all.filter(
+    (p) => !p.is_hidden && (p.official === true || canSee(p.trybe)),
+  );
   const filtered = visible.filter((p) =>
     trybe === "discover"
       ? p.visibility === "public"
-      : p.trybe === "announcements" && trybe === "all" || inTrybeFeed(p.trybe, trybe, joinedIds),
+      : (p.official === true && trybe === "all") ||
+        inTrybeFeed(p.trybe, trybe, joinedIds),
   );
   const posts = [...filtered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
@@ -369,8 +372,17 @@ function Trybes() {
       )}
       {trybe.startsWith("coach-") &&
         /^[0-9a-f-]{36}$/i.test(trybe.slice(6)) && (
-          <><TrainerStorefront trainerId={trybe.slice(6)} />
-            {me && me !== trybe.slice(6) && <div className="mb-4"><ReportContent targetType="trainer" targetId={trybe.slice(6)} label="Report this trainer" /></div>}
+          <>
+            <TrainerStorefront trainerId={trybe.slice(6)} />
+            {me && me !== trybe.slice(6) && (
+              <div className="mb-4">
+                <ReportContent
+                  targetType="trainer"
+                  targetId={trybe.slice(6)}
+                  label="Report this trainer"
+                />
+              </div>
+            )}
           </>
         )}
       {trybe !== "all" && trybe !== "discover" && (
@@ -527,9 +539,16 @@ function Trybes() {
                       size="sm"
                       initials={p.author_name.slice(0, 2).toUpperCase()}
                     />
-                    <p className="font-semibold">{p.trybe === "announcements" ? "Tryumph Gym" : p.author_name}</p>
-                    {p.trybe === "announcements" && <span className="chip chip-active">Official announcement</span>}
-                    {p.trybe !== "announcements" && p.author_id &&
+                    <p className="font-semibold">
+                      {p.official === true ? "Tryumph Gym" : p.author_name}
+                    </p>
+                    {p.official === true && (
+                      <span className="chip chip-active">
+                        Official announcement
+                      </span>
+                    )}
+                    {!p.official &&
+                      p.author_id &&
                       p.author_id !== me &&
                       !isFriend(p.author_id) && (
                         <button
@@ -553,9 +572,21 @@ function Trybes() {
                       {trybeName(p.trybe)}
                     </span>
                   </div>
-                  {p.trybe !== "announcements" && me && p.author_id && p.author_id !== me && <ReportContent targetType="user" targetId={p.author_id} label="Report user" />}
+                  {!p.official && me && p.author_id && p.author_id !== me && (
+                    <ReportContent
+                      targetType="user"
+                      targetId={p.author_id}
+                      label="Report user"
+                    />
+                  )}
                   <p className="mt-3">{p.text}</p>
-                  {me && p.author_id !== me && <ReportContent targetType="post" targetId={p.id} label="Report post" />}
+                  {me && p.author_id !== me && (
+                    <ReportContent
+                      targetType="post"
+                      targetId={p.id}
+                      label="Report post"
+                    />
+                  )}
                   <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
                     <button
                       className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
@@ -610,8 +641,20 @@ function Trybes() {
                       <span>
                         <b>{c.author_name}:</b> {c.text}
                       </span>
-                      {me && c.author_id !== me && <ReportContent targetType="user" targetId={c.author_id} label="Report user" />}
-                      {me && c.author_id !== me && <ReportContent targetType="comment" targetId={c.id} label="Report comment" />}
+                      {me && c.author_id !== me && (
+                        <ReportContent
+                          targetType="user"
+                          targetId={c.author_id}
+                          label="Report user"
+                        />
+                      )}
+                      {me && c.author_id !== me && (
+                        <ReportContent
+                          targetType="comment"
+                          targetId={c.id}
+                          label="Report comment"
+                        />
+                      )}
                       {c.author_id !== me && !isFriend(c.author_id) && (
                         <button
                           className="ml-auto text-xs text-primary"
@@ -701,7 +744,13 @@ function Trybes() {
                     initials={f.friend_name.slice(0, 2).toUpperCase()}
                   />
                   {f.friend_name}
-                  {me && f.friend_id !== me && <ReportContent targetType="user" targetId={f.friend_id} label="Report user" />}
+                  {me && f.friend_id !== me && (
+                    <ReportContent
+                      targetType="user"
+                      targetId={f.friend_id}
+                      label="Report user"
+                    />
+                  )}
                   <button
                     className={`ml-auto chip ${f.partner ? "chip-active" : ""}`}
                     onClick={() => togglePartner(f.friend_id, f.partner)}
@@ -752,7 +801,15 @@ function Trybes() {
               </div>
               {chatWith && (
                 <>
-                  {chatWith !== me && <div className="mt-2"><ReportContent targetType="user" targetId={chatWith} label="Report chat partner" /></div>}
+                  {chatWith !== me && (
+                    <div className="mt-2">
+                      <ReportContent
+                        targetType="user"
+                        targetId={chatWith}
+                        label="Report chat partner"
+                      />
+                    </div>
+                  )}
                   <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                     {msgs.length === 0 && (
                       <p className="text-sm text-muted-foreground">

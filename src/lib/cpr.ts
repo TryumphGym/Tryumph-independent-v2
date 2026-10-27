@@ -25,13 +25,18 @@ export const isExpired = (expires?: string | null) =>
   Boolean(
     expires &&
     /^\d{4}-\d{2}-\d{2}$/.test(expires) &&
-    expires < new Date().toISOString().slice(0, 10),
+    expires <
+      new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }),
   );
 export const isExpiringSoon = (expires?: string | null) => {
   if (!expires || !/^\d{4}-\d{2}-\d{2}$/.test(expires)) return false;
   const days =
     (Date.parse(expires + "T00:00:00Z") -
-      Date.parse(new Date().toISOString().slice(0, 10) + "T00:00:00Z")) /
+      Date.parse(
+        new Date().toLocaleDateString("en-CA", {
+          timeZone: "America/Chicago",
+        }) + "T00:00:00Z",
+      )) /
     86400000;
   return days >= 0 && days <= 30;
 };

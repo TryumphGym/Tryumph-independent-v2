@@ -1,8 +1,11 @@
+> October 27 follow-up: see [the founder handoff](../launch/FOUNDER_HANDOFF.md) for the current implementation, SQL sequence and verification boundaries. The historical descriptions below are retained as context; use the handoff where they conflict, including deposits, attendance and messaging policy.
+
 # Trainer inquiries — security migration required
 
 **Code is staged, not deployed.** UI: trainer profile `Message Trainer`, member account inbox, trainer studio Messages tab. Existing `messages` sender/recipient read policies remain unchanged. Do not use this feature before the additional insert RLS policy below is reviewed and applied in Supabase.
 
 ## Additive SQL for existing Supabase database (run in SQL Editor after checking table/roles)
+
 ```sql
 -- Existing friend messaging policy stays as-is.
 -- Allow member -> approved trainer initial contact, and trainer -> member replies
