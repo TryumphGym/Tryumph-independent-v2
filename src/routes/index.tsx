@@ -58,11 +58,11 @@ function Home() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const [v, l] = await Promise.all([
+      const [v, l, trainersResponse] = await Promise.all([
         supabase
           .from("trainer_videos")
           .select(
-            "id,title,category,level,minutes,equipment,pregnancy_safe,required_equipment",
+            "id,user_id,title,category,level,minutes,equipment,pregnancy_safe,required_equipment",
           )
           .eq("review_status", "approved")
           .order("created_at", { ascending: false })
@@ -74,10 +74,19 @@ function Home() {
           .gte("starts_at", new Date().toISOString())
           .order("starts_at")
           .limit(25),
+        fetch("/api/public/trainers", { cache: "no-store" }).catch(() => null),
       ]);
+      const verifiedTrainerIds = new Set<string>();
+      if (trainersResponse?.ok) {
+        try {
+          const directory = (await trainersResponse.json()) as { trainers: { id: string }[] };
+          for (const trainer of directory.trainers) verifiedTrainerIds.add(trainer.id);
+        } catch { /* Fail closed: do not show unverified workouts. */ }
+      }
       if (!active) return;
       setFeatured(
         (v.data ?? [])
+          .filter((x) => Boolean(x.user_id && verifiedTrainerIds.has(x.user_id)))
           .filter(isLaunchWorkout)
           .filter(
             (x) =>
