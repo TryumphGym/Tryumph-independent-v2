@@ -218,7 +218,7 @@ const initial: State = {
 };
 
 const KEY = "tryumph-state-v1";
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 type Ctx = {
