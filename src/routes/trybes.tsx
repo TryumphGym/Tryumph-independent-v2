@@ -142,11 +142,11 @@ function Trybes() {
   // Private Trybes: posts are only ever visible to joined members.
   const canSee = (id: string) => !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
-  const visible = all.filter((p) => !p.is_hidden && canSee(p.trybe));
+  const visible = all.filter((p) => !p.is_hidden && (p.trybe === "announcements" || canSee(p.trybe)));
   const filtered = visible.filter((p) =>
     trybe === "discover"
       ? p.visibility === "public"
-      : inTrybeFeed(p.trybe, trybe, joinedIds),
+      : p.trybe === "announcements" && trybe === "all" || inTrybeFeed(p.trybe, trybe, joinedIds),
   );
   const posts = [...filtered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
@@ -527,8 +527,9 @@ function Trybes() {
                       size="sm"
                       initials={p.author_name.slice(0, 2).toUpperCase()}
                     />
-                    <p className="font-semibold">{p.author_name}</p>
-                    {p.author_id &&
+                    <p className="font-semibold">{p.trybe === "announcements" ? "Tryumph Gym" : p.author_name}</p>
+                    {p.trybe === "announcements" && <span className="chip chip-active">Official announcement</span>}
+                    {p.trybe !== "announcements" && p.author_id &&
                       p.author_id !== me &&
                       !isFriend(p.author_id) && (
                         <button
@@ -552,7 +553,7 @@ function Trybes() {
                       {trybeName(p.trybe)}
                     </span>
                   </div>
-                  {me && p.author_id && p.author_id !== me && <ReportContent targetType="user" targetId={p.author_id} label="Report user" />}
+                  {p.trybe !== "announcements" && me && p.author_id && p.author_id !== me && <ReportContent targetType="user" targetId={p.author_id} label="Report user" />}
                   <p className="mt-3">{p.text}</p>
                   {me && p.author_id !== me && <ReportContent targetType="post" targetId={p.id} label="Report post" />}
                   <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
