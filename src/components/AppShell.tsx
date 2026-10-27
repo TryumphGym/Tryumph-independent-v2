@@ -198,6 +198,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p>© 2026 Tryumph Gym — bring the gym home.</p>
           <div className="flex gap-4">
             <Link to="/terms">Terms & waiver</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/contact">Contact Us</Link>
             <Link to="/for-trainers">For trainers</Link>
           </div>
         </div>
