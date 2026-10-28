@@ -229,6 +229,7 @@ function Live() {
                   onClick={() => {
                     if (!s.signedIn) {
                       toast.error("Sign in to reserve and get reminders.");
+                      navigate({ to: "/account" });
                       return;
                     }
                     reserve(l.id);
