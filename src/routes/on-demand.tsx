@@ -199,7 +199,7 @@ function OnDemand() {
             <article className="card overflow-hidden" key={x.id}>
               <button
                 onClick={() => openVideo(x)}
-                className="bg-brand grid aspect-video w-full place-items-center"
+                className="relative grid aspect-video w-full place-items-center overflow-hidden bg-brand"
                 aria-label={`Play ${x.title}`}
               >
                 <img
