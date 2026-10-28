@@ -17,7 +17,7 @@ export const thumbFor = (category: string) =>
  */
 export const workoutThumbFor = (path: string | null | undefined, category: string) => {
   const fallback = thumbFor(category);
-  const cdnHost = (import.meta.env["VITE_BUNNY_STREAM_CDN_HOSTNAME"] ?? "")
+  const cdnHost = (import.meta.env["VITE_BUNNY_STREAM_CDN_HOSTNAME"] || "vz-1c46665f-b5c.b-cdn.net")
     .trim()
     .replace(/^https?:\/\//i, "")
     .replace(/\/$/, "")
