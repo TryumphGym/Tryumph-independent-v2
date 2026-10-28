@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isLaunchWorkout } from "@/lib/launch";
 import { gearOf } from "@/lib/data";
 import { matchesWorkout } from "@/lib/workout-preferences";
-import { thumbFor } from "@/lib/thumbs";
+import { thumbFor, workoutThumbFor } from "@/lib/thumbs";
 import { useStore, streak } from "@/lib/store";
 import { Waitlist } from "@/components/Waitlist";
 
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { s } = useStore();
   const [featured, setFeatured] = useState<
-    { id: string; title: string; category: string; minutes: number }[]
+    { id: string; title: string; category: string; minutes: number; path: string }[]
   >([]);
   const [upNext, setUpNext] = useState<{
     id: string;
@@ -62,7 +62,7 @@ function Home() {
         supabase
           .from("trainer_videos")
           .select(
-            "id,user_id,title,category,level,minutes,equipment,pregnancy_safe,required_equipment",
+            "id,user_id,title,category,level,minutes,path,equipment,pregnancy_safe,required_equipment",
           )
           .eq("review_status", "approved")
           .order("created_at", { ascending: false })
@@ -256,7 +256,8 @@ function Home() {
             >
               <div className="relative aspect-video overflow-hidden">
                 <img
-                  src={thumbFor(v.category)}
+                  src={workoutThumbFor(v.path, v.category)}
+                  onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = thumbFor(v.category); }}
                   alt=""
                   loading="lazy"
                   width={1088}
