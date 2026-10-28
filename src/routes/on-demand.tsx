@@ -12,6 +12,7 @@ import { z } from "zod";
 import { CATEGORIES, LEVELS, EQUIPMENT, DURATIONS, gearOf } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { getVideoUrl } from "@/lib/videos.functions";
+import { thumbFor, workoutThumbFor } from "@/lib/thumbs";
 import { PageHeader } from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { ChoiceDropdown, MultiDropdown } from "@/components/WorkoutFilters";
@@ -189,7 +190,14 @@ function OnDemand() {
                 className="bg-brand grid aspect-video w-full place-items-center"
                 aria-label={`Play ${x.title}`}
               >
-                <Play className="h-8 w-8 text-primary-foreground" />
+                <img
+                  src={workoutThumbFor(x.path, x.category)}
+                  onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = thumbFor(x.category); }}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute inset-0 grid place-items-center bg-black/20"><Play className="h-8 w-8 text-white" /></span>
               </button>
               <div className="p-4">
                 <p className="eyebrow">
