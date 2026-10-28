@@ -58,7 +58,7 @@ function Home() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const [v, l, trainersResponse] = await Promise.all([
+      const [v, l] = await Promise.all([
         supabase
           .from("trainer_videos")
           .select(
@@ -74,19 +74,10 @@ function Home() {
           .gte("starts_at", new Date().toISOString())
           .order("starts_at")
           .limit(25),
-        fetch("/api/public/trainers", { cache: "no-store" }).catch(() => null),
       ]);
-      const verifiedTrainerIds = new Set<string>();
-      if (trainersResponse?.ok) {
-        try {
-          const directory = (await trainersResponse.json()) as { trainers: { id: string }[] };
-          for (const trainer of directory.trainers) verifiedTrainerIds.add(trainer.id);
-        } catch { /* Fail closed: do not show unverified workouts. */ }
-      }
       if (!active) return;
       setFeatured(
         (v.data ?? [])
-          .filter((x) => Boolean(x.user_id && verifiedTrainerIds.has(x.user_id)))
           .filter(isLaunchWorkout)
           .filter(
             (x) =>
@@ -294,19 +285,21 @@ function Home() {
         </div>
       </section>
 
-      {!(s.signedIn && s.role === "trainer") && <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
-        <div>
-          <p className="eyebrow">For coaches</p>
-          <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
-          <p className="text-muted-foreground">
-            Reach families who need you — uncapped live classes, 1-on-1s at your
-            rate, and a free storefront.
-          </p>
-        </div>
-        <Link to="/for-trainers" className="btn btn-primary">
-          Become a coach
-        </Link>
-      </section>}
+      {!(s.signedIn && s.role === "trainer") && (
+        <section className="card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <p className="eyebrow">For coaches</p>
+            <h2 className="mt-2 text-2xl font-bold">Coach with Tryumph</h2>
+            <p className="text-muted-foreground">
+              Reach families who need you — uncapped live classes, 1-on-1s at
+              your rate, and a community of your own.
+            </p>
+          </div>
+          <Link to="/for-trainers" className="btn btn-primary">
+            Become a coach
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

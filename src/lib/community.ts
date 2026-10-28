@@ -18,6 +18,7 @@ export function useUserId() {
 export type CPost = {
   id: string;
   visibility: string;
+  official?: boolean;
   is_hidden?: boolean;
   is_pinned?: boolean;
   author_id: string | null;
@@ -50,17 +51,27 @@ export function useFriendRequests(me: string | null) {
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
   const reload = useCallback(async () => {
-    if (!me) { setIncoming([]); setOutgoing([]); return; }
-    const { data, error } = await supabase.from("friend_requests")
+    if (!me) {
+      setIncoming([]);
+      setOutgoing([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("friend_requests")
       .select("requester_id,recipient_id,requester_name,recipient_name")
       .or(`requester_id.eq.${me},recipient_id.eq.${me}`);
-    if (error) { console.error("Friend requests unavailable", error); return; }
+    if (error) {
+      console.error("Friend requests unavailable", error);
+      return;
+    }
     setIncoming((data ?? []).filter((item) => item.recipient_id === me));
     setOutgoing((data ?? []).filter((item) => item.requester_id === me));
   }, [me]);
   useEffect(() => {
     void reload();
-    const poll = window.setInterval(() => { void reload(); }, 5000);
+    const poll = window.setInterval(() => {
+      void reload();
+    }, 5000);
     return () => window.clearInterval(poll);
   }, [reload]);
   return { incoming, outgoing, reload };
@@ -121,7 +132,9 @@ export function useFriends(me: string | null) {
   }, [me]);
   useEffect(() => {
     void load();
-    const poll = window.setInterval(() => { void load(); }, 5000);
+    const poll = window.setInterval(() => {
+      void load();
+    }, 5000);
     return () => window.clearInterval(poll);
   }, [load]);
   return { friends, reload: load };
@@ -147,7 +160,9 @@ export function useChat(me: string | null, other: string | null) {
       if (alive) setMsgs(data ?? []);
     };
     void load();
-    const interval = window.setInterval(() => { void load(); }, 4000);
+    const interval = window.setInterval(() => {
+      void load();
+    }, 4000);
     const ch = supabase
       .channel(`chat-${me}-${other}`)
       .on(

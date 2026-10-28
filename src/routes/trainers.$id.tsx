@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import type { PublicTrainer } from "@/lib/public-trainers";
 import { PrivateBookingForm } from "@/components/PrivateBookingForm";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
+import { TrainerMessages } from "@/components/TrainerMessages";
 
 export const Route = createFileRoute("/trainers/$id")({
   head: () => ({ meta: [{ title: "Trainer Profile — Tryumph Gym" }] }),
@@ -14,6 +15,7 @@ function TrainerProfile() {
   const [trainer, setTrainer] = useState<PublicTrainer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -115,6 +117,7 @@ function TrainerProfile() {
           </div>
         </section>
       )}
+      {trainer && <section className="space-y-3"><button className="btn btn-outline" onClick={() => setShowMessages(x => !x)}>{showMessages ? "Close messages" : "Message Trainer"}</button>{showMessages && <TrainerMessages selectedTrainerId={trainer.id} />}</section>}
       {trainer && trainer.rate > 0 && (
         <PrivateBookingForm trainerId={trainer.id} rate={trainer.rate} />
       )}

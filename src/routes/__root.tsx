@@ -85,6 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     head: () => ({
       meta: [
         { charSet: "utf-8" },
+        { name: "google-adsense-account", content: "ca-pub-9411563336964465" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { title: "Tryumph Gym — Bring the gym home" },
         {

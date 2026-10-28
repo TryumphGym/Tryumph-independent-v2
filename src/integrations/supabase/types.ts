@@ -10,6 +10,87 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "14.18" };
   public: {
     Tables: {
+      account_activity_days: {
+        Row: {
+          user_id: string;
+          day: string;
+          time_zone: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          time_zone: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          time_zone?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      account_notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          event_key: string;
+          category: string;
+          body: string;
+          href: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          event_key: string;
+          category: string;
+          body: string;
+          href?: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          event_key?: string;
+          category?: string;
+          body?: string;
+          href?: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      account_restrictions: {
+        Row: {
+          user_id: string;
+          scope: string;
+          reason: string;
+          admin_id: string;
+          active: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          scope: string;
+          reason: string;
+          admin_id: string;
+          active?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          scope?: string;
+          reason?: string;
+          admin_id?: string;
+          active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ad_settlement_events: {
         Row: {
           id: string;
@@ -42,6 +123,30 @@ export type Database = {
           break_second?: number;
           gross_cents?: number;
           fee_cents?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      audience_announcements: {
+        Row: {
+          id: string;
+          body: string;
+          audience: string;
+          author_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          body: string;
+          audience: string;
+          author_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          body?: string;
+          audience?: string;
+          author_id?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -127,6 +232,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      contact_delivery_requests: {
+        Row: {
+          request_id: string;
+          requester_hash: string;
+          payload_hash: string;
+          status: string;
+          attempts: number;
+          lease_until: string;
+          provider_id: string | null;
+          last_error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          request_id: string;
+          requester_hash: string;
+          payload_hash: string;
+          status?: string;
+          attempts?: number;
+          lease_until?: string;
+          provider_id?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          request_id?: string;
+          requester_hash?: string;
+          payload_hash?: string;
+          status?: string;
+          attempts?: number;
+          lease_until?: string;
+          provider_id?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      content_reports: {
+        Row: {
+          id: string;
+          reporter_id: string;
+          target_type: string;
+          target_id: string;
+          reason: string;
+          details: string;
+          evidence: string | null;
+          status: string;
+          review_note: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          target_type: string;
+          target_id: string;
+          reason: string;
+          details?: string;
+          evidence?: string | null;
+          status?: string;
+          review_note?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_id?: string;
+          target_type?: string;
+          target_id?: string;
+          reason?: string;
+          details?: string;
+          evidence?: string | null;
+          status?: string;
+          review_note?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       credential_reviews: {
         Row: {
           id: string;
@@ -206,6 +389,18 @@ export type Database = {
           partner?: boolean;
           created_at?: string;
         };
+        Relationships: [];
+      };
+      launch_schema_versions: {
+        Row: { version: string; applied_at: string };
+        Insert: { version: string; applied_at?: string };
+        Update: { version?: string; applied_at?: string };
+        Relationships: [];
+      };
+      legacy_friendship_grants: {
+        Row: { user_id: string; friend_id: string };
+        Insert: { user_id: string; friend_id: string };
+        Update: { user_id?: string; friend_id?: string };
         Relationships: [];
       };
       live_checkout_intents: {
@@ -406,6 +601,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      message_controls: {
+        Row: {
+          user_id: string;
+          other_id: string;
+          blocked: boolean;
+          muted: boolean;
+          read_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          other_id: string;
+          blocked?: boolean;
+          muted?: boolean;
+          read_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          other_id?: string;
+          blocked?: boolean;
+          muted?: boolean;
+          read_at?: string | null;
+        };
+        Relationships: [];
+      };
       messages: {
         Row: {
           id: string;
@@ -430,6 +649,84 @@ export type Database = {
           sender_name?: string;
           text?: string;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      moderation_actions: {
+        Row: {
+          id: string;
+          actor_id: string;
+          target_type: string;
+          target_id: string;
+          action: string;
+          note: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id: string;
+          target_type: string;
+          target_id: string;
+          action: string;
+          note?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string;
+          target_type?: string;
+          target_id?: string;
+          action?: string;
+          note?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      moderation_appeals: {
+        Row: {
+          id: string;
+          user_id: string;
+          body: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          body: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          body?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          session_updates: boolean;
+          credential_updates: boolean;
+          friend_activity: boolean;
+          share_live_activity: boolean;
+        };
+        Insert: {
+          user_id: string;
+          session_updates?: boolean;
+          credential_updates?: boolean;
+          friend_activity?: boolean;
+          share_live_activity?: boolean;
+        };
+        Update: {
+          user_id?: string;
+          session_updates?: boolean;
+          credential_updates?: boolean;
+          friend_activity?: boolean;
+          share_live_activity?: boolean;
         };
         Relationships: [];
       };
@@ -471,6 +768,7 @@ export type Database = {
           author_name: string;
           text: string;
           created_at: string;
+          is_hidden: boolean;
         };
         Insert: {
           id?: string;
@@ -479,6 +777,7 @@ export type Database = {
           author_name: string;
           text: string;
           created_at?: string;
+          is_hidden?: boolean;
         };
         Update: {
           id?: string;
@@ -487,6 +786,7 @@ export type Database = {
           author_name?: string;
           text?: string;
           created_at?: string;
+          is_hidden?: boolean;
         };
         Relationships: [];
       };
@@ -508,6 +808,7 @@ export type Database = {
           is_hidden: boolean;
           is_pinned: boolean;
           visibility: string;
+          official: boolean;
         };
         Insert: {
           id?: string;
@@ -520,6 +821,7 @@ export type Database = {
           is_hidden?: boolean;
           is_pinned?: boolean;
           visibility?: string;
+          official?: boolean;
         };
         Update: {
           id?: string;
@@ -532,6 +834,40 @@ export type Database = {
           is_hidden?: boolean;
           is_pinned?: boolean;
           visibility?: string;
+          official?: boolean;
+        };
+        Relationships: [];
+      };
+      private_balance_operations: {
+        Row: {
+          booking_id: string;
+          operation_key: string;
+          intent_id: string | null;
+          checkout_id: string | null;
+          lease_until: string;
+          status: string;
+          last_error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          booking_id: string;
+          operation_key: string;
+          intent_id?: string | null;
+          checkout_id?: string | null;
+          lease_until?: string;
+          status?: string;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          booking_id?: string;
+          operation_key?: string;
+          intent_id?: string | null;
+          checkout_id?: string | null;
+          lease_until?: string;
+          status?: string;
+          last_error?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -543,6 +879,8 @@ export type Database = {
           day: string;
           time: string;
           expires_at: string;
+          total_cents: number | null;
+          terms_version: string | null;
         };
         Insert: {
           id?: string;
@@ -551,6 +889,8 @@ export type Database = {
           day: string;
           time: string;
           expires_at?: string;
+          total_cents?: number | null;
+          terms_version?: string | null;
         };
         Update: {
           id?: string;
@@ -559,6 +899,107 @@ export type Database = {
           day?: string;
           time?: string;
           expires_at?: string;
+          total_cents?: number | null;
+          terms_version?: string | null;
+        };
+        Relationships: [];
+      };
+      private_booking_payments: {
+        Row: {
+          payment_id: string;
+          booking_id: string;
+          stage: string;
+          intent_id: string | null;
+          gross_cents: number;
+          fee_cents: number;
+          refunded_cents: number;
+          created_at: string;
+        };
+        Insert: {
+          payment_id: string;
+          booking_id: string;
+          stage: string;
+          intent_id?: string | null;
+          gross_cents: number;
+          fee_cents: number;
+          refunded_cents?: number;
+          created_at?: string;
+        };
+        Update: {
+          payment_id?: string;
+          booking_id?: string;
+          stage?: string;
+          intent_id?: string | null;
+          gross_cents?: number;
+          fee_cents?: number;
+          refunded_cents?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      private_payment_methods: {
+        Row: {
+          booking_id: string;
+          customer_id: string;
+          payment_method_id: string;
+        };
+        Insert: {
+          booking_id: string;
+          customer_id: string;
+          payment_method_id: string;
+        };
+        Update: {
+          booking_id?: string;
+          customer_id?: string;
+          payment_method_id?: string;
+        };
+        Relationships: [];
+      };
+      private_reschedule_requests: {
+        Row: {
+          id: string;
+          booking_id: string;
+          member_id: string;
+          day: string;
+          time: string;
+          created_at: string;
+          status: string;
+        };
+        Insert: {
+          id?: string;
+          booking_id: string;
+          member_id: string;
+          day: string;
+          time: string;
+          created_at?: string;
+          status?: string;
+        };
+        Update: {
+          id?: string;
+          booking_id?: string;
+          member_id?: string;
+          day?: string;
+          time?: string;
+          created_at?: string;
+          status?: string;
+        };
+        Relationships: [];
+      };
+      private_room_shutdown_jobs: {
+        Row: {
+          booking_id: string;
+          completed_at: string | null;
+          last_error: string | null;
+        };
+        Insert: {
+          booking_id: string;
+          completed_at?: string | null;
+          last_error?: string | null;
+        };
+        Update: {
+          booking_id?: string;
+          completed_at?: string | null;
+          last_error?: string | null;
         };
         Relationships: [];
       };
@@ -572,6 +1013,17 @@ export type Database = {
           starts_at: string;
           status: string;
           created_at: string;
+          payment_version: number;
+          total_cents: number | null;
+          deposit_cents: number | null;
+          balance_cents: number | null;
+          terms_version: string | null;
+          both_present_at: string | null;
+          delivered_at: string | null;
+          member_confirmed_at: string | null;
+          deposit_origin: string | null;
+          transfer_used: boolean;
+          transfer_from: string | null;
         };
         Insert: {
           checkout_id: string;
@@ -582,6 +1034,17 @@ export type Database = {
           starts_at: string;
           status: string;
           created_at?: string;
+          payment_version?: number;
+          total_cents?: number | null;
+          deposit_cents?: number | null;
+          balance_cents?: number | null;
+          terms_version?: string | null;
+          both_present_at?: string | null;
+          delivered_at?: string | null;
+          member_confirmed_at?: string | null;
+          deposit_origin?: string | null;
+          transfer_used?: boolean;
+          transfer_from?: string | null;
         };
         Update: {
           checkout_id?: string;
@@ -592,6 +1055,17 @@ export type Database = {
           starts_at?: string;
           status?: string;
           created_at?: string;
+          payment_version?: number;
+          total_cents?: number | null;
+          deposit_cents?: number | null;
+          balance_cents?: number | null;
+          terms_version?: string | null;
+          both_present_at?: string | null;
+          delivered_at?: string | null;
+          member_confirmed_at?: string | null;
+          deposit_origin?: string | null;
+          transfer_used?: boolean;
+          transfer_from?: string | null;
         };
         Relationships: [];
       };
@@ -747,6 +1221,8 @@ export type Database = {
           completed_at: string | null;
           provider_id: string | null;
           target_cents: number | null;
+          last_error: string | null;
+          attempts: number;
         };
         Insert: {
           checkout_id: string;
@@ -755,6 +1231,8 @@ export type Database = {
           completed_at?: string | null;
           provider_id?: string | null;
           target_cents?: number | null;
+          last_error?: string | null;
+          attempts?: number;
         };
         Update: {
           checkout_id?: string;
@@ -763,6 +1241,8 @@ export type Database = {
           completed_at?: string | null;
           provider_id?: string | null;
           target_cents?: number | null;
+          last_error?: string | null;
+          attempts?: number;
         };
         Relationships: [];
       };
@@ -853,6 +1333,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      trainer_credential_requirements: {
+        Row: {
+          trainer_id: string;
+          credential_name: string;
+          created_by: string;
+        };
+        Insert: {
+          trainer_id: string;
+          credential_name: string;
+          created_by: string;
+        };
+        Update: {
+          trainer_id?: string;
+          credential_name?: string;
+          created_by?: string;
+        };
+        Relationships: [];
+      };
       trainer_earnings: {
         Row: {
           id: string;
@@ -876,6 +1374,7 @@ export type Database = {
           operation_target: number | null;
           operation_lease_until: string | null;
           adjustment_for: string | null;
+          fulfillment_pending: boolean;
         };
         Insert: {
           id?: string;
@@ -899,6 +1398,7 @@ export type Database = {
           operation_target?: number | null;
           operation_lease_until?: string | null;
           adjustment_for?: string | null;
+          fulfillment_pending?: boolean;
         };
         Update: {
           id?: string;
@@ -922,6 +1422,7 @@ export type Database = {
           operation_target?: number | null;
           operation_lease_until?: string | null;
           adjustment_for?: string | null;
+          fulfillment_pending?: boolean;
         };
         Relationships: [];
       };
@@ -1363,9 +1864,32 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
-      unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
-      accept_friend_request: { Args: { p_requester_id: string }; Returns: undefined };
+      accept_friend_request: {
+        Args: { p_requester_id: string };
+        Returns: undefined;
+      };
+      account_can_act: {
+        Args: { p_id: string; p_content?: boolean };
+        Returns: boolean;
+      };
+      admin_profile_directory: {
+        Args: Record<never, never>;
+        Returns: {
+          id: string;
+          name: string;
+          role: string;
+          created_at: string;
+        }[];
+      };
       apply_checkout_refund: {
+        Args: {
+          p_checkout_id: string;
+          p_refund_cents: number;
+          p_fully_refunded: boolean;
+        };
+        Returns: undefined;
+      };
+      apply_checkout_refund_legacy: {
         Args: {
           p_checkout_id: string;
           p_refund_cents: number;
@@ -1411,6 +1935,32 @@ export type Database = {
         Args: { p_id: string; p_checkout_id: string; p_status: string };
         Returns: undefined;
       };
+      apply_payment_dispute_legacy: {
+        Args: { p_id: string; p_checkout_id: string; p_status: string };
+        Returns: undefined;
+      };
+      apply_private_balance: {
+        Args: {
+          p_booking: string;
+          p_intent: string;
+          p_gross: number;
+          p_fee: number;
+        };
+        Returns: undefined;
+      };
+      apply_private_deposit: {
+        Args: {
+          p_checkout: string;
+          p_hold: string;
+          p_member: string;
+          p_gross: number;
+          p_fee: number;
+          p_customer: string;
+          p_method: string;
+          p_intent: string;
+        };
+        Returns: undefined;
+      };
       apply_verified_ad_settlement: {
         Args: {
           p_network: string;
@@ -1424,22 +1974,62 @@ export type Database = {
         };
         Returns: undefined;
       };
+      approve_private_reschedule: {
+        Args: { p_request: string; p_approve: boolean };
+        Returns: string;
+      };
       can_edit_menu: { Args: { _client: string }; Returns: boolean };
       can_see_trybe: { Args: { _trybe: string }; Returns: boolean };
+      can_send_message: {
+        Args: { p_sender: string; p_recipient: string };
+        Returns: boolean;
+      };
       cancel_private_session: {
         Args: { p_checkout_id: string; p_user_id: string };
         Returns: undefined;
+      };
+      claim_contact_delivery: {
+        Args: {
+          p_request: string;
+          p_requester_hash: string;
+          p_payload_hash: string;
+        };
+        Returns: string;
       };
       claim_earning_operation: {
         Args: { p_id: string };
         Returns: Database["public"]["Tables"]["trainer_earnings"]["Row"][];
       };
+      claim_private_balance: {
+        Args: { p_booking: string };
+        Returns: Database["public"]["Tables"]["private_balance_operations"]["Row"][];
+      };
       claim_recording_import: {
         Args: { p_egress_id: string };
         Returns: Database["public"]["Tables"]["live_recordings"]["Row"][];
       };
+      confirm_private_delivery: {
+        Args: { p_booking: string };
+        Returns: undefined;
+      };
+      consume_attended_live_token: {
+        Args: { p_user_id: string; p_session_id: string };
+        Returns: undefined;
+      };
+      finalize_delivered_private_sessions: {
+        Args: Record<never, never>;
+        Returns: undefined;
+      };
       finish_earning_operation: {
         Args: { p_id: string; p_key: string; p_provider_id: string };
+        Returns: undefined;
+      };
+      generate_credential_alerts: {
+        Args: Record<never, never>;
+        Returns: undefined;
+      };
+      generate_live_session_reminders: {
+        Args: Record<never, never>;
         Returns: undefined;
       };
       get_live_checkout_intent: {
@@ -1457,8 +2047,34 @@ export type Database = {
         Returns: string;
       };
       joinable_trybe: { Args: { p_id: string }; Returns: boolean };
+      maintain_private_bookings: {
+        Args: Record<never, never>;
+        Returns: undefined;
+      };
+      message_contact_names: {
+        Args: Record<never, never>;
+        Returns: { id: string; name: string }[];
+      };
+      moderate_comment: {
+        Args: { p_id: string; p_hidden: boolean; p_note: string };
+        Returns: undefined;
+      };
       moderate_trybe_post: {
         Args: { p_post_id: string; p_action: string; p_value: boolean };
+        Returns: undefined;
+      };
+      notify_account: {
+        Args: {
+          p_user: string;
+          p_key: string;
+          p_category: string;
+          p_body: string;
+          p_href?: string;
+        };
+        Returns: undefined;
+      };
+      notify_friend_attendance: {
+        Args: { p_user: string; p_session: string };
         Returns: undefined;
       };
       partner_reservations: {
@@ -1468,6 +2084,29 @@ export type Database = {
           friend_name: string;
           reservations: Json;
         }[];
+      };
+      prepare_deposit_booking: {
+        Args: {
+          p_trainer: string;
+          p_member: string;
+          p_day: string;
+          p_time: string;
+          p_terms: string;
+        };
+        Returns: string;
+      };
+      publish_official_announcement: {
+        Args: { p_body: string };
+        Returns: string;
+      };
+      publish_targeted_announcement: {
+        Args: { p_body: string; p_audience: string };
+        Returns: string;
+      };
+      record_account_activity: { Args: { p_time_zone: string }; Returns: Json };
+      record_private_both_present: {
+        Args: { p_booking: string };
+        Returns: boolean;
       };
       record_water_break_impression: {
         Args: {
@@ -1491,17 +2130,50 @@ export type Database = {
         Args: { p_program_id: string; p_video_ids: string[] };
         Returns: undefined;
       };
+      request_private_reschedule: {
+        Args: { p_booking: string; p_day: string; p_time: string };
+        Returns: string;
+      };
       reserve_class_recording: {
         Args: { p_session_id: string };
         Returns: boolean;
       };
+      reserve_live_class: {
+        Args: { p_user_id: string; p_session_id: string };
+        Returns: undefined;
+      };
       restore_won_disputes: { Args: Record<never, never>; Returns: undefined };
+      restrict_account: {
+        Args: {
+          p_id: string;
+          p_scope: string;
+          p_active: boolean;
+          p_reason: string;
+        };
+        Returns: undefined;
+      };
+      review_content_report: {
+        Args: { p_id: string; p_status: string; p_note: string };
+        Returns: undefined;
+      };
+      review_moderation_appeal: {
+        Args: { p_id: string; p_status: string; p_note: string };
+        Returns: undefined;
+      };
       review_trainer_video: {
         Args: { p_video_id: string; p_status: string; p_note: string };
         Returns: undefined;
       };
       save_program_workouts: {
         Args: { p_program_id: string; p_video_ids: string[] };
+        Returns: undefined;
+      };
+      set_live_reservation: {
+        Args: { p_session: string; p_reserved: boolean };
+        Returns: undefined;
+      };
+      settle_paid_checkout: {
+        Args: { p_kind: string; p_args: Json; p_refunded?: number };
         Returns: undefined;
       };
       share_menu: { Args: { _code: string }; Returns: string };
@@ -1514,6 +2186,7 @@ export type Database = {
         Args: { p_user_id: string; p_live?: boolean };
         Returns: boolean;
       };
+      unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
       valid_iso_date: { Args: { p_value: string }; Returns: boolean };
     };
     Enums: { app_role: "admin" | "moderator" | "user" };

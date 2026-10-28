@@ -1,6 +1,5 @@
 # Tryumph Gym
 
-
 Independent React 19 / TanStack Start application for Cloudflare Workers, with Supabase, Bunny Stream, LiveKit and Stripe Connect integrations.
 
 ## Development
@@ -38,3 +37,4 @@ The local app can start without private provider credentials. Real directory dat
 
 Work belongs on `codex/tryumph-january-launch`. Do not merge, deploy, execute hosted SQL, change DNS or process real payments without explicit authorization. Existing history remains intact for the connected source editor; the production app does not depend on Lovable hosting.
 
+Current January launch continuation: [Founder handoff](docs/launch/FOUNDER_HANDOFF.md), [verification evidence](docs/launch/VERIFICATION.md), and [Resend setup status](docs/launch/RESEND_SETUP.md). These identify the staged SQL artifacts and the external acceptance gates; no production action follows from a Git push.

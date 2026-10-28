@@ -118,10 +118,21 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
       .in("status", ["live", "ended"])
       .gte("starts_at", new Date(monthAgo).toISOString())
       .lte("starts_at", new Date().toISOString());
+    const privateCount = await supabaseAdmin
+      .from("private_session_access")
+      .select("checkout_id", { count: "exact", head: true })
+      .eq("trainer_id", context.userId)
+      .eq("status", "paid")
+      .or("payment_version.eq.1,delivered_at.not.is.null");
     const attendance = await supabaseAdmin.rpc("trainer_attendance_count", {
       p_trainer_id: context.userId,
     });
-    if (membership.error || classCount.error || attendance.error)
+    if (
+      membership.error ||
+      classCount.error ||
+      attendance.error ||
+      privateCount.error
+    )
       throw new Error("Unable to load verified trainer statistics");
     return {
       linked: !!acct?.stripe_account_id,
@@ -137,8 +148,7 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
       stats: {
         liveAttendanceMonth: attendance.data ?? 0,
         liveClassesMonth: classCount.count ?? 0,
-        oneononeSessions: (rows ?? []).filter((r) => r.source === "oneonone")
-          .length,
+        oneononeSessions: privateCount.count ?? 0,
         followers,
         trybeMembers,
       },

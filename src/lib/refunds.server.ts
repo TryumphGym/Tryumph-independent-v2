@@ -8,51 +8,93 @@ export async function processRefundJobs() {
   const stripe = new Stripe(key);
   const jobs = await supabaseAdmin
     .from("refund_jobs")
-    .select("checkout_id,target_cents")
+    .select("checkout_id,target_cents,attempts,reason")
     .is("completed_at", null)
     .limit(100);
   if (jobs.error) throw jobs.error;
-  let completed = 0;
+  let completed = 0,
+    failed = 0;
   for (const job of jobs.data ?? []) {
-    const session = await stripe.checkout.sessions.retrieve(job.checkout_id);
-    const intent =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id;
-    if (!intent || session.payment_status !== "paid") continue;
-    const intentRecord = await stripe.paymentIntents.retrieve(intent, {
-      expand: ["latest_charge"],
-    });
-    const charge = intentRecord.latest_charge;
-    if (!charge || typeof charge === "string")
-      throw new Error("Charge not available for refund");
-    const target = job.target_cents ?? session.amount_total ?? 0;
-    const delta = Math.max(0, target - charge.amount_refunded);
-    let providerId = charge.id;
-    if (delta > 0) {
-      const refund = await stripe.refunds.create(
-        { payment_intent: intent, amount: delta },
-        { idempotencyKey: `refund-job:${session.id}:${target}` },
-      );
-      const confirmed = await stripe.refunds.retrieve(refund.id);
-      if (confirmed.status !== "succeeded") continue;
-      providerId = confirmed.id;
+    try {
+      const session = job.checkout_id.startsWith("pi_")
+        ? null
+        : await stripe.checkout.sessions.retrieve(job.checkout_id);
+      const intent = session
+        ? typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id
+        : job.checkout_id;
+      if (!intent || (session && session.payment_status !== "paid")) continue;
+      const intentRecord = await stripe.paymentIntents.retrieve(intent, {
+        expand: ["latest_charge"],
+      });
+      const charge = intentRecord.latest_charge;
+      if (!charge || typeof charge === "string")
+        throw new Error("Charge not available for refund");
+      const target = job.target_cents ?? intentRecord.amount_received;
+      const delta = Math.max(0, target - charge.amount_refunded);
+      let providerId = charge.id;
+      if (delta > 0) {
+        const refund = await stripe.refunds.create(
+          { payment_intent: intent, amount: delta },
+          { idempotencyKey: `refund-job:${job.checkout_id}:${target}` },
+        );
+        const confirmed = await stripe.refunds.retrieve(refund.id);
+        if (confirmed.status !== "succeeded") continue;
+        providerId = confirmed.id;
+      }
+      const saved = await supabaseAdmin.rpc("apply_checkout_refund", {
+        p_checkout_id: job.checkout_id,
+        p_refund_cents: target,
+        p_fully_refunded: target === intentRecord.amount_received,
+      });
+      if (saved.error) throw saved.error;
+      // Unfulfillable checkouts may have no settlement row; Stripe metadata still
+      // identifies the authenticated purchaser without trusting a browser claim.
+      const purchaser = session?.metadata?.["userId"];
+      if (
+        job.reason === "paid_booking_unfulfillable" &&
+        purchaser &&
+        /^[0-9a-f-]{36}$/i.test(purchaser)
+      ) {
+        const notice = await supabaseAdmin.rpc("notify_account", {
+          p_user: purchaser,
+          p_key: `refund-confirmed:${job.checkout_id}:${target}`,
+          p_category: "session",
+          p_body: `Refund confirmed: $${(target / 100).toFixed(2)} refunded in total for this payment.`,
+          p_href: "/account",
+        });
+        if (notice.error) throw notice.error;
+      }
+      let doneQuery = supabaseAdmin
+        .from("refund_jobs")
+        .update({
+          completed_at: new Date().toISOString(),
+          provider_id: providerId,
+          last_error: null,
+          attempts: job.attempts + 1,
+        })
+        .eq("checkout_id", job.checkout_id);
+      doneQuery =
+        job.target_cents === null
+          ? doneQuery.is("target_cents", null)
+          : doneQuery.eq("target_cents", job.target_cents);
+      const done = await doneQuery;
+      if (done.error) throw done.error;
+      completed++;
+    } catch (error) {
+      failed++;
+      const saved = await supabaseAdmin
+        .from("refund_jobs")
+        .update({
+          attempts: job.attempts + 1,
+          last_error:
+            "Refund not confirmed. Retained for retry; inspect provider event and server logs.",
+        })
+        .eq("checkout_id", job.checkout_id);
+      if (saved.error) throw saved.error;
+      console.error("Refund job retained for retry", job.checkout_id, error);
     }
-    const saved = await supabaseAdmin.rpc("apply_checkout_refund", {
-      p_checkout_id: session.id,
-      p_refund_cents: target,
-      p_fully_refunded: target === (session.amount_total ?? 0),
-    });
-    if (saved.error) throw saved.error;
-    const done = await supabaseAdmin
-      .from("refund_jobs")
-      .update({
-        completed_at: new Date().toISOString(),
-        provider_id: providerId,
-      })
-      .eq("checkout_id", session.id);
-    if (done.error) throw done.error;
-    completed++;
   }
-  return { completed };
+  return { completed, failed };
 }

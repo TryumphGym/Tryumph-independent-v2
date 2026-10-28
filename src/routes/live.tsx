@@ -37,7 +37,7 @@ export const Route = createFileRoute("/live")({
 });
 
 function Live() {
-  const { s, reserve, setExtra, uid } = useStore();
+  const { s, reserve } = useStore();
   const navigate = useNavigate();
   const [room, setRoom] = useState<(LiveClass & { hostName?: string }) | null>(
     null,
@@ -114,30 +114,39 @@ function Live() {
         }
         const candidates = data ?? [];
         const trainerIds = [...new Set(candidates.map((r) => r.trainer_id))];
-        const checks = await Promise.all(trainerIds.map(async (id) => {
-          const result = await supabase.rpc("trainer_is_eligible", { p_user_id: id, p_live: true });
-          return [id, !result.error && result.data === true] as const;
-        }));
-        const eligibleIds = new Set(checks.filter(([, eligible]) => eligible).map(([id]) => id));
+        const checks = await Promise.all(
+          trainerIds.map(async (id) => {
+            const result = await supabase.rpc("trainer_is_eligible", {
+              p_user_id: id,
+              p_live: true,
+            });
+            return [id, !result.error && result.data === true] as const;
+          }),
+        );
+        const eligibleIds = new Set(
+          checks.filter(([, eligible]) => eligible).map(([id]) => id),
+        );
         setCoachLives(
-          candidates.filter((r) => eligibleIds.has(r.trainer_id)).map((r) => ({
-            id: r.id,
-            title: r.title,
-            trainerId: r.trainer_id,
-            hostName: r.trainer_name,
-            category: r.category as LiveClass["category"],
-            level: r.level,
-            minutes: r.minutes,
-            attendees: 0,
-            description: r.description,
-            when: new Date(r.starts_at).toLocaleString([], {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            }),
-          })),
+          candidates
+            .filter((r) => eligibleIds.has(r.trainer_id))
+            .map((r) => ({
+              id: r.id,
+              title: r.title,
+              trainerId: r.trainer_id,
+              hostName: r.trainer_name,
+              category: r.category as LiveClass["category"],
+              level: r.level,
+              minutes: r.minutes,
+              attendees: 0,
+              description: r.description,
+              when: new Date(r.starts_at).toLocaleString([], {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }),
+            })),
         );
       });
   }, []);
@@ -232,30 +241,15 @@ function Live() {
                       navigate({ to: "/account" });
                       return;
                     }
-                    reserve(l.id);
-                    if (!reserved) {
-                      setExtra((e) => ({
-                        ...e,
-                        alerts: [
-                          {
-                            id: uid(),
-                            text: `Reminders set for ${l.title}: 10 minutes before.`,
-                            date: l.when,
-                          },
-                          ...e.alerts,
-                        ].slice(0, 20),
-                      }));
-                      if (
-                        typeof Notification !== "undefined" &&
-                        Notification.permission === "default"
+                    void reserve(l.id)
+                      .then(() =>
+                        toast.success(
+                          reserved
+                            ? "Reservation removed"
+                            : "Reserved free. One token will be spent only on verified entry.",
+                        ),
                       )
-                        void Notification.requestPermission();
-                    }
-                    toast(
-                      reserved
-                        ? "Reservation removed"
-                        : "Reserved! We'll remind you 10 minutes before.",
-                    );
+                      .catch((error) => toast.error(error.message));
                   }}
                 >
                   {reserved ? (

@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { LAUNCH } from "@/lib/launch";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserId } from "@/lib/community";
@@ -10,6 +11,9 @@ import { Avatar, PageHeader } from "@/components/Avatar";
 import { MenuBoard, addToPlan, groceryList } from "@/components/MenuBoard";
 
 export const Route = createFileRoute("/nutrition")({
+  beforeLoad: () => {
+    if (!LAUNCH.nutrition) throw redirect({ to: "/on-demand" });
+  },
   head: () => ({
     meta: [
       { title: "Nutrition & Weekly Menu — Tryumph Gym" },

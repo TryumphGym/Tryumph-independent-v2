@@ -79,13 +79,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {n.label}
               </Link>
             ))}
-            {!(s.signedIn && s.role === "trainer") && <Link
-              to="/for-trainers"
-              className="ml-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
-              activeProps={{ className: "bg-primary/10" }}
-            >
-              Teach on Tryumph
-            </Link>}
+            {!(s.signedIn && s.role === "trainer") && (
+              <Link
+                to="/for-trainers"
+                className="ml-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                activeProps={{ className: "bg-primary/10" }}
+              >
+                Teach on Tryumph
+              </Link>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <GetAppButton className="btn btn-ghost hidden md:inline-flex" />
@@ -98,7 +100,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             )}
             {s.role === "trainer" && s.signedIn && userId && (
-              <Link to="/trybes" search={{t: `coach-${userId}`}} className="btn btn-ghost hidden sm:inline-flex">My Trybe</Link>
+              <Link
+                to="/trybes"
+                search={{ t: `coach-${userId}` }}
+                className="btn btn-ghost hidden sm:inline-flex"
+              >
+                My Trybe
+              </Link>
             )}
             {s.role === "trainer" && s.signedIn && (
               <Link
@@ -138,21 +146,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {open && (
           <nav className="grid gap-1 border-t px-4 py-3 lg:hidden">
-            {!(s.signedIn && s.role === "trainer") && <Link
-              to="/for-trainers"
-              onClick={() => setOpen(false)}
-              className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
-            >
-              Teach on Tryumph →
-            </Link>}
-            {s.role === "trainer" && s.signedIn && userId && (
-              <Link to="/trybes" search={{t: `coach-${userId}`}} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm">My Trybe</Link>
+            {!(s.signedIn && s.role === "trainer") && (
+              <Link
+                to="/for-trainers"
+                onClick={() => setOpen(false)}
+                className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+              >
+                Teach on Tryumph →
+              </Link>
             )}
-            {[
-              ...nav,
-              { to: "/studio", label: "Trainer Studio" },
-              { to: "/shop", label: "Shop" },
-            ].map((n) => (
+            {s.role === "trainer" && s.signedIn && userId && (
+              <Link
+                to="/trybes"
+                search={{ t: `coach-${userId}` }}
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm"
+              >
+                My Trybe
+              </Link>
+            )}
+            {[...nav, { to: "/studio", label: "Trainer Studio" }].map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
@@ -161,9 +174,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 activeProps={{ className: "bg-secondary" }}
               >
                 {n.label}
-                {n.to === "/shop" && (
-                  <span className="chip ml-2 text-xs">Coming soon</span>
-                )}
               </Link>
             ))}
             {isAdmin && (
@@ -208,7 +218,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p>© 2026 Tryumph Gym — bring the gym home.</p>
           <div className="flex gap-4">
             <Link to="/terms">Terms & waiver</Link>
-            <Link to="/shop">Shop (coming soon)</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/contact">Contact Us</Link>
             <Link to="/for-trainers">For trainers</Link>
           </div>
         </div>

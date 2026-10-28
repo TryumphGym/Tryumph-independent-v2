@@ -3,85 +3,201 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms, Waiver & Coach Agreement — Tryumph Gym" },
-      { name: "description", content: "Member activity waiver, coach terms and insurance attestation, and youth contributor consent for Tryumph Gym." },
-      { property: "og:title", content: "Terms, Waiver & Coach Agreement — Tryumph Gym" },
-      { property: "og:description", content: "The terms that keep Tryumph safe for members, coaches and families." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      { title: "Terms of Service & Fitness Waiver — Tryumph Gym" },
+      {
+        name: "description",
+        content:
+          "Tryumph Gym member and trainer terms, fitness safety, payments, content and community rules.",
+      },
     ],
   }),
   component: Terms,
 });
-
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
-  return (
-    <section id={id} className="card space-y-3 p-6">
-      <h2 className="text-2xl font-bold">{title}</h2>
-      {children}
-    </section>
-  );
-}
+const Section = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <section className="card space-y-3 p-6">
+    <h2 className="text-xl font-bold">{title}</h2>
+    {children}
+  </section>
+);
 
 function Terms() {
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div>
-        <p className="eyebrow">The fine print, in plain English</p>
-        <h1 className="mt-2 text-3xl font-extrabold">Terms, Waiver & Coach Agreement</h1>
-        <p className="mt-2 text-muted-foreground">
-          Last updated October 2026. These terms govern your use of Tryumph Gym ("Tryumph"). By creating an account, booking a session, or uploading content, you agree to them. This is a starter template — have a lawyer review before launch.
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header className="space-y-2">
+        <p className="eyebrow">Legal</p>
+        <h1 className="text-3xl font-extrabold">
+          Terms of Service & Fitness Waiver
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Updated October 27, 2026 · Applies to Tryumph Gym's U.S. fitness
+          platform. Please read before participating or publishing content.
         </p>
-        <nav className="mt-4 flex flex-wrap gap-2 text-sm">
-          <a href="#member-waiver" className="chip">Member waiver</a>
-          <a href="#coach-terms" className="chip">Coach terms</a>
-          <a href="#youth" className="chip">Youth contributors</a>
-          <a href="#payments" className="chip">Payments & refunds</a>
-        </nav>
-      </div>
-
-      <Section id="member-waiver" title="1. Member Activity Waiver">
-        <p>Exercise involves risk. By taking part in any Tryumph workout — live, 1-on-1, or on-demand — you confirm that:</p>
-        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>You are physically able to exercise, or have cleared it with your doctor — especially if you are pregnant, postpartum, or managing an injury or health condition.</li>
-          <li>You are responsible for your own space, equipment, and surroundings (kids, pets, furniture, floors).</li>
-          <li>You will stop immediately if you feel pain, dizziness, or shortness of breath, and seek medical care when needed.</li>
-          <li>Coaches provide general fitness guidance, not medical advice, diagnosis, or treatment.</li>
-        </ul>
-        <p>To the fullest extent permitted by law, you release Tryumph Gym and its coaches from liability for injuries or losses arising from your participation, except where caused by our gross negligence or willful misconduct.</p>
+      </header>
+      <Section title="1. Using Tryumph Gym">
+        <p>
+          Tryumph Gym provides an online platform to discover and watch
+          workouts, participate in creator-led communities ("Trybes"), and,
+          where available, reserve live classes or private sessions with
+          independent trainers. Users must provide accurate account information,
+          protect their credentials and follow applicable laws and platform
+          rules. The launch service is intended for adults aged 18 and older in
+          the United States; youth and homeschool features are not part of this
+          launch.
+        </p>
+        <p>
+          We may restrict accounts or content for safety, fraud, harassment,
+          expired credentials, or policy violations, subject to applicable law.
+          Do not impersonate others, harass members, spam trainers, or share
+          someone else's private information.
+        </p>
       </Section>
-
-      <Section id="coach-terms" title="2. Coach Terms & Insurance Attestation">
-        <p>Coaches (trainers and nutritionists) are independent contractors, not employees. By coaching on Tryumph you attest that:</p>
-        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>You hold a current, valid certification for what you teach (e.g. NASM, ACE, ISSA, USREPS-registered, or a recognized prenatal/postpartum or nutrition credential), and you will keep it current.</li>
-          <li>You carry, or will obtain before your first paid session, professional liability insurance appropriate for fitness instruction.</li>
-          <li>Your submitted credentials are genuine. Tryumph may verify them and may suspend or remove your account for false or expired credentials.</li>
-          <li>You will not provide medical advice, and will refer members to healthcare professionals when appropriate.</li>
-          <li>You will treat members with respect. Harassment, discrimination, or inappropriate contact ends your account.</li>
-        </ul>
-        <p><strong>Earnings.</strong> Private 1-on-1 sessions booked through Tryumph pay you 90% of the net amount after payment processing fees. Live drop-in class revenue is shared 50/50 after fees. Payouts require a linked payout account. Tryumph is non-exclusive: your existing clients, website, and products remain yours — only bookings made through Tryumph are subject to these terms.</p>
+      <Section title="2. Fitness participation and health">
+        <p>
+          Exercise carries risks, including injury. Workouts and trainer
+          communications provide general fitness information, not medical care,
+          diagnosis or treatment. Consider professional medical advice before
+          beginning or changing an exercise program, especially if pregnant,
+          postpartum, injured, or managing a health condition.
+        </p>
+        <p>
+          Use equipment appropriately, maintain a safe exercise space, work
+          within your limits and stop if you experience symptoms that concern
+          you. In an emergency, contact local emergency services. To the extent
+          permitted by applicable law, you accept the ordinary risks inherent in
+          voluntary exercise participation; nothing in these terms waives rights
+          that cannot lawfully be waived or excludes liability where doing so
+          would be unlawful.
+        </p>
       </Section>
-
-      <Section id="youth" title="3. Youth Contributors (Under 18)">
-        <p>We welcome youth athletic content (for example, teen athletes sharing sport drills) under these guardrails:</p>
-        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>A parent or legal guardian must submit written consent and a content release before any youth content is published.</li>
-          <li>Youth contributors upload on-demand videos only — no live classes, no 1-on-1 sessions, no direct messaging with members, and no payouts.</li>
-          <li>All youth content is reviewed by the Tryumph team before it goes live.</li>
-          <li>The guardian may withdraw consent at any time, and we will remove the content promptly.</li>
-        </ul>
+      <Section title="3. Trainers and credentials">
+        <p>
+          Trainers are independent providers, not medical professionals acting
+          on behalf of Tryumph. Trainers must provide genuine certification
+          information, maintain current required credentials (including
+          applicable CPR/AED verification), follow fitness safety guidelines and
+          maintain any legally required permissions or insurance. Tryumph may
+          review credentials and suspend new uploads, classes or private
+          bookings when required credentials are missing or expired. Previously
+          approved content may remain available unless it presents a separate
+          safety concern.
+        </p>
+        <p>
+          Trainers must have five approved on-demand workouts before hosting
+          live classes. Trainer access, review and payout eligibility are
+          subject to platform verification. Trainer listings, certifications and
+          reviews do not guarantee any particular fitness result.
+        </p>
       </Section>
-
-      <Section id="payments" title="4. Payments, Tokens & Refunds">
-        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Live group classes are reserved free and cost one token when you join. 1-on-1 sessions are paid in dollars at the coach's listed rate.</li>
-          <li>Tokens are non-transferable and not redeemable for cash.</li>
-          <li>If a coach cancels a paid session or a live class you joined, your payment or token is returned automatically.</li>
-          <li>Members may cancel a 1-on-1 up to 24 hours before start for a full refund; later cancellations are at the coach's discretion.</li>
-        </ul>
-        <p className="text-muted-foreground">Questions? Reach us via the <Link to="/account" className="text-primary">Account</Link> page.</p>
+      <Section title="4. Prices, reservations, deposits and refunds">
+        <p>
+          On-demand workouts are available without a required paid membership;
+          eligible videos may contain advertising during trainer-designated
+          water breaks. Live drop-in classes cost $5 per class unless a
+          specifically authorized price change is disclosed. Reservations are
+          free. A purchased token is spent once only after verified room entry;
+          reconnecting or missing a reserved class does not spend another token.
+          Trainers set their own private-session prices. Final prices, charges,
+          cancellation deadlines and any taxes are displayed at checkout.
+        </p>
+        <p>
+          <strong>Current checkout terms govern:</strong> A planned
+          private-session model collects a 25% deposit at reservation and the
+          remaining 75% after verified two-party waiting-room entry at the
+          scheduled session time, with current trainer eligibility and
+          successful payment required before full audio/video access. The
+          deposit is credited toward the agreed total; the saved card may
+          require additional authentication. This deposit model is{" "}
+          <strong>not yet active</strong>; it will only apply once the checkout
+          clearly presents and obtains agreement to those terms. Until then, the
+          existing checkout and cancellation terms shown when booking apply. We
+          will not retroactively impose a new deposit on existing bookings.
+        </p>
+        <p>
+          When the deposit checkout is enabled, our launch policy grants a full
+          refund for any unfulfilled private-session cancellation, including
+          late cancellation, no-show, trainer cancellation, expired credentials
+          or system failure. If both participants have not entered within 15
+          minutes after the scheduled start, the unfulfilled booking is
+          cancelled for refund. The member may instead request one reschedule
+          with the same trainer at the same agreed price; the trainer must
+          approve transferring the original deposit once, without a second
+          deposit charge. A credential hold never waives the member's right to a
+          refund, and renewal alone does not revive a cancelled appointment.
+          Statutory rights remain available. Refund delivery may take additional
+          time with the payment provider.
+        </p>
+        <p>
+          Trainer compensation is calculated after applicable payment-processing
+          fees but before hosting costs: 90% of eligible private-session revenue
+          to the trainer, and 50% of eligible live-class and eligible on-demand
+          advertising revenue to the trainer. New private-session earnings
+          remain held until the member confirms received service after the
+          session window. No mandatory recurring member or trainer subscription
+          is required. External affiliate links and independently managed
+          trainer stores are the trainer's own arrangements; Tryumph takes no
+          commission from those external earnings.
+        </p>
       </Section>
+      <Section title="5. User content, communications and intellectual property">
+        <p>
+          You retain ownership of content you lawfully upload. By submitting it,
+          you grant Tryumph a nonexclusive permission to host, process, display
+          and distribute it as needed to operate the service, subject to your
+          privacy settings and applicable law. You must have rights to the
+          videos, images, music and other materials you provide. Trainers may
+          link to licensed music services; do not upload copyrighted recordings
+          without permission.
+        </p>
+        <p>
+          Community posts, comments and private messages must comply with safety
+          rules. Moderators may review reports and content they are authorized
+          to access; private messages are not a general public feed. We may
+          remove infringing, unsafe or abusive content. Advertising and sponsor
+          content must follow applicable disclosure rules.
+        </p>
+      </Section>
+      <Section title="6. Privacy and external services">
+        <p>
+          Our{" "}
+          <Link to="/privacy" className="text-primary underline">
+            Privacy Policy
+          </Link>{" "}
+          explains data handling, cookies, advertising technologies, service
+          providers and how to submit privacy requests. Trainers' external
+          stores and links have their own terms and privacy practices. Tryumph
+          cannot guarantee uptime or uninterrupted availability of third-party
+          video, payment or live-streaming services.
+        </p>
+      </Section>
+      <Section title="7. Changes, disputes and contact">
+        <p>
+          We may update these terms as the service evolves. Material changes
+          should be communicated before they take effect where required, and
+          changes do not retroactively alter completed purchases. Applicable
+          consumer rights remain in effect. If a provision is unenforceable, the
+          remaining terms continue as permitted by law.
+        </p>
+        <p>
+          For questions, refund requests, accessibility issues, copyright
+          complaints, or concerns about community safety, use{" "}
+          <Link to="/contact" className="text-primary underline">
+            Contact Us
+          </Link>
+          .
+        </p>
+      </Section>
+      <p className="text-xs text-muted-foreground">
+        These terms are a launch draft and require review by a qualified U.S.
+        attorney for enforceability, state consumer laws, trainer relationships,
+        waivers, refund terms and business-entity identification before
+        production publication.
+      </p>
     </div>
   );
 }

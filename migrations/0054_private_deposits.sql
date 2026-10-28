@@ -1,0 +1,445 @@
+-- Version 1 paid bookings remain fully paid; no second charge is created for them.
+ALTER TABLE private_booking_holds ADD COLUMN IF NOT EXISTS total_cents integer;
+ALTER TABLE private_booking_holds ADD COLUMN IF NOT EXISTS terms_version text;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS payment_version integer NOT NULL DEFAULT 1;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS total_cents integer;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS deposit_cents integer;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS balance_cents integer;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS terms_version text;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS both_present_at timestamptz;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS delivered_at timestamptz;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS member_confirmed_at timestamptz;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS deposit_origin text;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS transfer_used boolean NOT NULL DEFAULT false;
+ALTER TABLE private_session_access ADD COLUMN IF NOT EXISTS transfer_from text;
+ALTER TABLE private_session_access DROP CONSTRAINT IF EXISTS private_session_access_status_check;
+ALTER TABLE private_session_access ADD CONSTRAINT private_session_access_status_check CHECK(status IN ('paid','refunded','cancelled','deposit_paid','balance_pending','credential_hold','transferred'));
+DROP INDEX IF EXISTS private_active_slot;
+CREATE UNIQUE INDEX private_active_slot ON private_session_access(trainer_id,day,time) WHERE status IN ('paid','deposit_paid','balance_pending','credential_hold');
+CREATE TABLE IF NOT EXISTS private_payment_methods (
+ booking_id text PRIMARY KEY REFERENCES private_session_access(checkout_id),customer_id text NOT NULL,payment_method_id text NOT NULL);
+CREATE TABLE IF NOT EXISTS private_booking_payments (
+ payment_id text PRIMARY KEY,booking_id text NOT NULL REFERENCES private_session_access(checkout_id),stage text NOT NULL CHECK(stage IN ('deposit','balance')),
+ intent_id text UNIQUE,gross_cents integer NOT NULL CHECK(gross_cents>0),fee_cents integer NOT NULL CHECK(fee_cents>=0 AND fee_cents<=gross_cents),
+ refunded_cents integer NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(booking_id,stage));
+CREATE TABLE IF NOT EXISTS private_balance_operations (
+ booking_id text PRIMARY KEY REFERENCES private_session_access(checkout_id),operation_key text NOT NULL UNIQUE,
+ intent_id text UNIQUE,checkout_id text,lease_until timestamptz NOT NULL DEFAULT now(),status text NOT NULL DEFAULT 'pending'
+ CHECK(status IN ('pending','requires_action','processing','succeeded','failed')),last_error text);
+CREATE TABLE IF NOT EXISTS private_reschedule_requests (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),booking_id text NOT NULL REFERENCES private_session_access(checkout_id),
+ member_id uuid NOT NULL REFERENCES auth.users(id),day date NOT NULL,time text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),
+ status text NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','approved','declined')),UNIQUE(booking_id,day,time));
+ALTER TABLE trainer_earnings ADD COLUMN IF NOT EXISTS fulfillment_pending boolean NOT NULL DEFAULT false;
+CREATE OR REPLACE FUNCTION prepare_deposit_booking(p_trainer uuid,p_member uuid,p_day date,p_time text,p_terms text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE h uuid; price integer;
+BEGIN
+ IF p_terms<>'private-deposit-v1' OR NOT account_can_act(p_member,false) THEN RAISE EXCEPTION 'Consent and active account required'; END IF;
+ h=hold_private_booking(p_trainer,p_member,p_day,p_time);
+ SELECT round((extra->'trainer'->>'rate')::numeric*100)::integer INTO price FROM profiles WHERE id=p_trainer;
+ -- Stripe minimum applies to EACH installment: 25% deposit at least 50 cents.
+ IF price NOT BETWEEN 200 AND 100000 THEN RAISE EXCEPTION 'Trainer price must support both installments (minimum $2)'; END IF;
+ UPDATE private_booking_holds SET total_cents=coalesce(total_cents,price),terms_version=p_terms WHERE id=h;
+ RETURN h;
+END $$;
+CREATE OR REPLACE FUNCTION apply_private_deposit(p_checkout text,p_hold uuid,p_member uuid,p_gross integer,p_fee integer,p_customer text,p_method text,p_intent text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE h private_booking_holds%ROWTYPE; amount integer;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext(p_checkout));
+ IF EXISTS(SELECT 1 FROM private_booking_payments WHERE payment_id=p_checkout) THEN RETURN; END IF;
+ SELECT * INTO h FROM private_booking_holds WHERE id=p_hold FOR UPDATE;
+ IF NOT FOUND OR h.member_id<>p_member OR h.expires_at<=now() OR (h.day::text||' '||h.time)::timestamp AT TIME ZONE 'America/Chicago'<=now() OR h.terms_version<>'private-deposit-v1' OR h.total_cents IS NULL THEN RAISE EXCEPTION 'Invalid reservation'; END IF;
+ amount=floor((h.total_cents+2)::numeric/4);
+ IF p_gross<>amount OR p_fee<0 OR p_fee>amount OR p_customer='' OR p_method='' OR p_intent='' THEN RAISE EXCEPTION 'Invalid deposit'; END IF;
+ IF NOT trainer_is_eligible(h.trainer_id,false) OR NOT account_can_act(p_member,false) THEN RAISE EXCEPTION 'Trainer or member unavailable'; END IF;
+ INSERT INTO private_session_access(checkout_id,trainer_id,member_id,day,time,starts_at,status,payment_version,total_cents,deposit_cents,balance_cents,terms_version,deposit_origin)
+ VALUES(p_checkout,h.trainer_id,h.member_id,h.day,h.time,(h.day::text||' '||h.time)::timestamp AT TIME ZONE 'America/Chicago',
+ 'deposit_paid',2,h.total_cents,amount,h.total_cents-amount,h.terms_version,p_checkout);
+ INSERT INTO checkout_payment_state(checkout_id,kind,user_id,gross_cents,fee_cents) VALUES(p_checkout,'booking',p_member,amount,p_fee);
+ INSERT INTO private_booking_payments(payment_id,booking_id,stage,intent_id,gross_cents,fee_cents) VALUES(p_checkout,p_checkout,'deposit',p_intent,amount,p_fee);
+ INSERT INTO private_payment_methods(booking_id,customer_id,payment_method_id) VALUES(p_checkout,p_customer,p_method);
+ INSERT INTO trainer_busy(trainer_id,day,time,source) VALUES(h.trainer_id::text,h.day,h.time,'booked');
+ DELETE FROM private_booking_holds WHERE id=h.id;
+ PERFORM notify_account(h.member_id,'deposit:'||p_checkout,'session','Private session reserved. Deposit paid; balance is due only after both participants enter the waiting room.');
+ PERFORM notify_account(h.trainer_id,'deposit:'||p_checkout,'session','A private session deposit was received.','/studio');
+END $$;
+CREATE OR REPLACE FUNCTION record_private_both_present(p_booking text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_booking FOR UPDATE;
+ IF NOT FOUND OR b.payment_version<>2 OR b.status NOT IN ('deposit_paid','balance_pending') OR NOT trainer_is_eligible(b.trainer_id,false)
+ OR NOT account_can_act(b.member_id,false) OR now()<b.starts_at OR now()>b.starts_at+interval '15 minutes'
+ OR EXISTS(SELECT 1 FROM private_booking_payments p JOIN checkout_payment_state s ON s.checkout_id=p.payment_id
+ WHERE p.payment_id=coalesce(b.deposit_origin,b.checkout_id) AND (s.refunded_cents>0 OR EXISTS(SELECT 1 FROM payment_disputes WHERE checkout_id=s.checkout_id AND status IN ('open','lost')))) THEN RETURN false; END IF;
+ UPDATE private_session_access SET both_present_at=coalesce(both_present_at,now()),status='balance_pending' WHERE checkout_id=p_booking;
+ RETURN true;
+END $$;
+CREATE OR REPLACE FUNCTION claim_private_balance(p_booking text)
+RETURNS SETOF private_balance_operations LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_booking FOR UPDATE;
+ IF NOT FOUND OR b.payment_version<>2 OR b.status<>'balance_pending' OR b.both_present_at IS NULL OR NOT trainer_is_eligible(b.trainer_id,false) THEN RETURN; END IF;
+ INSERT INTO private_balance_operations(booking_id,operation_key,lease_until) VALUES(p_booking,'balance:'||p_booking,now()+interval '2 minutes') ON CONFLICT DO NOTHING;
+ IF FOUND THEN RETURN QUERY SELECT * FROM private_balance_operations WHERE booking_id=p_booking; RETURN; END IF;
+ RETURN QUERY UPDATE private_balance_operations SET lease_until=now()+interval '2 minutes' WHERE booking_id=p_booking AND lease_until<=now() AND status<>'succeeded' RETURNING *;
+END $$;
+CREATE OR REPLACE FUNCTION apply_private_balance(p_booking text,p_intent text,p_gross integer,p_fee integer)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_booking FOR UPDATE;
+ IF NOT FOUND OR b.payment_version<>2 OR b.both_present_at IS NULL OR p_gross<>b.balance_cents OR p_fee<0 OR p_fee>p_gross THEN RAISE EXCEPTION 'Invalid balance payment'; END IF;
+ IF EXISTS(SELECT 1 FROM private_booking_payments WHERE payment_id=p_intent) THEN RETURN; END IF;
+ IF EXISTS(SELECT 1 FROM private_booking_payments WHERE booking_id=p_booking AND stage='balance') THEN RAISE EXCEPTION 'Second balance payment'; END IF;
+ INSERT INTO checkout_payment_state(checkout_id,kind,user_id,gross_cents,fee_cents) VALUES(p_intent,'booking',b.member_id,p_gross,p_fee);
+ INSERT INTO private_booking_payments(payment_id,booking_id,stage,intent_id,gross_cents,fee_cents) VALUES(p_intent,p_booking,'balance',p_intent,p_gross,p_fee);
+ UPDATE private_balance_operations SET status='succeeded',intent_id=p_intent WHERE booking_id=p_booking;
+ IF b.status IN ('cancelled','refunded','credential_hold','transferred') OR NOT trainer_is_eligible(b.trainer_id,false) OR now()>b.starts_at+interval '60 minutes' THEN
+  INSERT INTO refund_jobs(checkout_id,reason) VALUES(p_intent,'unfulfillable_balance') ON CONFLICT DO NOTHING;
+  RETURN;
+ END IF;
+ UPDATE private_session_access SET status='paid' WHERE checkout_id=p_booking;
+ PERFORM notify_account(b.member_id,'balance:'||p_booking,'session','Private session balance confirmed. Full session access is ready.');
+END $$;
+-- No deposit or balance earnings before the completed session; fees are allocated separately
+-- to each real charge so both processing fees precede the agreed 90% split.
+CREATE OR REPLACE FUNCTION finalize_delivered_private_sessions()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE; p private_booking_payments%ROWTYPE;
+BEGIN
+ FOR b IN SELECT * FROM private_session_access WHERE payment_version=2 AND status='paid' AND both_present_at IS NOT NULL
+ AND member_confirmed_at IS NOT NULL AND both_present_at+interval '60 minutes'<now() AND delivered_at IS NULL FOR UPDATE LOOP
+  UPDATE private_session_access SET delivered_at=now() WHERE checkout_id=b.checkout_id;
+  FOR p IN SELECT * FROM private_booking_payments WHERE (booking_id=b.checkout_id AND stage='balance') OR payment_id=b.deposit_origin LOOP
+   IF EXISTS(SELECT 1 FROM payment_disputes WHERE checkout_id=p.payment_id AND status IN ('open','lost')) THEN CONTINUE; END IF;
+   INSERT INTO trainer_earnings(trainer_slug,source,ref,gross_cents,fee_cents,net_cents,share_pct,payout_cents,reversal_target_cents,status)
+   VALUES(b.trainer_id::text,'oneonone',p.payment_id,p.gross_cents,p.fee_cents,p.gross_cents-p.fee_cents,90,floor((p.gross_cents-p.fee_cents)*0.9),
+   floor(floor((p.gross_cents-p.fee_cents)*0.9)*p.refunded_cents/p.gross_cents),CASE WHEN p.refunded_cents>=p.gross_cents THEN 'refunded' ELSE 'pending' END) ON CONFLICT(ref) DO NOTHING;
+  END LOOP;
+ END LOOP;
+END $$;
+CREATE OR REPLACE FUNCTION cancel_private_session(p_checkout_id text,p_user_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE; p record;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_checkout_id FOR UPDATE;
+ IF NOT FOUND OR p_user_id NOT IN(b.trainer_id,b.member_id) THEN RAISE EXCEPTION 'Not your booking'; END IF;
+ IF b.delivered_at IS NOT NULL THEN RAISE EXCEPTION 'Contact support about a completed session'; END IF;
+ IF b.status IN ('refunded','cancelled','transferred') THEN RETURN; END IF;
+ UPDATE private_session_access SET status='cancelled' WHERE checkout_id=p_checkout_id;
+ DELETE FROM trainer_busy WHERE trainer_id=b.trainer_id::text AND day=b.day AND time=b.time AND source='booked';
+ -- Launch policy deliberately grants a full refund on all unfulfilled cancellations,
+ -- including member late cancellation/no-show; no speculative retained cancellation fee.
+ IF b.payment_version=1 THEN INSERT INTO refund_jobs(checkout_id,reason) VALUES(p_checkout_id,'private_cancelled') ON CONFLICT DO NOTHING;
+ ELSE
+  FOR p IN SELECT payment_id FROM private_booking_payments WHERE booking_id=b.checkout_id OR payment_id=b.deposit_origin LOOP
+   INSERT INTO refund_jobs(checkout_id,reason) VALUES(p.payment_id,'private_cancelled_full_refund') ON CONFLICT(checkout_id) DO UPDATE SET target_cents=NULL,completed_at=NULL;
+  END LOOP;
+ END IF;
+ PERFORM notify_account(b.member_id,'cancel:'||p_checkout_id,'session','Private session cancelled. A full refund has been queued; processing status remains visible.');
+ PERFORM notify_account(b.trainer_id,'cancel:'||p_checkout_id,'session','Private session cancelled; no session payout.','/studio');
+END $$;
+CREATE OR REPLACE FUNCTION request_private_reschedule(p_booking text,p_day date,p_time text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE; result uuid;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_booking FOR UPDATE;
+ IF NOT FOUND OR b.member_id<>auth.uid() OR b.payment_version<>2 OR b.transfer_used OR b.status NOT IN ('deposit_paid','credential_hold') OR b.both_present_at IS NOT NULL OR p_day<=current_date THEN RAISE EXCEPTION 'Deposit cannot be transferred'; END IF;
+ INSERT INTO private_reschedule_requests(booking_id,member_id,day,time) VALUES(p_booking,auth.uid(),p_day,p_time) ON CONFLICT(booking_id,day,time) DO UPDATE SET status='requested' RETURNING id INTO result;
+ RETURN result;
+END $$;
+CREATE OR REPLACE FUNCTION approve_private_reschedule(p_request uuid,p_approve boolean)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE r private_reschedule_requests%ROWTYPE; b private_session_access%ROWTYPE; h uuid; result text;
+BEGIN
+ SELECT * INTO r FROM private_reschedule_requests WHERE id=p_request FOR UPDATE;
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=r.booking_id FOR UPDATE;
+ IF NOT FOUND OR b.trainer_id<>auth.uid() OR r.status<>'requested' THEN RAISE EXCEPTION 'Trainer decision required'; END IF;
+ IF NOT p_approve THEN UPDATE private_reschedule_requests SET status='declined' WHERE id=p_request; RETURN b.checkout_id; END IF;
+ IF b.payment_version<>2 OR b.transfer_used OR b.both_present_at IS NOT NULL OR b.status NOT IN ('deposit_paid','credential_hold') OR NOT trainer_is_eligible(b.trainer_id,false)
+ OR EXISTS(SELECT 1 FROM refund_jobs WHERE checkout_id=b.deposit_origin)
+ OR EXISTS(SELECT 1 FROM checkout_payment_state WHERE checkout_id=b.deposit_origin AND refunded_cents>0)
+ OR EXISTS(SELECT 1 FROM payment_disputes WHERE checkout_id=b.deposit_origin AND status IN ('open','lost')) THEN RAISE EXCEPTION 'Deposit is unavailable'; END IF;
+ h=hold_private_booking(b.trainer_id,b.member_id,r.day,r.time); result='rescheduled:'||r.id;
+ UPDATE private_session_access SET status='transferred',transfer_used=true WHERE checkout_id=b.checkout_id;
+ DELETE FROM trainer_busy WHERE trainer_id=b.trainer_id::text AND day=b.day AND time=b.time AND source='booked';
+ INSERT INTO private_session_access(checkout_id,trainer_id,member_id,day,time,starts_at,status,payment_version,total_cents,deposit_cents,balance_cents,terms_version,deposit_origin,transfer_used,transfer_from)
+ VALUES(result,b.trainer_id,b.member_id,r.day,r.time,(r.day::text||' '||r.time)::timestamp AT TIME ZONE 'America/Chicago','deposit_paid',2,b.total_cents,b.deposit_cents,b.balance_cents,b.terms_version,b.deposit_origin,true,b.checkout_id);
+ INSERT INTO private_payment_methods SELECT result,customer_id,payment_method_id FROM private_payment_methods WHERE booking_id=b.checkout_id;
+ INSERT INTO trainer_busy(trainer_id,day,time,source) VALUES(b.trainer_id::text,r.day,r.time,'booked');
+ DELETE FROM private_booking_holds WHERE id=h;
+ UPDATE private_reschedule_requests SET status='approved' WHERE id=r.id;
+ PERFORM notify_account(b.member_id,'rescheduled:'||r.id,'session','Trainer approved the new date. Your existing deposit was transferred once; no new deposit was charged.');
+ RETURN result;
+END $$;
+CREATE OR REPLACE FUNCTION maintain_private_bookings()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE;
+BEGIN
+ FOR b IN SELECT * FROM private_session_access WHERE status IN ('paid','deposit_paid','balance_pending','credential_hold') AND delivered_at IS NULL AND (payment_version=2 OR starts_at>now()) FOR UPDATE LOOP
+  IF (b.both_present_at IS NULL OR b.status<>'paid') AND NOT trainer_is_eligible(b.trainer_id,false) THEN
+   UPDATE private_session_access SET status='credential_hold' WHERE checkout_id=b.checkout_id;
+   PERFORM notify_account(b.member_id,'credential-hold:'||b.checkout_id,'session','Trainer credentials are unavailable. Session is on hold; request a full refund now or propose one consensual reschedule.');
+   PERFORM notify_account(b.trainer_id,'credential-hold:'||b.checkout_id,'credential','An upcoming booking is on credential hold. Renewal alone does not restart it.','/studio');
+  END IF;
+  IF (b.status='credential_hold' AND b.starts_at<=now()) OR (b.both_present_at IS NULL AND b.starts_at+interval '15 minutes'<now())
+  OR (b.status IN ('deposit_paid','balance_pending') AND b.starts_at+interval '60 minutes'<now()) THEN
+   PERFORM cancel_private_session(b.checkout_id,b.member_id);
+  END IF;
+ END LOOP;
+ PERFORM finalize_delivered_private_sessions();
+ INSERT INTO private_room_shutdown_jobs(booking_id)
+ SELECT checkout_id FROM private_session_access WHERE status='paid'
+ AND (payment_version=2 OR starts_at>now()-interval '1 day')
+ AND coalesce(both_present_at,starts_at)+interval '60 minutes'<now() ON CONFLICT DO NOTHING;
+END $$;
+DO $$ DECLARE t text; BEGIN
+ FOREACH t IN ARRAY ARRAY['private_payment_methods','private_booking_payments','private_balance_operations','private_reschedule_requests'] LOOP
+ EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t); EXECUTE format('REVOKE ALL ON %I FROM anon,authenticated',t); EXECUTE format('GRANT ALL ON %I TO service_role',t); END LOOP;
+END $$;
+GRANT SELECT ON private_reschedule_requests TO authenticated;
+DROP POLICY IF EXISTS reschedule_participants ON private_reschedule_requests;
+CREATE POLICY reschedule_participants ON private_reschedule_requests FOR SELECT TO authenticated USING(member_id=auth.uid() OR EXISTS(SELECT 1 FROM private_session_access WHERE checkout_id=booking_id AND trainer_id=auth.uid()));
+REVOKE ALL ON FUNCTION prepare_deposit_booking(uuid,uuid,date,text,text),apply_private_deposit(text,uuid,uuid,integer,integer,text,text,text),record_private_both_present(text),claim_private_balance(text),apply_private_balance(text,text,integer,integer),finalize_delivered_private_sessions(),maintain_private_bookings(),request_private_reschedule(text,date,text),approve_private_reschedule(uuid,boolean) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION prepare_deposit_booking(uuid,uuid,date,text,text),apply_private_deposit(text,uuid,uuid,integer,integer,text,text,text),record_private_both_present(text),claim_private_balance(text),apply_private_balance(text,text,integer,integer),finalize_delivered_private_sessions(),maintain_private_bookings() TO service_role;
+GRANT EXECUTE ON FUNCTION request_private_reschedule(text,date,text),approve_private_reschedule(uuid,boolean) TO authenticated;
+
+CREATE OR REPLACE FUNCTION apply_checkout_refund_legacy(p_checkout_id text,p_refund_cents integer,p_fully_refunded boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v checkout_payment_state%ROWTYPE; u wallet_token_units%ROWTYPE; e trainer_earnings%ROWTYPE; target integer; revoked_count integer; rounded integer; before_balance integer; after_balance integer;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext(p_checkout_id));
+ SELECT * INTO v FROM checkout_payment_state WHERE checkout_id=p_checkout_id FOR UPDATE;
+ IF NOT FOUND THEN RETURN; END IF;
+ IF p_refund_cents<0 OR p_refund_cents>v.gross_cents THEN RAISE EXCEPTION 'Invalid refund'; END IF;
+ IF p_refund_cents<=v.refunded_cents THEN RETURN; END IF;
+ UPDATE checkout_payment_state SET refunded_cents=p_refund_cents WHERE checkout_id=p_checkout_id;
+ IF v.kind='tokens' THEN
+  SELECT tokens INTO before_balance FROM profiles WHERE id=v.user_id FOR UPDATE;
+  revoked_count=ceil(v.quantity::numeric*p_refund_cents/v.gross_cents);
+  FOR u IN SELECT * FROM wallet_token_units WHERE lot_id=p_checkout_id AND unit_index>=v.quantity-revoked_count AND state<>'refunded' FOR UPDATE LOOP
+   UPDATE wallet_token_units SET state='refunded' WHERE lot_id=u.lot_id AND unit_index=u.unit_index;
+   IF u.redemption_id IS NOT NULL THEN
+    UPDATE live_room_access SET status='refunded' WHERE wallet_redemption_id=u.redemption_id;
+    UPDATE trainer_earnings SET reversal_target_cents=payout_cents,
+      status=CASE WHEN transfer_id IS NULL AND operation_key IS NULL THEN 'refunded' ELSE 'reversal_due' END WHERE ref='wallet:'||u.redemption_id::text;
+   END IF;
+  END LOOP;
+  PERFORM sync_wallet_balance(v.user_id);
+  SELECT tokens INTO after_balance FROM profiles WHERE id=v.user_id;
+  UPDATE profiles SET ledger=jsonb_build_array(jsonb_build_object('id','refund:'||p_checkout_id||':'||p_refund_cents::text,
+   'label','Payment refund $'||((p_refund_cents-v.refunded_cents)/100.0)::text,'tokens',after_balance-before_balance,'date',current_date))||coalesce(ledger,'[]'::jsonb) WHERE id=v.user_id;
+  -- Token refunds are whole $5 units. Finish a provider-initiated fractional refund via an auditable job.
+  rounded=least(v.gross_cents,revoked_count*500);
+  IF rounded>p_refund_cents THEN
+   INSERT INTO refund_jobs(checkout_id,reason,target_cents) VALUES(p_checkout_id,'complete_token_unit_refund',rounded)
+   ON CONFLICT(checkout_id) DO UPDATE SET target_cents=CASE WHEN refund_jobs.target_cents IS NULL THEN NULL ELSE greatest(refund_jobs.target_cents,excluded.target_cents) END,completed_at=NULL;
+  END IF;
+ ELSIF p_refund_cents=v.gross_cents THEN
+  UPDATE private_session_access SET status='refunded' WHERE checkout_id=p_checkout_id;
+  DELETE FROM trainer_busy WHERE source='booked' AND (trainer_id,day,time) IN(SELECT trainer_id::text,day,time FROM private_session_access WHERE checkout_id=p_checkout_id);
+  UPDATE profiles SET bookings=(SELECT coalesce(jsonb_agg(b),'[]'::jsonb) FROM jsonb_array_elements(coalesce(bookings,'[]'::jsonb)) b WHERE b->>'id'<>p_checkout_id) WHERE id=v.user_id;
+  UPDATE live_room_access SET status='refunded' WHERE stripe_checkout_session_id=p_checkout_id;
+ END IF;
+ SELECT * INTO e FROM trainer_earnings WHERE ref=p_checkout_id FOR UPDATE;
+ IF FOUND THEN
+  target=floor(e.payout_cents::numeric*p_refund_cents/v.gross_cents);
+  UPDATE trainer_earnings SET reversal_target_cents=target,status=CASE
+   WHEN operation_key IS NOT NULL THEN CASE WHEN transfer_id IS NULL THEN 'transferring' ELSE 'reversal_due' END
+   WHEN transfer_id IS NOT NULL THEN CASE WHEN target>withheld_cents+transfer_reversed_cents THEN 'reversal_due' ELSE 'paid' END
+   WHEN p_refund_cents=v.gross_cents THEN 'refunded' ELSE 'pending' END WHERE id=e.id;
+ END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION apply_checkout_refund(p_checkout_id text,p_refund_cents integer,p_fully_refunded boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE; customer uuid;
+BEGIN
+ PERFORM apply_checkout_refund_legacy(p_checkout_id,p_refund_cents,p_fully_refunded);
+ SELECT user_id INTO customer FROM checkout_payment_state WHERE checkout_id=p_checkout_id AND refunded_cents=p_refund_cents;
+ IF customer IS NOT NULL AND p_refund_cents>0 THEN
+  PERFORM notify_account(customer,'refund-confirmed:'||p_checkout_id||':'||p_refund_cents,'session','Refund confirmed: $'||(p_refund_cents/100.0)::text||' refunded in total for this payment.');
+ END IF;
+ UPDATE private_booking_payments SET refunded_cents=greatest(refunded_cents,p_refund_cents) WHERE payment_id=p_checkout_id;
+ FOR b IN SELECT * FROM private_session_access WHERE payment_version=2 AND delivered_at IS NULL AND status NOT IN ('transferred','refunded','cancelled')
+ AND (deposit_origin=p_checkout_id OR checkout_id IN(SELECT booking_id FROM private_booking_payments WHERE payment_id=p_checkout_id)) FOR UPDATE LOOP
+  IF p_refund_cents>0 THEN PERFORM cancel_private_session(b.checkout_id,b.member_id); END IF;
+ END LOOP;
+END $$;
+REVOKE ALL ON FUNCTION apply_checkout_refund_legacy(text,integer,boolean) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION apply_checkout_refund_legacy(text,integer,boolean) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.hold_private_booking(p_trainer_id uuid,p_member_id uuid,p_day date,p_time text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE out_id uuid; start_time timestamptz;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext(p_trainer_id::text||p_day::text));
+ start_time=(p_day::text||' '||p_time)::timestamp AT TIME ZONE 'America/Chicago';
+ IF p_member_id=p_trainer_id OR start_time<=now() OR p_day>current_date+365
+ OR p_time NOT IN ('07:00','09:00','12:00','15:00','19:00') OR NOT trainer_is_eligible(p_trainer_id,false)
+ THEN RAISE EXCEPTION 'Invalid private booking'; END IF;
+ DELETE FROM private_booking_holds WHERE expires_at<now();
+ SELECT id INTO out_id FROM private_booking_holds WHERE trainer_id=p_trainer_id AND member_id=p_member_id AND day=p_day AND time=p_time;
+ IF FOUND THEN RETURN out_id; END IF;
+ IF EXISTS(SELECT 1 FROM trainer_busy WHERE trainer_id=p_trainer_id::text AND day=p_day AND (time=p_time OR time='ALL'))
+ OR EXISTS(SELECT 1 FROM live_sessions WHERE trainer_id=p_trainer_id AND status IN ('scheduled','live')
+  AND starts_at<start_time+interval '1 hour' AND starts_at+minutes*interval '1 minute'>start_time)
+ OR EXISTS(SELECT 1 FROM private_session_access WHERE trainer_id=p_trainer_id AND status IN ('paid','deposit_paid','balance_pending','credential_hold')
+  AND starts_at<start_time+interval '1 hour' AND starts_at+interval '1 hour'>start_time)
+ THEN RAISE EXCEPTION 'Trainer unavailable'; END IF;
+ INSERT INTO private_booking_holds(trainer_id,member_id,day,time) VALUES(p_trainer_id,p_member_id,p_day,p_time) RETURNING id INTO out_id;
+ RETURN out_id;
+END $$;
+-- A new live class cannot take a time already reserved in a private checkout or paid booking.
+CREATE OR REPLACE FUNCTION public.protect_class_calendar()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+ IF TG_OP='UPDATE' AND NEW.starts_at=OLD.starts_at THEN RETURN NEW; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext(NEW.trainer_id::text||(NEW.starts_at AT TIME ZONE 'America/Chicago')::date::text));
+ IF EXISTS(SELECT 1 FROM private_booking_holds WHERE trainer_id=NEW.trainer_id AND expires_at>now()
+  AND (day::text||' '||time)::timestamp AT TIME ZONE 'America/Chicago'<NEW.starts_at+NEW.minutes*interval '1 minute'
+  AND ((day::text||' '||time)::timestamp AT TIME ZONE 'America/Chicago')+interval '1 hour'>NEW.starts_at)
+ OR EXISTS(SELECT 1 FROM private_session_access WHERE trainer_id=NEW.trainer_id AND status IN ('paid','deposit_paid','balance_pending','credential_hold')
+  AND starts_at<NEW.starts_at+NEW.minutes*interval '1 minute' AND starts_at+interval '1 hour'>NEW.starts_at)
+ THEN RAISE EXCEPTION 'Time conflicts with a private reservation'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS protect_class_calendar ON live_sessions;
+CREATE TRIGGER protect_class_calendar BEFORE INSERT OR UPDATE OF starts_at ON live_sessions FOR EACH ROW EXECUTE FUNCTION protect_class_calendar();
+ALTER TABLE private_balance_operations ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+CREATE TABLE IF NOT EXISTS private_room_shutdown_jobs (
+ booking_id text PRIMARY KEY REFERENCES private_session_access(checkout_id),completed_at timestamptz,last_error text);
+ALTER TABLE private_room_shutdown_jobs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private_room_shutdown_jobs FROM anon,authenticated;
+GRANT ALL ON private_room_shutdown_jobs TO service_role;
+CREATE OR REPLACE FUNCTION queue_private_room_shutdown()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN
+ IF NEW.status IN ('cancelled','refunded','credential_hold','transferred') AND NEW.status IS DISTINCT FROM OLD.status THEN
+  INSERT INTO private_room_shutdown_jobs(booking_id) VALUES(NEW.checkout_id) ON CONFLICT(booking_id) DO UPDATE SET completed_at=NULL;
+ END IF; RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS private_room_shutdown ON private_session_access;
+CREATE TRIGGER private_room_shutdown AFTER UPDATE ON private_session_access FOR EACH ROW EXECUTE FUNCTION queue_private_room_shutdown();
+ALTER TABLE refund_jobs ADD COLUMN IF NOT EXISTS last_error text;
+ALTER TABLE refund_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+-- Disputes on either installment must lock the corresponding active booking, including
+-- a rescheduled booking linked to the original deposit. Preserve the existing ledger engine.
+CREATE OR REPLACE FUNCTION public.apply_payment_dispute_legacy(p_id text,p_checkout_id text,p_status text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v checkout_payment_state%ROWTYPE; prior payment_disputes%ROWTYPE;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext(p_checkout_id));
+ SELECT * INTO prior FROM payment_disputes WHERE id=p_id FOR UPDATE;
+ IF FOUND AND prior.status IN ('won','lost') THEN RETURN; END IF;
+ INSERT INTO payment_disputes(id,checkout_id,status) VALUES(p_id,p_checkout_id,p_status)
+ ON CONFLICT(id) DO UPDATE SET status=p_status;
+ SELECT * INTO v FROM checkout_payment_state WHERE checkout_id=p_checkout_id FOR UPDATE;
+ IF NOT FOUND THEN RETURN; END IF;
+ IF p_status='open' OR p_status='lost' THEN
+  UPDATE payment_disputes SET wallet_remaining=coalesce(wallet_remaining,(SELECT remaining FROM wallet_token_lots WHERE id=p_checkout_id)),
+   wallet_revoked=coalesce(wallet_revoked,(SELECT revoked FROM wallet_token_lots WHERE id=p_checkout_id)) WHERE id=p_id;
+  UPDATE wallet_token_lots SET frozen=true WHERE id=p_checkout_id;
+  UPDATE profiles SET tokens=(SELECT coalesce(sum(remaining),0) FROM wallet_token_lots WHERE user_id=v.user_id AND NOT frozen) WHERE id=v.user_id;
+  UPDATE private_session_access SET status='cancelled' WHERE checkout_id=p_checkout_id AND status='paid';
+  UPDATE live_room_access SET status='cancelled' WHERE (stripe_checkout_session_id=p_checkout_id OR wallet_lot_id=p_checkout_id) AND status='paid';
+  UPDATE trainer_earnings SET reversal_target_cents=payout_cents,
+   status=CASE WHEN transfer_id IS NULL AND operation_key IS NULL THEN 'refunded' ELSE 'reversal_due' END
+   WHERE ref=p_checkout_id OR ref IN(SELECT 'wallet:'||id::text FROM wallet_redemptions WHERE lot_id=p_checkout_id);
+ END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.apply_payment_dispute(p_id text,p_checkout_id text,p_status text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN
+ PERFORM apply_payment_dispute_legacy(p_id,p_checkout_id,p_status);
+ IF EXISTS(SELECT 1 FROM payment_disputes WHERE id=p_id AND status IN ('open','lost')) THEN
+  UPDATE private_session_access SET status='credential_hold' WHERE payment_version=2 AND delivered_at IS NULL
+   AND status IN ('paid','deposit_paid','balance_pending') AND (deposit_origin=p_checkout_id OR checkout_id IN(SELECT booking_id FROM private_booking_payments WHERE payment_id=p_checkout_id));
+ END IF;
+END $$;
+REVOKE ALL ON FUNCTION apply_payment_dispute_legacy(text,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION apply_payment_dispute_legacy(text,text,text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.restore_won_disputes()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE d payment_disputes%ROWTYPE; v checkout_payment_state%ROWTYPE; e trainer_earnings%ROWTYPE;
+ desired integer; actual integer; refund_target integer;
+BEGIN
+ FOR d IN SELECT * FROM payment_disputes WHERE status='won' AND NOT reconciled FOR UPDATE LOOP
+  IF EXISTS(SELECT 1 FROM trainer_earnings WHERE operation_key IS NOT NULL AND
+   (ref=d.checkout_id OR ref IN(SELECT 'wallet:'||id::text FROM wallet_redemptions WHERE lot_id=d.checkout_id))) THEN CONTINUE; END IF;
+  SELECT * INTO v FROM checkout_payment_state WHERE checkout_id=d.checkout_id;
+  IF NOT FOUND THEN CONTINUE; END IF;
+  UPDATE wallet_token_lots SET frozen=false WHERE id=d.checkout_id;
+  UPDATE profiles SET tokens=(SELECT coalesce(sum(remaining),0) FROM wallet_token_lots WHERE user_id=v.user_id AND NOT frozen) WHERE id=v.user_id;
+  IF v.refunded_cents=0 THEN
+   UPDATE private_session_access SET status='paid' WHERE checkout_id=d.checkout_id AND status='cancelled' AND payment_version=1;
+   UPDATE live_room_access a SET status='paid' WHERE (stripe_checkout_session_id=d.checkout_id OR wallet_lot_id=d.checkout_id)
+    AND status='cancelled' AND EXISTS(SELECT 1 FROM live_sessions WHERE id=a.session_id AND status IN ('scheduled','live'));
+  END IF;
+  FOR e IN SELECT * FROM trainer_earnings WHERE ref=d.checkout_id OR
+    ref IN(SELECT 'wallet:'||id::text FROM wallet_redemptions WHERE lot_id=d.checkout_id) FOR UPDATE LOOP
+   refund_target=CASE WHEN v.gross_cents>0 THEN floor(e.payout_cents::numeric*v.refunded_cents/v.gross_cents) ELSE e.payout_cents END;
+   desired=e.payout_cents-refund_target;
+   IF e.transfer_id IS NULL THEN
+    UPDATE trainer_earnings SET reversal_target_cents=refund_target,status=CASE WHEN desired>0 THEN 'pending' ELSE 'refunded' END WHERE id=e.id;
+   ELSE
+    actual=e.payout_cents-e.withheld_cents-e.transfer_reversed_cents;
+    UPDATE trainer_earnings SET reversal_target_cents=greatest(refund_target,e.withheld_cents+e.transfer_reversed_cents),
+      status=CASE WHEN refund_target>e.withheld_cents+e.transfer_reversed_cents THEN 'reversal_due' ELSE 'paid' END WHERE id=e.id;
+    IF desired>actual THEN
+     INSERT INTO trainer_earnings(trainer_slug,source,ref,gross_cents,fee_cents,net_cents,share_pct,payout_cents,adjustment_for)
+     VALUES(e.trainer_slug,e.source,'dispute-recovery:'||d.id||':'||e.id::text,desired-actual,0,desired-actual,100,desired-actual,e.id)
+     ON CONFLICT(ref) DO NOTHING;
+    END IF;
+   END IF;
+  END LOOP;
+  UPDATE payment_disputes SET reconciled=true WHERE id=d.id;
+ END LOOP;
+END $$;
+
+
+CREATE OR REPLACE FUNCTION confirm_private_delivery(p_booking text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE b private_session_access%ROWTYPE;
+BEGIN
+ SELECT * INTO b FROM private_session_access WHERE checkout_id=p_booking FOR UPDATE;
+ IF NOT FOUND OR b.member_id<>auth.uid() OR b.payment_version<>2 OR b.status<>'paid' OR b.both_present_at IS NULL
+ OR b.both_present_at+interval '60 minutes'>=now() THEN RAISE EXCEPTION 'Only the member can confirm a received session after its session window'; END IF;
+ UPDATE private_session_access SET member_confirmed_at=coalesce(member_confirmed_at,now()) WHERE checkout_id=p_booking;
+ PERFORM finalize_delivered_private_sessions();
+END $$;
+REVOKE ALL ON FUNCTION confirm_private_delivery(text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION confirm_private_delivery(text) TO authenticated;
+CREATE TABLE IF NOT EXISTS launch_schema_versions(version text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE launch_schema_versions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON launch_schema_versions FROM anon,authenticated;
+GRANT ALL ON launch_schema_versions TO service_role;
+INSERT INTO launch_schema_versions(version) VALUES('0054_launch_completion') ON CONFLICT DO NOTHING;
+-- Apply a delayed successful-payment event together with already-known refunds in
+-- ONE transaction. There is no intermediate spendable/paid access window.
+CREATE OR REPLACE FUNCTION settle_paid_checkout(p_kind text,p_args jsonb,p_refunded integer DEFAULT 0)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE payment text;
+BEGIN
+ payment=p_args->>'p_checkout_id';
+ IF p_kind='tokens' THEN
+  PERFORM apply_paid_token_checkout(payment,(p_args->>'p_user_id')::uuid,(p_args->>'p_tokens')::integer,(p_args->>'p_gross_cents')::integer,(p_args->>'p_fee_cents')::integer);
+ ELSIF p_kind='deposit' THEN
+  payment=p_args->>'p_checkout';
+  PERFORM apply_private_deposit(payment,(p_args->>'p_hold')::uuid,(p_args->>'p_member')::uuid,(p_args->>'p_gross')::integer,(p_args->>'p_fee')::integer,p_args->>'p_customer',p_args->>'p_method',p_args->>'p_intent');
+ ELSIF p_kind='balance' THEN
+  payment=p_args->>'p_intent';
+  PERFORM apply_private_balance(p_args->>'p_booking',payment,(p_args->>'p_gross')::integer,(p_args->>'p_fee')::integer);
+ ELSIF p_kind='booking' THEN
+  PERFORM apply_paid_private_booking(payment,(p_args->>'p_user_id')::uuid,p_args->>'p_trainer_id',p_args->>'p_day',p_args->>'p_time',(p_args->>'p_gross_cents')::integer,(p_args->>'p_fee_cents')::integer,(p_args->>'p_trainer_cents')::integer,(p_args->>'p_hold_id')::uuid);
+ ELSIF p_kind='live' THEN
+  PERFORM apply_paid_live_checkout(payment,(p_args->>'p_user_id')::uuid,(p_args->>'p_session_id')::uuid,(p_args->>'p_gross_cents')::integer,(p_args->>'p_fee_cents')::integer);
+ ELSE RAISE EXCEPTION 'Unknown settlement'; END IF;
+ IF p_refunded>0 THEN PERFORM apply_checkout_refund(payment,p_refunded,false); END IF;
+END $$;
+REVOKE ALL ON FUNCTION settle_paid_checkout(text,jsonb,integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION settle_paid_checkout(text,jsonb,integer) TO service_role;

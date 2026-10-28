@@ -1,4 +1,7 @@
 import { MemberSessions } from "@/components/MemberSessions";
+import { TrainerMessages } from "@/components/TrainerMessages";
+import { ActiveMilestones } from "@/components/ActiveMilestones";
+import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { cancelPrivateSession } from "@/lib/session-management.functions";
 import {
   credentialLabel,
@@ -523,6 +526,20 @@ function SignedInAccount() {
       {s.signedIn && !editing && (
         <div className="mb-6">
           <GearPicker />
+        </div>
+      )}
+      {s.signedIn && <AccountNoticeCenter trainer={s.role === "trainer"} />}
+      {s.signedIn && (
+        <div className="mb-6">
+          <ActiveMilestones
+            days={s.activeDays}
+            role={s.role === "trainer" ? "trainer" : "member"}
+          />
+        </div>
+      )}
+      {s.signedIn && s.role === "member" && (
+        <div className="mb-6">
+          <TrainerMessages />
         </div>
       )}
       {s.signedIn && <MemberSessions />}

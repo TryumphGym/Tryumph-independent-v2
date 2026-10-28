@@ -92,33 +92,21 @@ function OnDemand() {
       };
   const load = () => {
     setLoading(true);
-    void (async () => {
-      try {
-        const [videosResult, trainersResponse] = await Promise.all([
-          supabase
-            .from("trainer_videos")
-            .select("description,spotify_url,id,user_id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment")
-            .eq("review_status", "approved")
-            .order("created_at", { ascending: false })
-            .limit(250),
-          fetch("/api/public/trainers", { cache: "no-store" }),
-        ]);
-        if (videosResult.error || !trainersResponse.ok)
-          throw new Error("Public workout verification unavailable");
-        const { trainers } = (await trainersResponse.json()) as {
-          trainers: { id: string }[];
-        };
-        const verifiedTrainerIds = new Set(trainers.map((trainer) => trainer.id));
-        setRows(((videosResult.data ?? []) as Uploaded[]).filter(
-          (video) => Boolean(video.user_id && verifiedTrainerIds.has(video.user_id)),
-        ));
-      } catch {
-        toast.error("Cannot load verified workouts");
-        setRows([]);
-      } finally {
+    void supabase
+      .from("trainer_videos")
+      .select(
+        "description,spotify_url,id,user_id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment",
+      )
+      .eq("review_status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(250)
+      .then(({ data, error }) => {
         setLoading(false);
-      }
-    })();
+        if (error) {
+          toast.error("Cannot load approved workouts");
+          setRows([]);
+        } else setRows((data ?? []) as Uploaded[]);
+      });
   };
   useEffect(() => {
     load();
@@ -330,7 +318,14 @@ function OnDemand() {
         <ChoiceDropdown
           label="Time"
           value={dur}
-          options={["Any length", ...DURATIONS.map((d) => d.label), ...[5, 10, 15, 20, 30, 45, 60, 90].flatMap((min) => [`Up to ${min} min`, `Exactly ${min} min`])]}
+          options={[
+            "Any length",
+            ...DURATIONS.map((d) => d.label),
+            ...[5, 10, 15, 20, 30, 45, 60, 90].flatMap((min) => [
+              `Up to ${min} min`,
+              `Exactly ${min} min`,
+            ]),
+          ]}
           onChange={setDur}
         />
         {s.signedIn && (
