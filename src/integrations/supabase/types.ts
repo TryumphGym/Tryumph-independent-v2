@@ -713,6 +713,7 @@ export type Database = {
           credential_updates: boolean;
           friend_activity: boolean;
           share_live_activity: boolean;
+          poll_updates: boolean;
         };
         Insert: {
           user_id: string;
@@ -720,6 +721,7 @@ export type Database = {
           credential_updates?: boolean;
           friend_activity?: boolean;
           share_live_activity?: boolean;
+          poll_updates?: boolean;
         };
         Update: {
           user_id?: string;
@@ -727,6 +729,7 @@ export type Database = {
           credential_updates?: boolean;
           friend_activity?: boolean;
           share_live_activity?: boolean;
+          poll_updates?: boolean;
         };
         Relationships: [];
       };
@@ -1972,6 +1975,109 @@ export type Database = {
         Update: { user_id?: string; trybe_id?: string; joined_at?: string };
         Relationships: [];
       };
+      trybe_poll_ballots: {
+        Row: { poll_id: string; user_id: string; updated_at: string };
+        Insert: { poll_id: string; user_id: string; updated_at?: string };
+        Update: { poll_id?: string; user_id?: string; updated_at?: string };
+        Relationships: [];
+      };
+      trybe_poll_choices: {
+        Row: { poll_id: string; user_id: string; option_id: string };
+        Insert: { poll_id: string; user_id: string; option_id: string };
+        Update: { poll_id?: string; user_id?: string; option_id?: string };
+        Relationships: [];
+      };
+      trybe_poll_notice_jobs: {
+        Row: {
+          poll_id: string;
+          cursor_id: string | null;
+          finished_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          poll_id: string;
+          cursor_id?: string | null;
+          finished_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          poll_id?: string;
+          cursor_id?: string | null;
+          finished_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      trybe_poll_options: {
+        Row: { poll_id: string; id: string; position: number; label: string };
+        Insert: {
+          poll_id: string;
+          id?: string;
+          position: number;
+          label: string;
+        };
+        Update: {
+          poll_id?: string;
+          id?: string;
+          position?: number;
+          label?: string;
+        };
+        Relationships: [];
+      };
+      trybe_polls: {
+        Row: {
+          post_id: string;
+          question: string;
+          description: string;
+          max_selections: number;
+          expires_at: string | null;
+          closed_at: string | null;
+          revision: number;
+        };
+        Insert: {
+          post_id: string;
+          question: string;
+          description?: string;
+          max_selections?: number;
+          expires_at?: string | null;
+          closed_at?: string | null;
+          revision?: number;
+        };
+        Update: {
+          post_id?: string;
+          question?: string;
+          description?: string;
+          max_selections?: number;
+          expires_at?: string | null;
+          closed_at?: string | null;
+          revision?: number;
+        };
+        Relationships: [];
+      };
+      trybes: {
+        Row: {
+          id: string;
+          name: string;
+          owner_id: string;
+          kind: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+          owner_id: string;
+          kind?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          owner_id?: string;
+          kind?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: { id: string; user_id: string; role: string };
         Insert: { id?: string; user_id: string; role: string };
@@ -2449,6 +2555,10 @@ export type Database = {
         Args: { p_egress_id: string };
         Returns: Database["public"]["Tables"]["live_recordings"]["Row"][];
       };
+      close_trybe_poll: {
+        Args: { p_id: string; p_reason?: string };
+        Returns: Json;
+      };
       confirm_private_delivery: {
         Args: { p_booking: string };
         Returns: undefined;
@@ -2467,6 +2577,10 @@ export type Database = {
       consume_attended_live_token: {
         Args: { p_user_id: string; p_session_id: string };
         Returns: undefined;
+      };
+      deliver_trybe_poll_notices: {
+        Args: { p_limit?: number };
+        Returns: number;
       };
       enroll_fitness_program: { Args: { p_id: string }; Returns: string };
       finalize_delivered_private_sessions: {
@@ -2555,6 +2669,13 @@ export type Database = {
           reservations: Json;
         }[];
       };
+      poll_member: { Args: { p_trybe: string }; Returns: boolean };
+      poll_owned_trybes: {
+        Args: Record<never, never>;
+        Returns: { id: string; name: string }[];
+      };
+      poll_owner: { Args: { p_trybe: string }; Returns: boolean };
+      poll_view: { Args: { p_id: string }; Returns: Json };
       prepare_deposit_booking: {
         Args: {
           p_trainer: string;
@@ -2601,6 +2722,7 @@ export type Database = {
         Args: { p_body: string; p_audience: string };
         Returns: string;
       };
+      read_trybe_polls: { Args: { p_ids: string[] }; Returns: Json };
       record_account_activity: { Args: { p_time_zone: string }; Returns: Json };
       record_private_both_present: {
         Args: { p_booking: string };
@@ -2687,6 +2809,21 @@ export type Database = {
         Args: { p_program_id: string; p_video_ids: string[] };
         Returns: undefined;
       };
+      save_trybe_poll: {
+        Args: {
+          p_trybe: string;
+          p_question: string;
+          p_description: string;
+          p_options: string[];
+          p_max: number;
+          p_expires?: string;
+          p_notify?: boolean;
+          p_public?: boolean;
+          p_id?: string;
+          p_revision?: number;
+        };
+        Returns: string;
+      };
       set_fitness_program_visibility: {
         Args: { p_id: string; p_published: boolean };
         Returns: undefined;
@@ -2729,6 +2866,10 @@ export type Database = {
       };
       unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
       valid_iso_date: { Args: { p_value: string }; Returns: boolean };
+      vote_trybe_poll: {
+        Args: { p_id: string; p_options: string[]; p_revision: number };
+        Returns: Json;
+      };
     };
     Enums: { app_role: "admin" | "moderator" | "user" };
     CompositeTypes: Record<never, never>;

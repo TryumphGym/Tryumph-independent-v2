@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTrybePolls } from "@/lib/use-trybe-polls";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+import { TrybePollCard } from "./TrybePoll";
 const db = supabase;
 type Report = {
   id: string;
@@ -23,6 +25,7 @@ type Post = {
   text: string;
   visibility: string;
   is_hidden: boolean;
+  kind: string;
   created_at: string;
 };
 type Comment = {
@@ -43,6 +46,10 @@ export function AdminSafetyCenter() {
     { id: string; user_id: string; body: string; status: string }[]
   >([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const pollState = useTrybePolls([
+    ...posts.filter((p) => p.kind === "Poll").map((p) => p.id),
+    ...reports.filter((r) => r.target_type === "post").map((r) => r.target_id),
+  ]);
   const [section, setSection] = useState<
     "reports" | "users" | "trybes" | "comments" | "appeals"
   >("reports");
@@ -55,7 +62,9 @@ export function AdminSafetyCenter() {
       supabase.rpc("admin_profile_directory"),
       supabase
         .from("posts")
-        .select("id,trybe,author_name,text,visibility,is_hidden,created_at")
+        .select(
+          "id,trybe,author_name,text,visibility,is_hidden,created_at,kind",
+        )
         .order("created_at", { ascending: false })
         .limit(LIMIT),
       supabase
@@ -226,6 +235,14 @@ export function AdminSafetyCenter() {
                 {p.trybe} · {p.author_name}
               </p>
               <p className="whitespace-pre-wrap break-words">{p.text}</p>
+              {pollState.polls[p.id] && (
+                <TrybePollCard
+                  poll={pollState.polls[p.id]!}
+                  onUpdate={pollState.update}
+                  onRefresh={pollState.refresh}
+                  admin
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 {p.visibility} · {p.is_hidden ? "Hidden" : "Visible"}
               </p>
@@ -335,6 +352,36 @@ export function AdminSafetyCenter() {
                 <blockquote className="mt-2 border-l p-2">
                   Participant-reported evidence: {r.evidence}
                 </blockquote>
+              )}
+              {pollState.polls[r.target_id] && (
+                <TrybePollCard
+                  poll={pollState.polls[r.target_id]!}
+                  onUpdate={pollState.update}
+                  onRefresh={pollState.refresh}
+                  admin
+                />
+              )}
+              {pollState.polls[r.target_id] && (
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    void supabase
+                      .rpc("moderate_trybe_post", {
+                        p_post_id: r.target_id,
+                        p_action: "hide",
+                        p_value: true,
+                      })
+                      .then((result) => {
+                        if (result.error) toast.error(result.error.message);
+                        else {
+                          pollState.refresh();
+                          void load();
+                        }
+                      })
+                  }
+                >
+                  Remove reported poll from feeds
+                </button>
               )}
               <textarea
                 className="field mt-2"

@@ -10,6 +10,12 @@ export async function runMaintenance() {
   const preparation = [
     ...attendance,
     ...(await Promise.allSettled([
+      supabaseAdmin
+        .rpc("deliver_trybe_poll_notices", { p_limit: 200 })
+        .then((r) => {
+          if (r.error && !["42883", "PGRST202"].includes(r.error.code))
+            throw r.error;
+        }),
       supabaseAdmin.rpc("generate_live_session_reminders", {}).then((r) => {
         if (r.error) throw r.error;
       }),

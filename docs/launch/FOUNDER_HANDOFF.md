@@ -1,5 +1,8 @@
 # Founder handoff — January 1, 2027 launch
 
+> **October 31 consolidated update:** Programs, synchronized exercise variations and Trybe polls are covered by [FOUNDER_GUIDE.md](FOUNDER_GUIDE.md), including current migration ordering and staging acceptance. The dated October 27 evidence below remains historical; do not treat its old test counts or setup status as a current production verification.
+
+
 > **Reconciliation completed (October 27):** The actual 978-row hosted export has been compared. Neither old bundle is safe unchanged. Use only the new [reconciled staging sequence](reconciliation/findings.md); hosted business-data checks and real staging acceptance remain outstanding.
 
 Prepared October 27, 2026, America/Chicago. Repository `TryumphGym/Tryumph-independent-v2`, branch `codex/tryumph-january-launch`, [draft PR #2](https://github.com/TryumphGym/Tryumph-independent-v2/pull/2) for this continuation (original [PR #1](https://github.com/TryumphGym/Tryumph-independent-v2/pull/1) was merged October 26). **Do not launch from this report alone.** This pass implemented and tested code; it did not access hosted SQL, deploy, merge to main, change DNS/secrets, send an email, or activate live Stripe payments.

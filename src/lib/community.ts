@@ -86,35 +86,119 @@ export type Msg = {
   created_at: string;
 };
 
-export function usePosts(me: string | null) {
-  const [posts, setPosts] = useState<CPost[]>([]);
-  const load = useCallback(async () => {
-    const [{ data: p }, { data: l }, { data: c }] = await Promise.all([
-      supabase
-        .from("posts")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase.from("post_likes").select("post_id,user_id"),
-      supabase
-        .from("post_comments")
-        .select("id,post_id,author_id,author_name,text")
-        .order("created_at"),
-    ]);
-    setPosts(
-      (p ?? []).map((x) => ({
-        ...x,
-        likes: (l ?? []).filter((y) => y.post_id === x.id).length,
-        liked:
-          !!me && (l ?? []).some((y) => y.post_id === x.id && y.user_id === me),
-        comments: (c ?? []).filter((y) => y.post_id === x.id),
-      })),
-    );
-  }, [me]);
+export function usePosts(
+  me: string | null,
+  selected = "all",
+  joined: readonly string[] = [],
+  focusId?: string,
+) {
+  const [posts, setPosts] = useState<CPost[]>([]),
+    [page, setPage] = useState(0),
+    [hasMore, setHasMore] = useState(false),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState(""),
+    [version, setVersion] = useState(0);
+  const joinedKey = JSON.stringify(joined),
+    contextKey = JSON.stringify([me, selected, joined, focusId, version]);
+  const [snapshotKey, setSnapshotKey] = useState("");
   useEffect(() => {
-    load();
-  }, [load]);
-  return { posts, reload: load };
+    setPosts([]);
+    setPage(0);
+  }, [me, selected, joinedKey, version, focusId]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    void (async () => {
+      try {
+        let query = supabase
+          .from("posts")
+          .select("*")
+          .order("is_pinned", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(page * 20, page * 20 + 20);
+        if (selected === "discover") query = query.eq("visibility", "public");
+        else if (selected === "all")
+          query = query.in("trybe", [...JSON.parse(joinedKey), "official"]);
+        else query = query.eq("trybe", selected);
+        const r = await query;
+        if (r.error) throw r.error;
+        let rows = r.data.slice(0, 20);
+        if (focusId && page === 0 && !rows.some((p) => p.id === focusId)) {
+          const focus = await supabase
+            .from("posts")
+            .select("*")
+            .eq("id", focusId)
+            .maybeSingle();
+          if (focus.error) throw focus.error;
+          if (
+            focus.data &&
+            (selected === "all" || selected === "discover"
+              ? selected !== "discover" || focus.data.visibility === "public"
+              : focus.data.trybe === selected)
+          )
+            rows = [focus.data, ...rows];
+        }
+        const ids = rows.map((p) => p.id);
+        const [l, c] = ids.length
+          ? await Promise.all([
+              supabase
+                .from("post_likes")
+                .select("post_id,user_id")
+                .in("post_id", ids),
+              supabase
+                .from("post_comments")
+                .select("id,post_id,author_id,author_name,text")
+                .in("post_id", ids)
+                .order("created_at"),
+            ])
+          : [
+              { data: [], error: null },
+              { data: [], error: null },
+            ];
+        if (l.error || c.error) throw l.error ?? c.error;
+        if (!active) return;
+        const mapped = rows.map((x) => ({
+          ...x,
+          likes: (l.data ?? []).filter((y) => y.post_id === x.id).length,
+          liked:
+            !!me &&
+            (l.data ?? []).some((y) => y.post_id === x.id && y.user_id === me),
+          comments: (c.data ?? []).filter((y) => y.post_id === x.id),
+        }));
+        setSnapshotKey(contextKey);
+        setPosts((old) =>
+          page === 0
+            ? mapped
+            : [
+                ...old.filter((p) => !mapped.some((n) => n.id === p.id)),
+                ...mapped,
+              ],
+        );
+        setHasMore(r.data.length > 20);
+      } catch (e) {
+        if (active) setError("Community posts could not load. Please retry.");
+        console.error("Trybe feed unavailable", e);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [me, selected, joinedKey, page, version, focusId, contextKey]);
+  return {
+    posts: snapshotKey === contextKey ? posts : [],
+    reload: () => {
+      setPage(0);
+      setVersion((n) => n + 1);
+    },
+    hasMore,
+    loading,
+    error,
+    loadMore: () => setPage((n) => n + 1),
+  };
 }
 
 export function useFriends(me: string | null) {

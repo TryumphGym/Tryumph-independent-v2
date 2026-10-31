@@ -31,10 +31,15 @@ import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
+import { useTrybePolls } from "@/lib/use-trybe-polls";
+import { PollEditor, TrybePollCard } from "@/components/TrybePoll";
 import { ReportContent } from "@/components/ReportContent";
 
 export const Route = createFileRoute("/trybes")({
-  validateSearch: z.object({ t: z.string().optional() }),
+  validateSearch: z.object({
+    t: z.string().optional(),
+    poll: z.string().uuid().optional(),
+  }),
   head: () => ({
     meta: [
       { title: "Trybes Community — Tryumph Gym" },
@@ -57,13 +62,44 @@ export const Route = createFileRoute("/trybes")({
 });
 
 function Trybes() {
-  const { t } = Route.useSearch();
+  const { t, poll: focusedPoll } = Route.useSearch();
   const { s, setExtra } = useStore();
   const me = useUserId();
-  const { posts: all, reload } = usePosts(me);
+
   const { friends, reload: reloadFriends } = useFriends(me);
   const { incoming, outgoing, reload: reloadRequests } = useFriendRequests(me);
   const [trybe, setTrybe] = useState(t ?? "all");
+  const [ownedGroups, setOwnedGroups] = useState<
+      { id: string; name: string }[]
+    >([]),
+    [pollEditor, setPollEditor] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setOwnedGroups([]);
+    setPollEditor(false);
+    if (me)
+      void supabase.rpc("poll_owned_trybes").then((r) => {
+        if (active && !r.error) setOwnedGroups(r.data);
+      });
+    return () => {
+      active = false;
+    };
+  }, [me]);
+  useEffect(() => {
+    let active = true;
+    if (!focusedPoll) return;
+    void supabase
+      .from("posts")
+      .select("trybe")
+      .eq("id", focusedPoll)
+      .maybeSingle()
+      .then((r) => {
+        if (active && !r.error && r.data) setTrybe(r.data.trybe);
+      });
+    return () => {
+      active = false;
+    };
+  }, [focusedPoll, me]);
   const [postVisibility, setPostVisibility] = useState<"public" | "private">(
     "private",
   );
@@ -162,6 +198,17 @@ function Trybes() {
     s.signedIn && s.role === "trainer" && me
       ? [...new Set([...joinedIds, `coach-${me}`])]
       : joinedIds;
+  const {
+    posts: all,
+    reload,
+    hasMore,
+    loading: feedLoading,
+    error: feedError,
+    loadMore,
+  } = usePosts(me, trybe, effectiveMemberships, focusedPoll);
+  const pollState = useTrybePolls(
+    all.filter((p) => p.kind === "Poll").map((p) => p.id),
+  );
   const visible = all.filter(
     (p) => !p.is_hidden && (p.official === true || canSee(p.trybe)),
   );
@@ -461,6 +508,20 @@ function Trybes() {
               "Classes, tips and encouragement with your coach.")
         }
       />
+      {ownedGroups.length > 0 && (
+        <nav className="mb-4 flex flex-wrap gap-2" aria-label="Trybes you own">
+          {ownedGroups.map((g) => (
+            <Link
+              className="btn btn-outline"
+              key={g.id}
+              to="/trybes"
+              search={{ t: g.id }}
+            >
+              {g.name}
+            </Link>
+          ))}
+        </nav>
+      )}
       {trybe === "all" ? (
         <>
           <div className="mb-6 flex flex-wrap gap-2">
@@ -539,6 +600,45 @@ function Trybes() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
+          {ownedGroups.some((g) => g.id === target) && (
+            <div>
+              <button
+                className="btn btn-outline"
+                onClick={() => setPollEditor((v) => !v)}
+              >
+                {pollEditor ? "Cancel poll" : "Create a poll"}
+              </button>
+              {pollEditor && (
+                <PollEditor
+                  key={target}
+                  trybe={target!}
+                  onCancel={() => setPollEditor(false)}
+                  onSaved={() => {
+                    setPollEditor(false);
+                    if (target)
+                      setJoinedIds((old) => [...new Set([...old, target])]);
+                    pollState.refresh();
+                    reload();
+                    toast.success("Poll published");
+                  }}
+                />
+              )}
+            </div>
+          )}
+          {(feedError || pollState.error) && (
+            <p role="alert">
+              {feedError || pollState.error}
+              <button
+                className="underline ml-2"
+                onClick={() => {
+                  reload();
+                  pollState.refresh();
+                }}
+              >
+                Retry
+              </button>
+            </p>
+          )}
           {canPost ? (
             <div className="card space-y-3 p-4">
               <textarea
@@ -654,7 +754,7 @@ function Trybes() {
                 </p>
               )}
               {posts.map((p) => (
-                <div key={p.id} className="card p-5">
+                <div key={p.id} id={`post-${p.id}`} className="card p-5">
                   <div className="flex flex-wrap items-center gap-3">
                     <Avatar
                       size="sm"
@@ -702,7 +802,23 @@ function Trybes() {
                       label="Report user"
                     />
                   )}
-                  <p className="mt-3">{p.text}</p>
+                  {p.kind === "Poll" ? (
+                    pollState.polls[p.id] ? (
+                      <TrybePollCard
+                        poll={pollState.polls[p.id]!}
+                        onUpdate={pollState.update}
+                        onRefresh={pollState.refresh}
+                      />
+                    ) : (
+                      <p role="status">
+                        {pollState.error
+                          ? "Poll unavailable."
+                          : "Loading poll…"}
+                      </p>
+                    )
+                  ) : (
+                    <p className="mt-3">{p.text}</p>
+                  )}
                   {me && p.author_id !== me && (
                     <ReportContent
                       targetType="post"
@@ -807,6 +923,15 @@ function Trybes() {
                 </div>
               ))}
             </>
+          )}
+          {hasMore && !locked && (
+            <button
+              className="btn btn-outline"
+              disabled={feedLoading}
+              onClick={loadMore}
+            >
+              {feedLoading ? "Loading…" : "Load more posts"}
+            </button>
           )}
         </div>
         <aside className="space-y-4">
