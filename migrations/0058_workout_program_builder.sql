@@ -287,7 +287,7 @@ END $$;
 CREATE OR REPLACE FUNCTION public.sync_program_entitlement(p_order uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE o program_orders%ROWTYPE;best uuid;chosen program_orders%ROWTYPE;
 BEGIN
- SELECT * INTO o FROM program_orders WHERE id=p_order FOR UPDATE;IF o.paid_at IS NULL THEN RETURN; END IF;
+ SELECT * INTO o FROM program_orders WHERE id=p_order;PERFORM pg_advisory_xact_lock(hashtext('program-order:'||o.user_id||':'||o.program_id));SELECT * INTO o FROM program_orders WHERE id=p_order FOR UPDATE;IF o.paid_at IS NULL THEN RETURN; END IF;
  SELECT n.id INTO best FROM program_orders n WHERE n.user_id=o.user_id AND n.edition_id=o.edition_id AND n.paid_at IS NOT NULL AND n.refunded_cents=0 AND NOT n.refund_pending AND (n.access_days IS NULL OR n.paid_at+n.access_days*interval '1 day'>now()) AND NOT EXISTS(SELECT 1 FROM program_disputes d WHERE d.order_id=n.id AND d.status IN ('open','lost')) ORDER BY n.paid_at DESC,n.created_at DESC,(n.id=(SELECT en.order_id FROM program_enrollments en WHERE en.user_id=o.user_id AND en.edition_id=o.edition_id AND en.state='active')) DESC NULLS LAST,n.id DESC LIMIT 1;
  SELECT * INTO chosen FROM program_orders WHERE id=coalesce(best,o.id);
  INSERT INTO program_enrollments(user_id,program_id,edition_id,source,state,order_id,starts_at,expires_at) VALUES(o.user_id,o.program_id,o.edition_id,'native',CASE WHEN best IS NOT NULL THEN 'active' ELSE 'revoked' END,chosen.id,chosen.paid_at,CASE WHEN chosen.access_days IS NULL THEN NULL ELSE chosen.paid_at+chosen.access_days*interval '1 day' END)
@@ -307,7 +307,9 @@ BEGIN
  PERFORM sync_program_entitlement(p_order);
 END $$;
 CREATE OR REPLACE FUNCTION public.adjust_program_payment(p_order uuid,p_checkout text,p_intent text,p_refunded integer,p_dispute text,p_status text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE o program_orders%ROWTYPE;
 BEGIN
+ SELECT * INTO o FROM program_orders WHERE id=p_order;PERFORM pg_advisory_xact_lock(hashtext('program-order:'||o.user_id||':'||o.program_id));
  PERFORM 1 FROM program_orders WHERE id=p_order AND p_refunded BETWEEN 0 AND price_cents FOR UPDATE;IF NOT FOUND THEN RAISE EXCEPTION 'Invalid payment adjustment'; END IF;
  PERFORM attach_program_checkout(p_order,p_checkout,p_intent);
  UPDATE program_orders SET payout_dirty=true,refunded_cents=greatest(refunded_cents,p_refunded),status=CASE WHEN paid_at IS NOT NULL AND greatest(refunded_cents,p_refunded)=price_cents THEN 'refunded' ELSE status END WHERE id=p_order;
@@ -321,7 +323,7 @@ CREATE OR REPLACE FUNCTION public.request_program_refund(p_order uuid,p_reason t
 DECLARE o program_orders%ROWTYPE;
 BEGIN
  IF NOT has_role(auth.uid(),'admin') OR length(trim(p_reason)) NOT BETWEEN 3 AND 1000 THEN RAISE EXCEPTION 'Admin refund review required'; END IF;
- SELECT * INTO o FROM program_orders WHERE id=p_order FOR UPDATE;IF o.paid_at IS NULL THEN RAISE EXCEPTION 'Confirmed purchase required'; END IF;
+ SELECT * INTO o FROM program_orders WHERE id=p_order;PERFORM pg_advisory_xact_lock(hashtext('program-order:'||o.user_id||':'||o.program_id));SELECT * INTO o FROM program_orders WHERE id=p_order FOR UPDATE;IF o.paid_at IS NULL THEN RAISE EXCEPTION 'Confirmed purchase required'; END IF;
  INSERT INTO program_refund_requests(order_id,requested_by,reason) VALUES(p_order,auth.uid(),p_reason) ON CONFLICT DO NOTHING;
  UPDATE program_orders SET payout_dirty=true,refund_pending=true WHERE id=p_order;PERFORM sync_program_entitlement(p_order);
  INSERT INTO program_audit(actor,program_id,action,detail) VALUES(auth.uid(),o.program_id,'refund_requested',p_order::text||':'||p_reason);

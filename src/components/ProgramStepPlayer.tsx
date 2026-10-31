@@ -22,7 +22,11 @@ export function ProgramStepPlayer({
   onClose: () => void;
   recordProgress?: boolean;
 }) {
-  const [variation, setVariation] = useState(initialVariation ?? ""),
+  const [variation, setVariation] = useState(
+      initialVariation ??
+        programPhase(step.intervals, initialElapsed)?.phase.exercise_id ??
+        "",
+    ),
     [media, setMedia] = useState<Awaited<
       ReturnType<typeof getProgramVideo>
     > | null>(null),
