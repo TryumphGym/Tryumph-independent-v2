@@ -96,5 +96,10 @@ export async function processRefundJobs() {
       console.error("Refund job retained for retry", job.checkout_id, error);
     }
   }
-  return { completed, failed };
+  const { processProgramRefunds } = await import("./program-payments.server");
+  const programs = await processProgramRefunds(stripe);
+  return {
+    completed: completed + programs.completed,
+    failed: failed + programs.failed,
+  };
 }

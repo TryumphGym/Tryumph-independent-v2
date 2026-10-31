@@ -1,3 +1,4 @@
+import { Link as ProgramLink } from "@tanstack/react-router";
 import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
@@ -542,7 +543,16 @@ function SignedInAccount() {
           <TrainerMessages />
         </div>
       )}
-      {s.signedIn && <MemberSessions />}
+      {s.signedIn && (
+        <>
+          <div className="card p-4">
+            <ProgramLink className="text-primary underline" to="/programs">
+              My workout programs · resume progress →
+            </ProgramLink>
+          </div>
+          <MemberSessions />
+        </>
+      )}
       <div className="card mb-6 flex flex-wrap items-center gap-4 p-6">
         <Avatar
           size="lg"

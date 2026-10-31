@@ -1,3 +1,4 @@
+import { TrainerProgramBuilder } from "@/components/TrainerProgramBuilder";
 import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
@@ -7,7 +8,7 @@ import { ClassManager } from "@/components/ClassManager";
 import { TrainerWorkoutEditor } from "@/components/TrainerWorkoutEditor";
 import {
   TrainerStoreManager,
-  TrainerProgramManager,
+  LegacyTrainerProgramManager,
 } from "@/components/TrainerLaunchTools";
 import {
   hasVerifiedCpr,
@@ -77,6 +78,7 @@ const TABS = [
   "My Profile",
   "Calendar",
   "On-demand",
+  "Programs",
   "Store",
   "Credentials",
   "Messages",
@@ -199,9 +201,13 @@ function Studio() {
       {tab === "On-demand" && !credentialsPaused && (
         <>
           <Uploads />
-          <TrainerProgramManager />
+          <details className="card p-5">
+            <summary>Legacy ordered playlists</summary>
+            <LegacyTrainerProgramManager />
+          </details>
         </>
       )}
+      {tab === "Programs" && <TrainerProgramBuilder />}
       {tab === "Store" && <StoreTab />}
       {tab === "Messages" && <TrainerMessages />}
       {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && (
@@ -533,6 +539,7 @@ function Payouts() {
             ["1-on-1 sessions (90%)", st?.bySource.oneonone ?? 0],
             ["Live tokens (50%)", st?.bySource.live ?? 0],
             ["On-demand ads (50%)", st?.bySource.ads ?? 0],
+            ["Programs (approved terms)", st?.bySource.programs ?? 0],
           ] as const
         ).map(([l, c]) => (
           <div key={l} className="flex justify-between py-3">
@@ -854,6 +861,9 @@ function Uploads() {
     ),
   ];
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
+  const [accessScope, setAccessScope] = useState<"public" | "program">(
+    "public",
+  );
   const [file, setFile] = useState<File | null>(null);
   // Fill duration from the actual video metadata; trainers can correct it.
   useEffect(() => {
@@ -879,6 +889,9 @@ function Uploads() {
   const [playlistName, setPlaylistName] = useState("");
   const [playlistBusy, setPlaylistBusy] = useState(false);
   const vids = s.extra.trainer.videos.filter(isLaunchWorkout);
+  const approvedCount = vids.filter(
+    (v) => v.reviewStatus === "approved",
+  ).length;
   useEffect(() => {
     if (!me) return;
     supabase
@@ -956,7 +969,7 @@ function Uploads() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.session.access_token}`,
         },
-        body: JSON.stringify({ title: f.title }),
+        body: JSON.stringify({ title: f.title, accessScope }),
       });
       const ticket = (await ticketResponse.json()) as {
         error?: string;
@@ -1008,6 +1021,7 @@ function Uploads() {
       .from("trainer_videos")
       .insert({
         user_id: me,
+        access_scope: accessScope,
         title: f.title,
         description: f.description,
         spotify_url: f.spotify || null,
@@ -1069,7 +1083,9 @@ function Uploads() {
     setFile(null);
     setBusy(false);
     toast.success(
-      "Video uploaded for review — it will appear publicly after approval.",
+      accessScope === "public"
+        ? "Video uploaded for review — it will appear publicly after approval."
+        : "Protected program video submitted for admin review; it will not enter the public on-demand library.",
     );
   };
   const assignPlaylist = async (video: TrainerVideo, playlist: string) => {
@@ -1171,11 +1187,29 @@ function Uploads() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="card space-y-3 p-6">
-        <h2 className="text-xl font-bold">Upload an on-demand workout</h2>
+        <h2 className="text-xl font-bold">Upload a workout</h2>
+        <label className="block text-sm">
+          Video access
+          <select
+            className="field"
+            value={accessScope}
+            onChange={(e) =>
+              setAccessScope(e.target.value as "public" | "program")
+            }
+          >
+            <option value="public">Free public on-demand</option>
+            <option value="program">Protected program library</option>
+          </select>
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Public workouts stay free. Protected videos require a separately
+          secured Bunny library and cannot be converted from previously public
+          videos.
+        </p>
         <p className="text-sm text-muted-foreground">
-          {vids.length >= UNLOCK
+          {approvedCount >= UNLOCK
             ? "Live classes unlocked 🎉"
-            : `${UNLOCK - vids.length} more to unlock live classes.`}
+            : `${UNLOCK - approvedCount} more approved workouts to unlock live classes.`}
         </p>
         {youthLocked && (
           <p className="rounded-lg bg-secondary p-3 text-sm text-warning">

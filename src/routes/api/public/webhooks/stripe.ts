@@ -13,6 +13,12 @@ async function settleCheckout(
   stripe: Stripe,
   session: Stripe.Checkout.Session,
 ) {
+  if (session.metadata?.["type"] === "program") {
+    const { settleProgramCheckout } =
+      await import("@/lib/program-payments.server");
+    await settleProgramCheckout(stripe, session);
+    return;
+  }
   if (session.currency !== "usd")
     throw new Error("Unsupported checkout currency");
   if (session.mode !== "payment" || session.payment_status !== "paid") return;
@@ -148,6 +154,8 @@ async function settleCheckout(
 }
 
 async function handleRefund(stripe: Stripe, charge: Stripe.Charge) {
+  const { adjustProgramCharge } = await import("@/lib/program-payments.server");
+  if (await adjustProgramCharge(stripe, charge)) return;
   const paymentIntent =
     typeof charge.payment_intent === "string"
       ? charge.payment_intent
@@ -232,6 +240,10 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               typeof dispute.charge === "string"
                 ? await stripe.charges.retrieve(dispute.charge)
                 : dispute.charge;
+            const { adjustProgramCharge } =
+              await import("@/lib/program-payments.server");
+            if (await adjustProgramCharge(stripe, charge, dispute))
+              return new Response("ok", { status: 200 });
             const intent =
               typeof charge.payment_intent === "string"
                 ? charge.payment_intent

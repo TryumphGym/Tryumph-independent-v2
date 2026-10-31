@@ -4,7 +4,7 @@ export async function signVideoPath(path: string, seconds = 3600) {
   if (path.startsWith("bunny:")) {
     const match = /^bunny:(\d+):([a-f0-9-]{36})$/i.exec(path);
     const key = runtimeEnv("BUNNY_STREAM_TOKEN_KEY");
-    if (!match || !key)
+    if (!match || !key || match[1] === runtimeEnv("BUNNY_PROGRAM_LIBRARY_ID"))
       throw new Error("Secure video playback is not configured");
     const expires = Math.floor(Date.now() / 1000) + seconds;
     const bytes = await crypto.subtle.digest(

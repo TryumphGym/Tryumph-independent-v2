@@ -1,3 +1,4 @@
+import { ProgramAdmin } from "@/components/ProgramAdmin";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -290,6 +291,7 @@ function Admin() {
       <AdminOperations />
       <AdminAnnouncements />
       <AdminSafetyCenter />
+      <ProgramAdmin />
       {LAUNCH.youth && (
         <section className="card space-y-3 p-5">
           <div>

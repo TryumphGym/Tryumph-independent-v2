@@ -45,7 +45,13 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { s } = useStore();
   const [featured, setFeatured] = useState<
-    { id: string; title: string; category: string; minutes: number; path: string }[]
+    {
+      id: string;
+      title: string;
+      category: string;
+      minutes: number;
+      path: string;
+    }[]
   >([]);
   const [upNext, setUpNext] = useState<{
     id: string;
@@ -65,6 +71,7 @@ function Home() {
             "id,user_id,title,category,level,minutes,path,equipment,pregnancy_safe,required_equipment",
           )
           .eq("review_status", "approved")
+          .eq("access_scope", "public")
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
@@ -257,7 +264,10 @@ function Home() {
               <div className="relative aspect-video overflow-hidden">
                 <img
                   src={workoutThumbFor(v.path, v.category)}
-                  onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = thumbFor(v.category); }}
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = thumbFor(v.category);
+                  }}
                   alt=""
                   loading="lazy"
                   width={1088}

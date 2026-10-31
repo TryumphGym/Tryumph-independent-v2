@@ -93,6 +93,25 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
           (a, r) => a + Math.max(0, r.payout_cents - r.reversal_target_cents),
           0,
         );
+    const programResult = await context.supabase.rpc("program_metrics");
+    if (
+      programResult.error &&
+      !["PGRST202", "42883"].includes(programResult.error.code)
+    )
+      throw new Error("Unable to load program payout totals");
+    const programMetrics = Object.values(
+      (programResult.data ??
+        {}) as unknown as import("./programs").ProgramMetrics,
+    );
+    const programPending = programMetrics.reduce(
+      (n, p) => n + Math.max(0, p.payable - p.transferred),
+      0,
+    );
+    const programTransferred = programMetrics.reduce(
+      (n, p) => n + p.transferred,
+      0,
+    );
+    const programPayable = programMetrics.reduce((n, p) => n + p.payable, 0);
     const monthAgo = Date.now() - 30 * 864e5;
     const recent = (rows ?? []).filter(
       (r) => new Date(r.created_at).getTime() >= monthAgo,
@@ -137,14 +156,17 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
     return {
       linked: !!acct?.stripe_account_id,
       enabled,
-      pending: sum((r) => r.status === "pending"),
-      paid: sum((r) => r.status === "paid"),
+      pending: sum((r) => r.status === "pending") + programPending,
+      paid: sum((r) => r.status === "paid") + programTransferred,
       bySource: {
         oneonone: sum((r) => r.source === "oneonone"),
         live: sum((r) => r.source === "live"),
         ads: sum((r) => r.source === "ads"),
+        programs: programPayable,
       },
-      fees: (rows ?? []).reduce((a, r) => a + r.fee_cents, 0),
+      fees:
+        (rows ?? []).reduce((a, r) => a + r.fee_cents, 0) +
+        programMetrics.reduce((n, p) => n + p.fees, 0),
       stats: {
         liveAttendanceMonth: attendance.data ?? 0,
         liveClassesMonth: classCount.count ?? 0,

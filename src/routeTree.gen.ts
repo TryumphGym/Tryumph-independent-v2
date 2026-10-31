@@ -25,6 +25,8 @@ import { Route as TrybesRouteImport } from './routes/trybes'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as ApiBunnyUploadRouteImport } from './routes/api/bunny-upload'
+import { Route as ProgramsIndexRouteImport } from './routes/programs.index'
+import { Route as ProgramsIdRouteImport } from './routes/programs.$id'
 import { Route as TrainersIndexRouteImport } from './routes/trainers.index'
 import { Route as TrainersIdRouteImport } from './routes/trainers.$id'
 import { Route as ApiPublicTrainersRouteImport } from './routes/api/public/trainers'
@@ -113,6 +115,16 @@ const ApiBunnyUploadRoute = ApiBunnyUploadRouteImport.update({
   path: '/api/bunny-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgramsIndexRoute = ProgramsIndexRouteImport.update({
+  id: '/programs/',
+  path: '/programs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgramsIdRoute = ProgramsIdRouteImport.update({
+  id: '/programs/$id',
+  path: '/programs/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainersIndexRoute = TrainersIndexRouteImport.update({
   id: '/trainers/',
   path: '/trainers/',
@@ -168,7 +180,9 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs/': typeof ProgramsIndexRoute
   '/trainers/': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -193,7 +207,9 @@ export interface FileRoutesByTo {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs': typeof ProgramsIndexRoute
   '/trainers': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -219,7 +235,9 @@ export interface FileRoutesById {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs/': typeof ProgramsIndexRoute
   '/trainers/': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -246,7 +264,9 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs/'
     | '/trainers/'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -271,7 +291,9 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs'
     | '/trainers'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -296,7 +318,9 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs/'
     | '/trainers/'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -322,7 +346,9 @@ export interface RootRouteChildren {
   WalletRoute: typeof WalletRoute
   WelcomeRoute: typeof WelcomeRoute
   ApiBunnyUploadRoute: typeof ApiBunnyUploadRoute
+  ProgramsIdRoute: typeof ProgramsIdRoute
   TrainersIdRoute: typeof TrainersIdRoute
+  ProgramsIndexRoute: typeof ProgramsIndexRoute
   TrainersIndexRoute: typeof TrainersIndexRoute
   ApiPublicTrainersRoute: typeof ApiPublicTrainersRoute
   ApiPublicHooksPushRemindersRoute: typeof ApiPublicHooksPushRemindersRoute
@@ -445,6 +471,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBunnyUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programs/': {
+      id: '/programs/'
+      path: '/programs'
+      fullPath: '/programs/'
+      preLoaderRoute: typeof ProgramsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programs/$id': {
+      id: '/programs/$id'
+      path: '/programs/$id'
+      fullPath: '/programs/$id'
+      preLoaderRoute: typeof ProgramsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trainers/': {
       id: '/trainers/'
       path: '/trainers'
@@ -514,7 +554,9 @@ const rootRouteChildren: RootRouteChildren = {
   WalletRoute: WalletRoute,
   WelcomeRoute: WelcomeRoute,
   ApiBunnyUploadRoute: ApiBunnyUploadRoute,
+  ProgramsIdRoute: ProgramsIdRoute,
   TrainersIdRoute: TrainersIdRoute,
+  ProgramsIndexRoute: ProgramsIndexRoute,
   TrainersIndexRoute: TrainersIndexRoute,
   ApiPublicTrainersRoute: ApiPublicTrainersRoute,
   ApiPublicHooksPushRemindersRoute: ApiPublicHooksPushRemindersRoute,

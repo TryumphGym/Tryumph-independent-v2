@@ -70,5 +70,12 @@ export async function reconcilePendingTrainerTransfers() {
     });
     if (saved.error) throw saved.error;
   }
-  return { paid, reversed, waiting };
+  const { reconcileProgramTransfers } =
+    await import("./program-payments.server");
+  const programs = await reconcileProgramTransfers(stripe);
+  return {
+    paid: paid + programs.paid,
+    reversed: reversed + programs.reversed,
+    waiting: waiting + programs.waiting,
+  };
 }

@@ -1,3 +1,4 @@
+import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -117,11 +118,22 @@ function TrainerProfile() {
           </div>
         </section>
       )}
-      {trainer && <section className="space-y-3"><button className="btn btn-outline" onClick={() => setShowMessages(x => !x)}>{showMessages ? "Close messages" : "Message Trainer"}</button>{showMessages && <TrainerMessages selectedTrainerId={trainer.id} />}</section>}
+      {trainer && (
+        <section className="space-y-3">
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowMessages((x) => !x)}
+          >
+            {showMessages ? "Close messages" : "Message Trainer"}
+          </button>
+          {showMessages && <TrainerMessages selectedTrainerId={trainer.id} />}
+        </section>
+      )}
       {trainer && trainer.rate > 0 && (
         <PrivateBookingForm trainerId={trainer.id} rate={trainer.rate} />
       )}
       {trainer && <TrainerStorefront trainerId={trainer.id} />}
+      {trainer && <ProgramCatalog trainerId={trainer.id} />}
     </div>
   );
 }

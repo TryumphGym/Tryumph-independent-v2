@@ -9,11 +9,12 @@ export const getVideoUrl = createServerFn({ method: "GET" })
       await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("trainer_videos")
-      .select("path")
+      .select("path,access_scope")
       .eq("id", data.id)
       .eq("review_status", "approved")
+      .eq("access_scope", "public")
       .maybeSingle();
-    if (result.error || !result.data)
+    if (result.error || !result.data || result.data.access_scope !== "public")
       throw new Error("Approved workout not found");
     const { signVideoPath } = await import("./video-playback.server");
     return signVideoPath(result.data.path);
@@ -26,7 +27,7 @@ export const getPrivateVideoUrl = createServerFn({ method: "POST" })
       await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("trainer_videos")
-      .select("path,user_id")
+      .select("path,user_id,access_scope")
       .eq("id", data.id)
       .single();
     if (result.error) throw new Error("Workout not found");
@@ -38,6 +39,6 @@ export const getPrivateVideoUrl = createServerFn({ method: "POST" })
       if (admin.error || !admin.data)
         throw new Error("Not your private workout");
     }
-    const { signVideoPath } = await import("./video-playback.server");
-    return signVideoPath(result.data.path, 300);
+    const { signProgramPath } = await import("./program-media.server");
+    return signProgramPath(result.data.path, result.data.access_scope, 300);
   });

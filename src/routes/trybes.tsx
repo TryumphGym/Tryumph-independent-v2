@@ -27,6 +27,7 @@ import {
   usePosts,
   useUserId,
 } from "@/lib/community";
+import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
@@ -491,6 +492,9 @@ function Trybes() {
         /^[0-9a-f-]{36}$/i.test(trybe.slice(6)) && (
           <>
             <TrainerStorefront trainerId={trybe.slice(6)} />
+            <div className="mb-6">
+              <ProgramCatalog trainerId={trybe.slice(6)} />
+            </div>
             {me && me !== trybe.slice(6) && (
               <div className="mb-4">
                 <ReportContent

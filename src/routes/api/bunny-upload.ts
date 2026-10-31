@@ -10,9 +10,9 @@ export const Route = createFileRoute("/api/bunny-upload")({
         try {
           const url = env.SUPABASE_URL;
           const publicKey = env.SUPABASE_PUBLISHABLE_KEY;
-          const libraryId = env.BUNNY_STREAM_LIBRARY_ID;
-          const bunnyKey = env.BUNNY_STREAM_API_KEY;
-          if (!url || !publicKey || !libraryId || !bunnyKey)
+          let libraryId = env.BUNNY_STREAM_LIBRARY_ID;
+          let bunnyKey = env.BUNNY_STREAM_API_KEY;
+          if (!url || !publicKey)
             return Response.json(
               { error: "Bunny or Supabase server variables are missing" },
               { status: 503 },
@@ -62,7 +62,28 @@ export const Route = createFileRoute("/api/bunny-upload")({
               { error: "Current verified trainer credentials are required" },
               { status: 403 },
             );
-          const body = (await request.json()) as { title?: string };
+          const body = (await request.json()) as {
+            title?: string;
+            accessScope?: string;
+          };
+          const accessScope = body.accessScope ?? "public";
+          if (!["public", "program"].includes(accessScope))
+            return Response.json(
+              { error: "Invalid video audience" },
+              { status: 400 },
+            );
+          if (accessScope === "program") {
+            const { assertProgramMediaReady } =
+              await import("@/lib/program-media.server");
+            const { runtimeEnv } = await import("@/lib/runtime-env.server");
+            libraryId = assertProgramMediaReady();
+            bunnyKey = runtimeEnv("BUNNY_PROGRAM_API_KEY");
+          }
+          if (!libraryId || !bunnyKey)
+            return Response.json(
+              { error: "Selected video library is not configured" },
+              { status: 503 },
+            );
           const title = body.title?.trim().slice(0, 180);
           if (!title)
             return Response.json(
@@ -96,6 +117,7 @@ export const Route = createFileRoute("/api/bunny-upload")({
             guid: video.guid,
             user_id: auth.user.id,
             library_id: libraryId,
+            access_scope: accessScope,
           });
           if (ownership.error)
             return Response.json(
