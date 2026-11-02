@@ -95,8 +95,19 @@ def pdf(path, narrative, scripts):
     from reportlab.pdfbase.ttfonts import TTFont
     mono=Path('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf')
     if mono.exists():pdfmetrics.registerFont(TTFont('GuideMono',str(mono)))
+    regular=Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+    bold=Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf')
+    body_font='Helvetica'
+    if regular.exists() and bold.exists():
+        pdfmetrics.registerFont(TTFont('GuideText',str(regular)))
+        pdfmetrics.registerFont(TTFont('GuideTextBold',str(bold)))
+        pdfmetrics.registerFontFamily('GuideText',normal='GuideText',bold='GuideTextBold',italic='GuideText',boldItalic='GuideTextBold')
+        body_font='GuideText'
     styles=getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='GuideBody',fontName='Helvetica',fontSize=9,leading=13,spaceAfter=7))
+    if body_font=='GuideText':
+        for name in ['Normal','BodyText']:styles[name].fontName='GuideText'
+        for name in ['Title','Heading1','Heading2','Heading3']:styles[name].fontName='GuideTextBold'
+    styles.add(ParagraphStyle(name='GuideBody',fontName=body_font,fontSize=9,leading=13,spaceAfter=7))
     styles.add(ParagraphStyle(name='GuideCode',fontName='GuideMono' if mono.exists() else 'Courier',fontSize=7,leading=8.5,spaceAfter=0))
     styles['Heading1'].textColor=HexColor('#123b54');styles['Heading2'].textColor=HexColor('#123b54')
     story=[]; block=[]
@@ -126,6 +137,7 @@ def pdf(path, narrative, scripts):
         for start in range(0,len(lines),55):story.append(Preformatted('\n'.join(lines[start:start+55]),styles['GuideCode']))
     def footer(canvas, doc):
         canvas.setFont('Helvetica',7);canvas.setFillColor(HexColor('#53606b'))
+        canvas.setFont('GuideText' if body_font=='GuideText' else 'Helvetica',6)
         canvas.drawString(36,22,'Tryumph Gym · November 2, 2026 · Development / staging guide · No production execution authorized')
         canvas.drawRightString(576,22,str(doc.page))
     SimpleDocTemplate(str(path),pagesize=(612,792),rightMargin=36,leftMargin=36,topMargin=36,bottomMargin=36,title='Tryumph Gym — Complete Founder Guide',author='Tryumph Gym').build(story,onFirstPage=footer,onLaterPages=footer)
