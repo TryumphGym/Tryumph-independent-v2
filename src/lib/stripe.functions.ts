@@ -1,3 +1,4 @@
+import { offersPrivateCoaching } from "./trainer-services";
 import { runtimeEnv } from "./runtime-env.server";
 import { createServerFn } from "@tanstack/react-start";
 import { appOrigin } from "./app-origin.server";
@@ -97,6 +98,15 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
       !Array.isArray(extra["trainer"])
         ? (extra["trainer"] as Record<string, unknown>)
         : {};
+    if (
+      !offersPrivateCoaching({
+        rate: trainerData["rate"],
+        services: trainerData["services"],
+      })
+    )
+      throw new Error(
+        "This trainer is not accepting new private coaching bookings.",
+      );
     const rate = Number(trainerData["rate"]);
     if (!Number.isFinite(rate) || rate < 2 || rate > 1000)
       throw new Error(
@@ -133,6 +143,9 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
         `${t.name.split(" ")[0]} isn't available at ${data.time} on ${data.date}. Choose another open time.`,
       );
     }
+    const s = stripe();
+    const { checkCreatorConnect } = await import("./creator-payments.server");
+    await checkCreatorConnect(data.trainerId, s);
     // Reserve the slot atomically before redirecting to paid checkout.
     const { data: holdId, error: holdError } = await supabaseAdmin.rpc(
       "prepare_deposit_booking",
@@ -154,7 +167,6 @@ export const createBookingCheckout = createServerFn({ method: "POST" })
       .eq("id", holdId)
       .single();
     if (hold.error) throw hold.error;
-    const s = stripe();
     const origin = appOrigin();
     let session: Stripe.Checkout.Session;
     try {

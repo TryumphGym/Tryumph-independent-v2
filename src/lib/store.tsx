@@ -112,6 +112,7 @@ export type Extra = {
     kind: "Trainer" | "Nutritionist" | "Both";
     certs: Cert[];
     specialties: string[];
+    services?: string[];
     rate: number;
     bio: string;
     website?: string;

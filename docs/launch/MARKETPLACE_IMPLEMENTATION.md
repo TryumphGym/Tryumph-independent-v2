@@ -1,0 +1,83 @@
+# Marketplace implementation — November 2, 2026
+
+This is development code on `codex/tryumph-january-launch`. No hosted SQL, deployment, merge, DNS change, real charge, refund, transfer, email or provider activation was performed. January 1, 2027 launch readiness is **not established** by local checks.
+
+## Business decisions now authoritative
+
+| Stream                                                   | Trainer | Tryumph | Basis                                                         |
+| -------------------------------------------------------- | ------- | ------- | ------------------------------------------------------------- |
+| Optional monthly trainer membership                      | 90%     | 10%     | Actual payment fees first; before hosting                     |
+| Native hosted digital programs/courses/challenges/guides | 95%     | 5%      | Actual payment fees first; before hosting                     |
+| Private sessions                                         | 90%     | 10%     | Existing deposit/attendance rules retained                    |
+| $5 community live drop-ins                               | 50%     | 50%     | Existing token/attendance rules retained                      |
+| Eligible on-demand video advertising                     | 50%     | 50%     | Recognized revenue, marked water breaks only                  |
+| Community-feed advertising                               | 0%      | 100%    | Separate ledger; no trainer allocation                        |
+| Independent storefronts and affiliate links              | 100%    | 0%      | External seller handles payments                              |
+| Future Tryumph-sourced merchandise                       | 50%     | 50%     | Future net profit after directly attributable costs; inactive |
+
+The founder explicitly reconfirmed subscription **90/10**. New membership commercial settings, orders and invoice receipts constrain the platform rate to 1000 basis points. No mandatory recurring platform fee or mandatory member subscription exists. Free Trybe membership and free on-demand workouts remain available. All discovery filters are free to use.
+
+The later master assignment removes the old five-approved-video hosting quota. Migration 0060 retains the existing eligibility signature and all current independently reviewed CPR/AED and assigned-credential requirements, while removing the quota. Historical migrations and the captured hosted catalog retain their original definitions as evidence. Newly scheduled paid live classes and native program publication separately require payout eligibility. Existing paid services/history are preserved.
+
+## Implemented and connected
+
+- **Monthly memberships:** trainer-owned versioned offers, frozen price/terms/destination, explicit recurring consent, independently purchasable memberships, real-invoice paid periods, safe cancellation/payment-method management, current payout checks, renewal-stop maintenance, late/unfulfillable-charge refund jobs, disputes, refunds and separate auditable transfer/reversal operations. Multiple trainers do not share entitlements. A checkout redirect, subscription status or failed invoice never grants a paid period.
+- **Stripe orchestration:** signed existing webhook entry remains authoritative; fresh customer/subscription/price/invoice/payment identity, actual settled fees, unique invoice/payment identifiers, stable checkout/customer/price/refund/transfer keys, monotonic refunds and terminal dispute decisions. Fee-unavailable, ambiguous and unsupported invoices fail closed. Existing program, private and live ledgers remain separate.
+- **Content:** trainer public/subscriber/both posts use one post record. Existing private member posts remain private. Restrictive RLS and wrapped poll/report helpers protect subscriber content. Comments still require membership. Scheduled video release is a server-time authorization predicate over one approved protected Bunny asset; maintenance records releases. Approval, suspension, rescheduling and cancellation remain authoritative. Premium paths are absent from subscriber catalog responses. Viewer-keyed component state and private/no-store server responses prevent cross-account cache reuse. Already-issued media URLs have a short expiration window and cannot recall copied content.
+- **Programs:** existing multi-week builder, ordered workouts, rest days, independently reviewed immutable editions, external links, 30/90/lifetime access, progress/resume, interval timer and exercise variations remain. Video-course/challenge product labels and private PDF guide selection/delivery are connected. Download-only products require independently approved files; unsafe/revoked files stop delivery and unpublish listings. Newly unfulfillable payments queue refunds. Program and membership access never substitute for one another.
+- **Inclusive discovery:** 24 shared canonical focus labels cover all requested goals, life stages and accessibility options. Existing freeform goals/equipment metadata map at read time without rewriting old data. Trainer profiles distinguish self-described focus from independently verified qualifications. Protected clinical titles require matching current reviewed professional evidence. Public directory copy also suppresses unsupported historical clinical claims without rewriting source profiles; these checks supplement independent moderation and legal review. Public directories, workouts, live classes and programs support simultaneous filters; program filtering precedes pagination. Public data is allowlisted. Browsing does not require diagnoses or save new member health histories.
+- **Pick For Me:** free approved immediately playable catalog only, server-filtered duration/equipment/focus/level/intensity, optional explicit +5-minute approximation, deterministic ranking, optional qualifying community impressions, variety and Pick Again. No silent safety relaxation or paid-library bypass. No-match messages are honest. Existing browse/search remains.
+- **Community Tags:** private one-ballot-per-member-per-workout feedback, updates/removal, allowed subjective labels only, own-video exclusion, daily limits, locked transactional counters, configurable minimum 10 responses/70% agreement, admin investigation/exclusion and audit. Removing feedback cannot evade a moderation block. Community impressions never establish medical, prenatal, postpartum or accessibility suitability.
+- **Everyday Tryumphs:** six public Tryumph-attributed optional movement ideas, activity/time/position/type filtering, instructions/modifications and safe-task guidance. No background monitoring, routine tracking, gamification or push requirement.
+- **Community photos:** private upload intents, four-photo configurable limit, bounded authenticated processing retries, actual binary type/dimension checks, trusted re-encoding/thumbnail binding, explicit WebP EXIF/XMP removal, version-bound moderation adapter, specialist-clearance requirement, fail-closed outage handling, ordinary human review only for cleared uncertain images, signed authorized derivatives, removal/replacement and soft post deletion. Pending attachments hide the whole post. Text edits invalidate approvals. Illegal/specialist holds have no ordinary preview. Uploads remain disabled pending real provider/legal setup.
+- **Feed ads:** default-off, authenticated server-validated placements, signed one-hour browsing-session cookie, cross-feed deduplicated organic counts, first ad only after six eligible posts, at least eight organic posts between ads, no sponsored/health-sensitive/unreviewed posts counted, global/community controls, Sponsored label/hide/report, separate all-platform receipts. Initial rendering supports explicitly reviewed first-party sponsorship creatives; it does not implement an approved third-party ad-network SDK, billing integration or impression settlement. No artificial impressions are recorded.
+- **Optional services:** trainers can explicitly disable new private coaching bookings while preserving their existing accepted sessions. Legacy valid trainer-defined prices remain supported; no program-only or live-only creator is required to offer coaching.
+- **Public pages:** exact requested homepage/trainer headlines, About/founder story, real-services directory, Programs/About/trainer CTAs, preserved free signup, hidden Youth/Nutrition/Homeschool, draft marketplace legal/support pages. Founder photo remains an explicit placeholder. No invented trainers, activity, customers, credentials or earnings were seeded.
+
+## Audit changes and regression fixes
+
+The original repository was clean at `3d4f658`; the development remote was fetched and already matched. Existing live scheduling depended on five videos in SQL and Studio; both were changed by the later authorized requirement. Existing paid program publication lacked a payout-eligibility check; it now has a separate guard. Connect status refreshes now check active transfers as well as payouts. Private/live new checkout refreshes the provider account before accepting a new sale.
+
+New provider tests found and fixed treating successful null-data Supabase mutations as missing records. Renewal cancellation also rechecks and deletes/voids still-collectible invoices, including a fresh account becoming ineligible. A Bunny ready-message timing race found in the full suite was fixed by installing its message listener before layout paint; existing timer synchronization and water-break tests remain.
+
+The actual supplied **978-row hosted metadata export**, including completion, remains the schema reference. A new compatibility test reconstructs that catalog, applies the reviewed reconciliation plus modules 0058–0064 locally, compares preserved profiles/posts/messages/friend requests/videos/stores/payments/earnings and verifies the manually installed trainer inquiry policy remains unchanged by the new modules. It also sends an authenticated trainer inquiry in the isolated database. This is not a new inspection of the hosted project, its current business rows, actual Storage HTTP, Auth hooks or realtime delivery.
+
+## New SQL, in order
+
+Versioned migration sources are required engineering history, not SQL attachments or a ZIP delivery. The downloadable guide embeds their full text with copy buttons and hashes. Execute complete scripts individually only on an independently restored, verified staging database:
+
+1. Existing reviewed foundation reconciliation, only if that staging clone still matches the inspected unreconciled snapshot; never select a historical bundle from absent history.
+2. Existing 0058 program module and 0059 poll module, only if absent by actual catalog definitions.
+3. `migrations/0060_creator_memberships.sql`.
+4. `migrations/0061_creator_content.sql`.
+5. `migrations/0062_discovery_and_downloads.sql`.
+6. `migrations/0063_everyday_discovery.sql`.
+7. `migrations/0064_community_photos_and_ads.sql`.
+8. `docs/launch/marketplace-postchecks.sql`, then inspect the full schema again and compare definitions/grants/policies.
+
+Each new module is transactional and refuses a module already present. These are deliberate fail-closed apply-once guards, not permission to delete/recreate objects. On any error: `ROLLBACK`, inspect, and reconcile; do not remove checks, choose another baseline or reset data. No new module deletes historical business rows or changes the trainer inquiry policy. New metadata fields have neutral defaults; existing general focus/fitness tags are not overwritten. Function renames retain private historical validators and add guarded wrappers.
+
+Rollback: leave new financial/history/media records intact, disable new runtime/database commercial/upload/ad gates and stop new offers. Revert app code only after checking its compatibility with new audience restrictions. Once subscription-only content exists, never roll back restrictive policies or the patched playback path to a version that can disclose it. Use a forward repair or an independently restored staging backup. Existing subscriptions must be stopped/reconciled in Stripe before withdrawing the billing service; turning off new checkout alone does not stop existing renewals. No production restore or schema rollback was authorized.
+
+## External gates and deferred provider work
+
+- No service-role/database/Stripe/protected-Bunny/moderation credentials were present in the process. No real account signup, email delivery, checkout, renewal, Connect transfer, refund, dispute, protected CDN denial, Storage HTTP, LiveKit two-account call, moderation scan, specialist report, ad delivery or provider revenue recognition was verified.
+- Keep `CREATOR_MEMBERSHIPS_ENABLED`, `PROGRAM_NATIVE_CHECKOUT_ENABLED`, `BUNNY_PROGRAM_MEDIA_VERIFIED`, `PROGRAM_DOWNLOADS_VERIFIED`, `COMMUNITY_PHOTOS_VERIFIED` and `COMMUNITY_FEED_ADS_VERIFIED` false until their individual tests pass. Database commerce/upload/ad gates also default off. Source code is not provider approval.
+- The photo moderation endpoint is an explicit adapter contract, **not an installed/approved moderation vendor**. Select a vendor with specialist illegal-content screening, contextual fitness/pregnancy/postpartum/breastfeeding review, DPA, reporting/appeals and an approved retention/deletion/legal-hold process. Ordinary admin preview cannot replace this prerequisite. A generic nudity classifier or AI description does not satisfy specialist clearance.
+- Cloudflare `COMMUNITY_IMAGES` object binding/API, real derivative metadata stripping/dimensions and uploads must be acceptance-tested. The local decoder/adapter tests use fixtures and mocked providers; they do not certify Cloudflare Images compatibility or real image safety. Do not activate uploads until that binding and adapter contract are confirmed.
+- Private PDFs have signature/basic active-content rejection and independent review, not a complete malware engine. Establish malware/content review and Storage authorization tests before `PROGRAM_DOWNLOADS_VERIFIED=true`. Downloaded copies cannot be recalled.
+- A real ad-network integration/billing/revenue webhook remains deferred pending approved provider requirements. First-party sponsorship placement is prepared but disabled. Community revenue is never inferred from views. The existing video sponsor settlement remains separately configured.
+- Final legal policies are drafts requiring professional review. Existing approved Terms/Privacy remain; new documents must be reviewed for recurring billing, cancellation, tax, accessibility, copyright, photo safety, retention and specialist legal obligations. The founder’s requested email remains `mackenzie@tryumphgym.com`; Resend DNS/account/SMTP/delivery remain founder configuration, with no DNS changes authorized.
+- No database or deployment authorization is implied by this report. See `FOUNDER_HANDOFF.md` for exact staging steps and acceptance scripts.
+
+## Cost and commission review
+
+Revenue calculations use actual charge fees; no estimated fee is used to mint entitlements/earnings. Separate Stripe Billing/Connect fees, tax, FX, refund/dispute fees, storage, delivery and moderation invoices may exceed the charge balance transaction’s fee and must be reconciled as operating costs. The code does not assert that the 5%/10% commissions are profitable.
+
+Illustration only: a $20 monthly invoice with an actual $0.88 charge fee leaves $19.12. Trainer allocation is $17.20, platform $1.92 after cent rounding, before infrastructure and any separate provider costs. These are sample inputs, not quoted Stripe prices. At 100 such invoices, platform allocation is $192; confirm actual invoices and cost allocation before activation.
+
+Photo cost model: approved/reviewed upload = two image transformations + private original/derivative storage + moderation of original/normalized image and text + signed delivery. A rejected/held upload uses moderation and two transformations but stores no ordinary derivatives. Retries are bounded (five per photo, minute lease; 20 upload intents/member/day). Actual unit rates/minimum vendor contracts are unknown; request provider quotes. Disabled uploads/ads create no new provider processing requests from this feature. Community ad sessions expire after one hour and maintenance removes them; no sensitive member preference history is created.
+
+## Verification
+
+Final command results, browser evidence and exact changed paths are recorded in `MARKETPLACE_VALIDATION.md` and `MARKETPLACE_CHANGED_FILES.md`. Older reports/test counts are dated historical evidence. Do not add old counts to the current suite total.

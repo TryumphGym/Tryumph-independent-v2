@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -25,6 +26,7 @@ import { Route as TrybesRouteImport } from './routes/trybes'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as ApiBunnyUploadRouteImport } from './routes/api/bunny-upload'
+import { Route as PoliciesPageRouteImport } from './routes/policies.$page'
 import { Route as ProgramsIndexRouteImport } from './routes/programs.index'
 import { Route as ProgramsIdRouteImport } from './routes/programs.$id'
 import { Route as TrainersIndexRouteImport } from './routes/trainers.index'
@@ -38,6 +40,11 @@ import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountRoute = AccountRouteImport.update({
@@ -115,6 +122,11 @@ const ApiBunnyUploadRoute = ApiBunnyUploadRouteImport.update({
   path: '/api/bunny-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PoliciesPageRoute = PoliciesPageRouteImport.update({
+  id: '/policies/$page',
+  path: '/policies/$page',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgramsIndexRoute = ProgramsIndexRouteImport.update({
   id: '/programs/',
   path: '/programs/',
@@ -165,6 +177,7 @@ const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
@@ -180,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
   '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/programs/': typeof ProgramsIndexRoute
@@ -192,6 +206,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
@@ -207,6 +222,7 @@ export interface FileRoutesByTo {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
   '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/programs': typeof ProgramsIndexRoute
@@ -220,6 +236,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
@@ -235,6 +252,7 @@ export interface FileRoutesById {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
   '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
   '/programs/': typeof ProgramsIndexRoute
@@ -249,6 +267,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
     | '/contact'
@@ -264,6 +283,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
     | '/programs/$id'
     | '/trainers/$id'
     | '/programs/'
@@ -276,6 +296,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
     | '/contact'
@@ -291,6 +312,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
     | '/programs/$id'
     | '/trainers/$id'
     | '/programs'
@@ -303,6 +325,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
     | '/contact'
@@ -318,6 +341,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
     | '/programs/$id'
     | '/trainers/$id'
     | '/programs/'
@@ -331,6 +355,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
   ContactRoute: typeof ContactRoute
@@ -346,6 +371,7 @@ export interface RootRouteChildren {
   WalletRoute: typeof WalletRoute
   WelcomeRoute: typeof WelcomeRoute
   ApiBunnyUploadRoute: typeof ApiBunnyUploadRoute
+  PoliciesPageRoute: typeof PoliciesPageRoute
   ProgramsIdRoute: typeof ProgramsIdRoute
   TrainersIdRoute: typeof TrainersIdRoute
   ProgramsIndexRoute: typeof ProgramsIndexRoute
@@ -364,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account': {
@@ -471,6 +504,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBunnyUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/policies/$page': {
+      id: '/policies/$page'
+      path: '/policies/$page'
+      fullPath: '/policies/$page'
+      preLoaderRoute: typeof PoliciesPageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/programs/': {
       id: '/programs/'
       path: '/programs'
@@ -539,6 +579,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
   ContactRoute: ContactRoute,
@@ -554,6 +595,7 @@ const rootRouteChildren: RootRouteChildren = {
   WalletRoute: WalletRoute,
   WelcomeRoute: WelcomeRoute,
   ApiBunnyUploadRoute: ApiBunnyUploadRoute,
+  PoliciesPageRoute: PoliciesPageRoute,
   ProgramsIdRoute: ProgramsIdRoute,
   TrainersIdRoute: TrainersIdRoute,
   ProgramsIndexRoute: ProgramsIndexRoute,

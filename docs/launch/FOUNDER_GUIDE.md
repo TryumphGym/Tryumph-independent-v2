@@ -1,10 +1,19 @@
-# Tryumph Gym founder guide — October 31, 2026
+# Tryumph Gym founder guide — November 2, 2026
 
-This is the consolidated memory and operating guide for the January 1, 2027 launch. Dates in this guide use America/Chicago. It covers the existing launch engineering and hosted-schema reconciliation, Resend preparation, trainer programs and exercise variations, and the new Trybe community polls.
+This is the consolidated memory and operating guide for the January 1, 2027 launch. Dates in this guide use America/Chicago. It covers the existing launch engineering and hosted-schema reconciliation, Resend preparation, trainer programs and exercise variations, Trybe community polls, optional 90/10 trainer memberships, inclusive discovery, Pick For Me, Everyday Tryumphs, community feedback and gated photo/feed-ad foundations.
 
 **Status: implemented development code, with external staging acceptance still required.** This guide is not authorization to run production SQL, merge, deploy, change DNS or activate live payments. No hosted SQL, deployment, DNS or real payment operations were performed during this work. Keep the development branch `codex/tryumph-january-launch`; preserve published Git history.
 
 The downloadable edition adds the complete active SQL scripts as numbered appendices, with source paths and SHA256 hashes. Use the HTML or Markdown edition to copy SQL. PDF line wrapping is for reading, not authoritative SQL copying. The scripts are never executed by opening the guide or using its copy buttons. The generator excludes obsolete baseline bundles, private environment files, credentials and business-data exports.
+
+
+## November 2 marketplace continuation — current authority
+
+The subscription split was reconfirmed as **90% trainer / 10% Tryumph**, after actual payment-processing fees and before hosting. Programs remain 95/5. Community-feed advertisements belong 100% to Tryumph and never enter the 50/50 water-break video-ad ledger. Free Trybes/free on-demand remain available; subscriptions are optional trainer-specific products. The old five-video quota is removed, while all required current independently verified credentials remain.
+
+Read `MARKETPLACE_IMPLEMENTATION.md`, `MARKETPLACE_VALIDATION.md` and the current `FOUNDER_HANDOFF.md`. The download includes those complete current documents before the dated source references. New transactional modules are 0060 memberships, 0061 content, 0062 discovery/downloads, 0063 everyday feedback/recommendations and 0064 photos/feed ads, applied only after verified foundation/0058/0059. Never select a baseline because history is missing. No hosted schema was changed.
+
+Inclusive focus categories filter trainers, public workouts, programs and live classes for free and paying members. Trainer focus, verified qualifications and subjective Community Tags are distinct. Pick For Me enforces time/equipment/safety and never searches inaccessible premium content. Everyday Tryumphs offers small safe-task movement ideas. Feedback is private with configurable 10-member/70% minimum public thresholds. Photo uploads and feed ads remain disabled until the specific provider/legal steps pass; moderation adapter tests are not real vendor approval. Use the current handoff's acceptance checklist and false-by-default gates.
 
 ## 1. Your next steps, in order
 
@@ -48,7 +57,7 @@ Eligibility uses current independently verified required credentials, including 
 
 Expired credentials block new trainer activity and new sales where required; previously approved workouts and legitimate existing program editions are preserved unless moderation withdraws content. An eligible replacement credential restores current eligibility rather than leaving an old expired row as a permanent lock.
 
-All discovery groups exclude unapproved workouts. No-equipment workouts remain eligible regardless of owned equipment. Explicit safety incompatibilities cannot be overridden just to fill recommendations. The Best Matches, Close Matches and Explore All logic remains shared. Programs do not grant live eligibility: hosting a community live still requires **five approved on-demand videos** plus current credentials.
+All discovery groups exclude unapproved workouts. No-equipment workouts remain eligible regardless of owned equipment. Explicit safety incompatibilities cannot be overridden just to fill recommendations. The Best Matches, Close Matches and Explore All logic remains shared. The later marketplace requirement removes the five-video quota through 0060. Current verified required credentials remain mandatory; new paid scheduling separately requires eligible payouts. Programs do not replace credentials.
 
 ### Live classes, private sessions and financial safety
 
@@ -194,7 +203,7 @@ Use a verified trainer T, ordinary members A and B, and a separate admin O. Use 
 - Send/accept a friend request, exchange messages in both directions, refresh/reconnect, unfriend and confirm history remains. Check eligible trainer inquiry without friendship and trainer reply. Confirm unrelated strangers cannot message and blocks/restrictions apply. Admin must not browse unrelated DMs.
 - Upload private credential evidence into T's own UUID folder. Reject other-folder, invalid MIME/oversize and replacement attempts. Independently review, expire, renew and verify current eligibility and history. Preserve older approved workouts.
 - Upload/transcode/review an ordinary workout and exercise safety/equipment filters. Check no-equipment matching, all three discovery categories and exclusion of pending videos. Confirm no ads without break markers and no mid-set ads.
-- With fewer than five approved workouts, T cannot host a live. With five and current credentials, test a $5 drop-in, reservation without debit, actual attendance debit once, reconnects, cancellation/refund, audience permissions and room shutdown. Verify real signed webhooks.
+- With zero videos, a current verified trainer with eligible payouts can schedule/host a live after 0060. Test a $5 drop-in, reservation without debit, actual attendance debit once, reconnects, cancellation/refund, audience permissions and room shutdown. Verify real signed webhooks.
 - Book a new private session at T's price, inspect the 25% deposit, waiting room and no balance on token issuance alone. Admit both people, verify the same 75% intent/SCA flow before media, reconnect and confirm no extra charges. Exercise one approved deposit transfer, trainer cancellation/expiry, refunds, delivery confirmation and payout reversals. Old version-1 paid bookings must not prompt another charge.
 - Review official/public/private audiences, reports, restrictions and appeals, opt-in friend notices, credential reminders and local distinct-day activity. Verify Youth/Nutrition/Homeschool remain hidden.
 - Confirm existing external stores still open independent checkout and no Tryumph commission/payment is introduced. Test recordings/queues/dead letters only with consent and sandbox providers.

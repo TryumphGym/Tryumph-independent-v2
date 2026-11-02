@@ -57,6 +57,12 @@ export const programDaySchema = z
   );
 export const programDraftSchema = z
   .object({
+    product_type: z
+      .enum(["workout_program", "video_course", "challenge", "download"])
+      .default("workout_program"),
+    downloads: z.array(z.string().uuid()).max(20).default([]),
+    discovery_tags: z.array(z.string()).max(24).default([]),
+    intensity: z.enum(["", "gentle", "moderate", "challenging"]).default(""),
     title: z.string().trim().min(1).max(160),
     description: text(4000),
     cover_url: url,
@@ -160,13 +166,23 @@ export const programDraftSchema = z
       c.addIssue({ code: "custom", message: "Use at most 500 workouts." });
   });
 export const programSchema = programDraftSchema.superRefine((p, c) => {
+  if (p.product_type === "download") {
+    if (!p.downloads.length)
+      c.addIssue({
+        code: "custom",
+        message: "Add an approved PDF before submitting",
+      });
+  } else if (!p.weeks.some((w) => w.days.some((d) => d.workouts.length)))
+    c.addIssue({
+      code: "custom",
+      message: "Add at least one approved workout before submitting",
+    });
   if (
-    !p.weeks.some((w) => w.days.some((d) => d.workouts.length)) ||
     p.weeks.some((w) => w.days.some((d) => d.workouts.some((s) => !s.video_id)))
   )
     c.addIssue({
       code: "custom",
-      message: "Add at least one approved workout before submitting.",
+      message: "Complete all included workouts before submitting",
     });
 });
 export type FitnessProgram = z.infer<typeof programDraftSchema>;
@@ -200,6 +216,10 @@ export const newProgramDay = (): ProgramDay => ({
   workouts: [],
 });
 export const newProgram = (): FitnessProgram => ({
+  product_type: "workout_program",
+  intensity: "",
+  downloads: [],
+  discovery_tags: [],
   title: "",
   description: "",
   cover_url: "",

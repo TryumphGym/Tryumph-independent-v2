@@ -73,9 +73,12 @@ export async function reconcilePendingTrainerTransfers() {
   const { reconcileProgramTransfers } =
     await import("./program-payments.server");
   const programs = await reconcileProgramTransfers(stripe);
+  const { reconcileCreatorTransfers } =
+    await import("./creator-payments.server");
+  const creators = await reconcileCreatorTransfers(stripe);
   return {
-    paid: paid + programs.paid,
-    reversed: reversed + programs.reversed,
-    waiting: waiting + programs.waiting,
+    paid: paid + programs.paid + creators.paid,
+    reversed: reversed + programs.reversed + creators.reversed,
+    waiting: waiting + programs.waiting + creators.waiting,
   };
 }

@@ -177,10 +177,10 @@ afterEach(async () => {
   await db.exec("ROLLBACK");
 });
 describe("workout program creation, moderation, enrollment and immutable purchases", () => {
-  it("keeps program creation separate from the five-approved-video live eligibility rule", async () => {
+  it("allows live-only and program-only verified trainers without a video quota", async () => {
     expect(
       await owner("SELECT trainer_is_eligible($1,true) AS ok", [trainer]),
-    ).toEqual([{ ok: false }]);
+    ).toEqual([{ ok: true }]);
     const p = await published(document());
     await actor(member, "SELECT enroll_fitness_program($1)", [p.id]);
     const totals = (

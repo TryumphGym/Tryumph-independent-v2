@@ -1,3 +1,4 @@
+import { ProgramDownloads } from "./ProgramDownloads";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -22,6 +23,9 @@ const errorText = (e: unknown) =>
   e instanceof Error ? e.message : "Program unavailable";
 export function ProgramDetail({ id }: { id: string }) {
   const me = useUserId();
+  return <ProgramDetailForViewer key={`${me}:${id}`} id={id} me={me} />;
+}
+function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
   const [program, setProgram] = useState<Tables<"trainer_programs"> | null>(
       null,
     ),
@@ -210,7 +214,8 @@ export function ProgramDetail({ id }: { id: string }) {
         )}
         <div>
           <p className="eyebrow">
-            {display.category} · {display.difficulty}
+            {display.category} · {display.difficulty} · Intensity:{" "}
+            {display.intensity || "Not specified"}
           </p>
           <h1 className="mt-2 text-3xl font-bold">
             {display.title ?? program.title}
@@ -400,6 +405,9 @@ export function ProgramDetail({ id }: { id: string }) {
             </>
           )}
         </div>
+      )}
+      {doc && edition && (
+        <ProgramDownloads ids={doc.downloads} editionId={edition.id} />
       )}
       {doc && edition && (
         <>

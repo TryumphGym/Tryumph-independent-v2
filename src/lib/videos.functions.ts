@@ -12,10 +12,19 @@ export const getVideoUrl = createServerFn({ method: "GET" })
       .select("path,access_scope")
       .eq("id", data.id)
       .eq("review_status", "approved")
-      .eq("access_scope", "public")
       .maybeSingle();
-    if (result.error || !result.data || result.data.access_scope !== "public")
+    if (result.error || !result.data)
       throw new Error("Approved workout not found");
+    if (result.data.access_scope !== "public") {
+      const allowed = await supabaseAdmin.rpc("creator_video_token", {
+        p_user: "00000000-0000-0000-0000-000000000000",
+        p_video: data.id,
+      });
+      if (allowed.error || !allowed.data[0]?.is_public)
+        throw new Error("Approved public workout not found");
+      const { signProgramPath } = await import("./program-media.server");
+      return signProgramPath(allowed.data[0].path, "program", 300);
+    }
     const { signVideoPath } = await import("./video-playback.server");
     return signVideoPath(result.data.path);
   });

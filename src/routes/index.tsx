@@ -1,3 +1,5 @@
+import { PickForMe } from "@/components/PickForMe";
+import { EverydayTryumphs } from "@/components/EverydayTryumphs";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Flame,
@@ -23,13 +25,16 @@ import { Waitlist } from "@/components/Waitlist";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Tryumph Gym — Work out on your terms" },
+      { title: "Tryumph Gym — Fitness that fits real life." },
       {
         name: "description",
         content:
           "Free on-demand workouts, $5 drop-in live classes and supportive Trybes for real homes and busy families.",
       },
-      { property: "og:title", content: "Tryumph Gym — Work out on your terms" },
+      {
+        property: "og:title",
+        content: "Tryumph Gym — Fitness that fits real life.",
+      },
       {
         property: "og:description",
         content:
@@ -66,12 +71,11 @@ function Home() {
     void (async () => {
       const [v, l] = await Promise.all([
         supabase
-          .from("trainer_videos")
+          .from("public_workout_catalog")
           .select(
             "id,user_id,title,category,level,minutes,path,equipment,pregnancy_safe,required_equipment",
           )
           .eq("review_status", "approved")
-          .eq("access_scope", "public")
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
@@ -85,6 +89,26 @@ function Home() {
       if (!active) return;
       setFeatured(
         (v.data ?? [])
+          .filter(
+            (
+              x,
+            ): x is typeof x & {
+              id: string;
+              user_id: string;
+              title: string;
+              category: string;
+              level: string;
+              minutes: number;
+              path: string;
+              pregnancy_safe: boolean;
+            } =>
+              !!x.id &&
+              !!x.title &&
+              !!x.category &&
+              !!x.path &&
+              x.minutes !== null &&
+              x.pregnancy_safe !== null,
+          )
           .filter(isLaunchWorkout)
           .filter(
             (x) =>
@@ -94,7 +118,7 @@ function Home() {
                   ...x,
                   equipment: x.equipment ?? "",
                   required_equipment:
-                    x.required_equipment ?? gearOf(x.equipment),
+                    x.required_equipment ?? gearOf(x.equipment ?? undefined),
                   pregnancySafe: x.pregnancy_safe,
                   postpartum: x.level === "Postpartum",
                 },
@@ -153,27 +177,76 @@ function Home() {
               : "Built for real homes & busy families"}
           </p>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-6xl">
-            Work out on your terms.{" "}
-            <span className="text-gradient">Zero childcare guilt.</span>
+            Fitness that fits real life.
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Free on-demand workouts, $5 drop-in live classes, and supportive
-            Trybes designed for real homes and busy families.
+            Discover workouts, trainers, programs, and communities built around
+            your goals, schedule, and budget.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/on-demand" className="btn btn-primary">
               <Play className="h-4 w-4" />
-              Start a free workout
+              Explore Workouts
             </Link>
-            {!s.signedIn && (
-              <Link to="/account" className="btn btn-ghost">
-                Create free account
-              </Link>
-            )}
+            <Link to="/trainers" className="btn btn-outline">
+              Find Your Trainer
+            </Link>
           </div>
         </div>
       </section>
 
+      <section className="card space-y-3 p-6">
+        <p className="eyebrow">For fitness professionals</p>
+        <h2 className="text-3xl font-bold">Your fitness business. Your way.</h2>
+        <p>
+          Build your community, share your expertise, and create multiple ways
+          to earn.
+        </p>
+        <Link className="btn btn-primary" to="/for-trainers">
+          Become a Trainer
+        </Link>
+      </section>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[
+          {
+            to: "/on-demand",
+            title: "Free on-demand workouts",
+            text: "Approved workouts, with ads only at marked water breaks.",
+          },
+          {
+            to: "/live",
+            title: "Live fitness classes",
+            text: "$5 drop-ins without a mandatory subscription.",
+          },
+          {
+            to: "/trainers",
+            title: "Personal training",
+            text: "Explore verified trainers and their available services.",
+          },
+          {
+            to: "/programs",
+            title: "Trainer-created programs",
+            text: "Free or one-time programs, with checkout available after payment setup.",
+          },
+          {
+            to: "/trybes",
+            title: "Fitness communities",
+            text: "Free Trybes, conversations and community polls.",
+          },
+          {
+            to: "/trainers",
+            title: "Optional trainer memberships",
+            text: "Separate monthly creator memberships where activated; free participation remains available.",
+          },
+        ].map((v) => (
+          <Link className="card space-y-2 p-5" key={v.title} to={v.to}>
+            <h2 className="font-bold">{v.title}</h2>
+            <p className="text-sm text-muted-foreground">{v.text}</p>
+          </Link>
+        ))}
+      </section>
+      <PickForMe />
+      <EverydayTryumphs />
       {!s.signedIn && <Waitlist />}
 
       {!s.signedIn && (
@@ -182,7 +255,7 @@ function Home() {
             {
               icon: Baby,
               title: "New Parents & Postpartum",
-              text: "Diastasis-safe core and nap-time micro workouts.",
+              text: "Postpartum-focused options and individually appropriate modifications.",
             },
             {
               icon: Users,

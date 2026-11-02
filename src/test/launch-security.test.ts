@@ -32,6 +32,10 @@ beforeAll(async () => {
     `INSERT INTO certifications(user_id,name,expires,status,verified_at,verified_by) VALUES($1,'CPR/AED',(current_date+365)::text,'verified',now(),$2)`,
     [trainer, admin],
   );
+  await db.query(
+    "INSERT INTO trainer_accounts(user_id,stripe_account_id,payouts_enabled) VALUES($1,'acct_launch',true)",
+    [trainer],
+  );
   for (let i = 0; i < 5; i++)
     await db.query(
       "INSERT INTO trainer_videos(user_id,title,path,minutes,review_status,breaks) VALUES($1,'Approved','owned/test.mp4',20,'approved',ARRAY[180,600])",
@@ -100,24 +104,27 @@ describe("launch database authorization and lifecycle", () => {
       `UPDATE certifications SET name='CPR/AED' WHERE user_id='${trainer}'`,
     );
   });
-  it("five pending workouts cannot qualify; five approved workouts can", async () => {
+  it("allows current verified trainers to host with no approved video quota, but requires payouts", async () => {
     await db.exec(
       `UPDATE trainer_videos SET review_status='pending' WHERE user_id='${trainer}'`,
+    );
+    await asUser(
+      db,
+      trainer,
+      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Live-only trainer',now()+interval '2 hours')`,
+    );
+    await db.exec(
+      `UPDATE trainer_accounts SET payouts_enabled=false WHERE user_id='${trainer}'`,
     );
     await expect(
       asUser(
         db,
         trainer,
-        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Class',now()+interval '2 hours')`,
+        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Blocked',now()+interval '2 hours')`,
       ),
-    ).rejects.toThrow("five approved");
+    ).rejects.toThrow("payout");
     await db.exec(
-      `UPDATE trainer_videos SET review_status='approved' WHERE user_id='${trainer}'`,
-    );
-    await asUser(
-      db,
-      trainer,
-      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Class',now()+interval '2 hours')`,
+      `UPDATE trainer_accounts SET payouts_enabled=true WHERE user_id='${trainer}';UPDATE trainer_videos SET review_status='approved' WHERE user_id='${trainer}'`,
     );
   });
   it("keeps pending/rejected videos private to their owner and admins", async () => {

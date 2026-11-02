@@ -98,8 +98,10 @@ export async function processRefundJobs() {
   }
   const { processProgramRefunds } = await import("./program-payments.server");
   const programs = await processProgramRefunds(stripe);
+  const { processCreatorRefunds } = await import("./creator-payments.server");
+  const creators = await processCreatorRefunds(stripe);
   return {
-    completed: completed + programs.completed,
-    failed: failed + programs.failed,
+    completed: completed + programs.completed + creators.completed,
+    failed: failed + programs.failed + creators.failed,
   };
 }

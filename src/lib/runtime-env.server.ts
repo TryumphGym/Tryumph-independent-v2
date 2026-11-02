@@ -9,3 +9,8 @@ export function runtimeEnv(name: string): string | undefined {
   if (typeof value === "string" && value.length > 0) return value;
   return typeof process !== "undefined" ? process.env?.[name] : undefined;
 }
+
+/** Object bindings stay server-only, just like secret strings. */
+export function runtimeBinding<T>(name: string): T | undefined {
+  return (env as unknown as Record<string, unknown>)?.[name] as T | undefined;
+}

@@ -1,3 +1,5 @@
+import { ProgramDownloadEditor } from "./ProgramDownloads";
+import { DiscoveryFilters } from "./DiscoveryFilters";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -32,6 +34,9 @@ const errorText = (e: unknown) =>
 const money = (n: number) => `$${(n / 100).toFixed(2)}`;
 export function TrainerProgramBuilder() {
   const me = useUserId();
+  return <ProgramBuilderForViewer key={me ?? "signed-out"} me={me} />;
+}
+function ProgramBuilderForViewer({ me }: { me: string | null }) {
   const [programs, setPrograms] = useState<Tables<"trainer_programs">[]>([]),
     [editions, setEditions] = useState<Tables<"program_editions">[]>([]);
   const [videos, setVideos] = useState<
@@ -320,6 +325,58 @@ export function TrainerProgramBuilder() {
               />
             </label>
           </div>
+          <label className="block">
+            Intensity
+            <select
+              className="field"
+              value={doc.intensity}
+              onChange={(e) =>
+                change({
+                  ...doc,
+                  intensity: e.target.value as typeof doc.intensity,
+                })
+              }
+            >
+              <option value="">Not assessed</option>
+              {["gentle", "moderate", "challenging"].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            Product type
+            <select
+              className="field"
+              value={doc.product_type}
+              onChange={(e) =>
+                change({
+                  ...doc,
+                  product_type: e.target
+                    .value as FitnessProgram["product_type"],
+                })
+              }
+            >
+              {[
+                ["workout_program", "Workout program"],
+                ["video_course", "Video course"],
+                ["challenge", "Fitness challenge"],
+                ["download", "Downloadable guide"],
+              ].map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <DiscoveryFilters
+            value={doc.discovery_tags}
+            onChange={(discovery_tags) => change({ ...doc, discovery_tags })}
+            editor
+          />
+          <ProgramDownloadEditor
+            value={doc.downloads}
+            onChange={(downloads) => change({ ...doc, downloads })}
+          />
           <label className="block">
             Description
             <textarea

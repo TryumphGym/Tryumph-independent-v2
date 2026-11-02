@@ -1,3 +1,4 @@
+import { ProgramAssetAdmin } from "./ProgramDownloads";
 import { useUserId } from "@/lib/community";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -114,6 +115,7 @@ export function ProgramAdmin() {
   return (
     <section className="card space-y-4 p-6">
       <h2 className="text-xl font-bold">Program review, access and payments</h2>
+      <ProgramAssetAdmin />
       {error && <p role="alert">{error}</p>}
       <button
         className="btn btn-outline"

@@ -18,6 +18,7 @@ export function useUserId() {
 export type CPost = {
   id: string;
   visibility: string;
+  audience?: string;
   official?: boolean;
   is_hidden?: boolean;
   is_pinned?: boolean;
@@ -91,6 +92,7 @@ export function usePosts(
   selected = "all",
   joined: readonly string[] = [],
   focusId?: string,
+  audience?: "community" | "public" | "subscribers",
 ) {
   const [posts, setPosts] = useState<CPost[]>([]),
     [page, setPage] = useState(0),
@@ -99,12 +101,19 @@ export function usePosts(
     [error, setError] = useState(""),
     [version, setVersion] = useState(0);
   const joinedKey = JSON.stringify(joined),
-    contextKey = JSON.stringify([me, selected, joined, focusId, version]);
+    contextKey = JSON.stringify([
+      me,
+      selected,
+      joined,
+      focusId,
+      version,
+      audience,
+    ]);
   const [snapshotKey, setSnapshotKey] = useState("");
   useEffect(() => {
     setPosts([]);
     setPage(0);
-  }, [me, selected, joinedKey, version, focusId]);
+  }, [me, selected, joinedKey, version, focusId, audience]);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -122,6 +131,11 @@ export function usePosts(
         else if (selected === "all")
           query = query.in("trybe", [...JSON.parse(joinedKey), "official"]);
         else query = query.eq("trybe", selected);
+        if (audience === "public") query = query.eq("visibility", "public");
+        else if (audience === "subscribers")
+          query = query.in("audience", ["subscribers", "both"]);
+        else if (audience === "community")
+          query = query.neq("audience", "subscribers");
         const r = await query;
         if (r.error) throw r.error;
         let rows = r.data.slice(0, 20);
@@ -187,7 +201,7 @@ export function usePosts(
     return () => {
       active = false;
     };
-  }, [me, selected, joinedKey, page, version, focusId, contextKey]);
+  }, [me, selected, joinedKey, page, version, focusId, contextKey, audience]);
   return {
     posts: snapshotKey === contextKey ? posts : [],
     reload: () => {

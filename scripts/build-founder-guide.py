@@ -15,6 +15,12 @@ FILES = [
  ('Foundation confirmation', 'docs/launch/confirmation.sql'),
  ('Programs module: apply once after foundation', 'migrations/0058_workout_program_builder.sql'),
  ('Polls module: apply once after foundation/program review', 'migrations/0059_trybe_polls.sql'),
+ ('Optional memberships: 90/10; apply after 0059', 'migrations/0060_creator_memberships.sql'),
+ ('Subscriber content and timed releases', 'migrations/0061_creator_content.sql'),
+ ('Inclusive discovery and private digital guides', 'migrations/0062_discovery_and_downloads.sql'),
+ ('Everyday discovery and private workout feedback', 'migrations/0063_everyday_discovery.sql'),
+ ('Gated community photos and feed advertising', 'migrations/0064_community_photos_and_ads.sql'),
+ ('Marketplace postchecks (read-only)', 'docs/launch/marketplace-postchecks.sql'),
 ]
 POSTCHECK = '''BEGIN READ ONLY;
 SELECT c.relname,c.relrowsecurity FROM pg_catalog.pg_class c
@@ -120,7 +126,7 @@ def pdf(path, narrative, scripts):
         for start in range(0,len(lines),55):story.append(Preformatted('\n'.join(lines[start:start+55]),styles['GuideCode']))
     def footer(canvas, doc):
         canvas.setFont('Helvetica',7);canvas.setFillColor(HexColor('#53606b'))
-        canvas.drawString(36,22,'Tryumph Gym · October 31, 2026 · Development / staging guide · No production execution authorized')
+        canvas.drawString(36,22,'Tryumph Gym · November 2, 2026 · Development / staging guide · No production execution authorized')
         canvas.drawRightString(576,22,str(doc.page))
     SimpleDocTemplate(str(path),pagesize=(612,792),rightMargin=36,leftMargin=36,topMargin=36,bottomMargin=36,title='Tryumph Gym — Complete Founder Guide',author='Tryumph Gym').build(story,onFirstPage=footer,onLaterPages=footer)
 
@@ -129,6 +135,8 @@ def main():
     args.output_dir.mkdir(parents=True,exist_ok=True)
     sha=git('rev-parse','HEAD');dirty=git('status','--porcelain')
     narrative=(ROOT/'docs/launch/FOUNDER_GUIDE.md').read_text()
+    for source in ['FOUNDER_HANDOFF.md','MARKETPLACE_IMPLEMENTATION.md','MARKETPLACE_VALIDATION.md']:
+        narrative+='\n\n## Current source: '+source+'\n\n'+(ROOT/'docs/launch'/source).read_text()
     narrative+='\n\n## Download provenance and actual validation\n\n'
     narrative+=f'Generated from branch `{git("branch","--show-current")}`, HEAD `{sha}`. Working tree '+('contained changes at generation time; inspect the changed-file inventory below.' if dirty else 'was clean at generation time.')+'\n\n'
     if args.verification:
@@ -148,8 +156,8 @@ def main():
     scripts=[]
     for i,(title,name) in enumerate(FILES,1):
         code=(ROOT/name).read_text();digest=hashlib.sha256(code.encode()).hexdigest();scripts.append((f'SQL {i}: {title}',name,code,digest))
-    scripts.append(('SQL 9: Current module postchecks (read-only)','Guide postcheck query',POSTCHECK,hashlib.sha256(POSTCHECK.encode()).hexdigest()))
-    base='Tryumph-Founder-Guide-2026-10-31'
+    scripts.append((f'SQL {len(FILES)+1}: Program/poll postchecks (read-only)','Guide postcheck query',POSTCHECK,hashlib.sha256(POSTCHECK.encode()).hexdigest()))
+    base='Tryumph-Founder-Guide-2026-11-02'
     markdown=narrative+'\n\n## Complete active SQL appendices\n\nThese are conditional staging steps, not a command to execute every script on any database. Review section 5 first.\n'
     for title,name,code,digest in scripts:markdown+=f'\n### {title}\n\nSource: `{name}`\n\nSHA256: `{digest}`\n\n````sql\n{code.rstrip()}\n````\n'
     (args.output_dir/(base+'.md')).write_text(markdown)

@@ -1,3 +1,4 @@
+import { DiscoveryFilters } from "./DiscoveryFilters";
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,7 @@ import type { ProgramSummary } from "@/lib/programs";
 import type { Tables } from "@/integrations/supabase/types";
 export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
   const me = useUserId();
+  const [focus, setFocus] = useState<string[]>([]);
   const [libraryPage, setLibraryPage] = useState(0),
     [libraryNext, setLibraryNext] = useState(false);
   const [items, setItems] = useState<Tables<"trainer_programs">[]>([]),
@@ -31,13 +33,14 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
     setError(false);
     void (async () => {
       let query = supabase
-        .from("trainer_programs")
+        .from("discoverable_programs")
         .select("*")
         .eq("builder_version", 2)
         .eq("published", true)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .range(page * 12, page * 12 + 12);
+      if (focus.length) query = query.contains("discovery_focus_tags", focus);
       if (queryText) query = query.ilike("title", `%${queryText}%`);
       if (mode !== "all") query = query.eq("summary->>mode", mode);
       if (category !== "all") query = query.eq("summary->>category", category);
@@ -48,7 +51,7 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
         setError(true);
         setItems([]);
       } else {
-        setItems(result.data.slice(0, 12));
+        setItems(result.data.slice(0, 12) as Tables<"trainer_programs">[]);
         setHasNext(result.data.length > 12);
       }
       setLoading(false);
@@ -56,7 +59,7 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
     return () => {
       active = false;
     };
-  }, [trainerId, me, page, mode, category, queryText]);
+  }, [trainerId, me, page, mode, category, queryText, focus]);
   useEffect(() => {
     let active = true;
     setMine([]);
@@ -157,6 +160,13 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
           </nav>
         </section>
       )}
+      <DiscoveryFilters
+        value={focus}
+        onChange={(v) => {
+          setFocus(v);
+          setPage(0);
+        }}
+      />
       <div className="grid gap-3 sm:grid-cols-3">
         <label>
           Search programs

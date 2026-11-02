@@ -1,3 +1,5 @@
+import { offersPrivateCoaching } from "@/lib/trainer-services";
+import { mayPublishFitnessCopy } from "@/lib/professional-claims";
 import { safeExternalUrl } from "@/lib/launch-features";
 import { runtimeEnv } from "@/lib/runtime-env.server";
 import { createFileRoute } from "@tanstack/react-router";
@@ -19,12 +21,16 @@ export const Route = createFileRoute("/api/public/trainers")({
             await import("@/integrations/supabase/client.server");
           const { data: credentials, error: certError } = await db
             .from("certifications")
-            .select("user_id,name,expires,status,verified_at,verified_by")
+            .select(
+              "user_id,name,expires,status,verified_at,verified_by,document_path",
+            )
             .eq("status", "verified")
             .not("verified_at", "is", null)
             .not("verified_by", "is", null);
           if (certError) throw certError;
-          const valid = (credentials ?? []).filter((c) => isCurrentVerified(c));
+          const valid = (credentials ?? []).filter(
+            (c) => isCurrentVerified(c) && c.verified_by !== c.user_id,
+          );
           let ids = [...new Set(valid.map((c) => c.user_id))].filter((id) =>
             hasVerifiedCpr(valid.filter((c) => c.user_id === id)),
           );
@@ -42,10 +48,31 @@ export const Route = createFileRoute("/api/public/trainers")({
           if (!ids.length) return Response.json({ trainers: [] });
           const { data: profiles, error: profileError } = await db
             .from("profiles")
-            .select("id,name,role,extra,avatar_url")
+            .select("id,name,role,extra,avatar_url,focus_tags")
             .in("id", ids)
             .eq("role", "trainer");
           if (profileError) throw profileError;
+          const [programs, videos, lives, offers] = await Promise.all([
+            db
+              .from("trainer_programs")
+              .select("trainer_id")
+              .eq("builder_version", 2)
+              .eq("published", true)
+              .eq("blocked", false),
+            db.from("public_workout_catalog").select("user_id"),
+            db
+              .from("live_sessions")
+              .select("trainer_id")
+              .in("status", ["scheduled", "live"])
+              .gte("starts_at", new Date(Date.now() - 7200000).toISOString()),
+            db
+              .from("creator_offers")
+              .select("trainer_id")
+              .eq("enabled", true)
+              .eq("blocked", false),
+          ]);
+          if (programs.error || videos.error || lives.error || offers.error)
+            throw new Error("Service directory unavailable");
           const trainers = (profiles ?? []).map((p) => {
             const extra =
               p.extra && typeof p.extra === "object" && !Array.isArray(p.extra)
@@ -59,7 +86,15 @@ export const Route = createFileRoute("/api/public/trainers")({
                 : {};
             const specialties = Array.isArray(trainer["specialties"])
               ? trainer["specialties"]
-                  .filter((s): s is string => typeof s === "string")
+                  .filter(
+                    (s): s is string =>
+                      typeof s === "string" &&
+                      mayPublishFitnessCopy(
+                        s,
+                        p.id,
+                        valid.filter((c) => c.user_id === p.id),
+                      ),
+                  )
                   .slice(0, 12)
               : [];
             return {
@@ -77,16 +112,52 @@ export const Route = createFileRoute("/api/public/trainers")({
               name: p.name,
               bio:
                 typeof trainer["bio"] === "string"
-                  ? trainer["bio"].slice(0, 1500)
+                  ? mayPublishFitnessCopy(
+                      trainer["bio"],
+                      p.id,
+                      valid.filter((c) => c.user_id === p.id),
+                    )
+                    ? trainer["bio"].slice(0, 1500)
+                    : "Biography awaiting professional-title review."
                   : "",
               specialties,
+              focus_tags: p.focus_tags,
+              services: [
+                "community",
+                ...(programs.data.some((x) => x.trainer_id === p.id)
+                  ? ["programs"]
+                  : []),
+                ...(videos.data.some((x) => x.user_id === p.id)
+                  ? ["workouts"]
+                  : []),
+                ...(lives.data.some((x) => x.trainer_id === p.id)
+                  ? ["live"]
+                  : []),
+                ...(offers.data.some((x) => x.trainer_id === p.id)
+                  ? ["membership"]
+                  : []),
+                ...(offersPrivateCoaching({
+                  rate: trainer["rate"],
+                  services: trainer["services"],
+                })
+                  ? ["coaching"]
+                  : []),
+              ],
               rate:
                 typeof trainer["rate"] === "number" &&
                 Number.isFinite(trainer["rate"])
                   ? trainer["rate"]
                   : 0,
               qualifications: valid
-                .filter((c) => c.user_id === p.id)
+                .filter(
+                  (c) =>
+                    c.user_id === p.id &&
+                    mayPublishFitnessCopy(
+                      c.name,
+                      p.id,
+                      valid.filter((v) => v.user_id === p.id),
+                    ),
+                )
                 .map((c) => c.name),
               avatarUrl:
                 typeof p.avatar_url === "string" &&

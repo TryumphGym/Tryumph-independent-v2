@@ -11,6 +11,21 @@ export async function runMaintenance() {
     ...attendance,
     ...(await Promise.allSettled([
       supabaseAdmin
+        .from("community_ad_sessions")
+        .delete()
+        .lt("expires_at", new Date().toISOString())
+        .then((r) => {
+          if (r.error && !["42P01", "PGRST205"].includes(r.error.code))
+            throw r.error;
+        }),
+      import("./creator-payments.server").then((m) =>
+        m.maintainCreatorRenewals(),
+      ),
+      supabaseAdmin.rpc("record_creator_releases").then((r) => {
+        if (r.error && !["42883", "PGRST202"].includes(r.error.code))
+          throw r.error;
+      }),
+      supabaseAdmin
         .rpc("deliver_trybe_poll_notices", { p_limit: 200 })
         .then((r) => {
           if (r.error && !["42883", "PGRST202"].includes(r.error.code))

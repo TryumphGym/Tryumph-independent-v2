@@ -1,3 +1,11 @@
+import { CommunityPostPhotos } from "@/components/CommunityPostPhotos";
+import { CommunityFeedAd } from "@/components/CommunityFeedAd";
+import { getCommunityAdSlot } from "@/lib/community-ads.functions";
+import {
+  CreatorMembership,
+  CreatorVideos,
+} from "@/components/CreatorMembership";
+import { publishCreatorPost } from "@/lib/creator.functions";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Heart,
@@ -8,7 +16,7 @@ import {
   UserPlus,
   Bell,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -69,6 +77,9 @@ function Trybes() {
   const { friends, reload: reloadFriends } = useFriends(me);
   const { incoming, outgoing, reload: reloadRequests } = useFriendRequests(me);
   const [trybe, setTrybe] = useState(t ?? "all");
+  const [audienceTab, setAudienceTab] = useState<
+    "community" | "public" | "subscribers"
+  >("community");
   const [ownedGroups, setOwnedGroups] = useState<
       { id: string; name: string }[]
     >([]),
@@ -100,9 +111,9 @@ function Trybes() {
       active = false;
     };
   }, [focusedPoll, me]);
-  const [postVisibility, setPostVisibility] = useState<"public" | "private">(
-    "private",
-  );
+  const [postVisibility, setPostVisibility] = useState<
+    "public" | "private" | "subscribers" | "both"
+  >("private");
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [directoryCoaches, setDirectoryCoaches] = useState<
     { id: string; name: string }[]
@@ -205,7 +216,13 @@ function Trybes() {
     loading: feedLoading,
     error: feedError,
     loadMore,
-  } = usePosts(me, trybe, effectiveMemberships, focusedPoll);
+  } = usePosts(
+    me,
+    trybe,
+    effectiveMemberships,
+    focusedPoll,
+    trybe.startsWith("coach-") ? audienceTab : undefined,
+  );
   const pollState = useTrybePolls(
     all.filter((p) => p.kind === "Poll").map((p) => p.id),
   );
@@ -218,9 +235,33 @@ function Trybes() {
       : (p.official === true && trybe === "all") ||
         inTrybeFeed(p.trybe, trybe, effectiveMemberships),
   );
-  const posts = [...filtered].sort(
+  const audienceFiltered =
+    audienceTab === "community"
+      ? filtered
+      : filtered.filter((p) =>
+          audienceTab === "public"
+            ? p.visibility === "public"
+            : p.audience === "subscribers" || p.audience === "both",
+        );
+  const [adSlot, setAdSlot] =
+    useState<Awaited<ReturnType<typeof getCommunityAdSlot>>>(null);
+  const posts = [...audienceFiltered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
   );
+  const adPostIds = JSON.stringify(posts.slice(-20).map((p) => p.id));
+  useEffect(() => {
+    let active = true;
+    setAdSlot(null);
+    if (me)
+      void getCommunityAdSlot({ data: { postIds: JSON.parse(adPostIds) } })
+        .then((r) => {
+          if (active) setAdSlot(r);
+        })
+        .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [adPostIds, me, trybe]);
   const coaches = directoryCoaches;
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
   const joined =
@@ -349,13 +390,25 @@ function Trybes() {
       toast.error("Join this Trybe to post.");
       return;
     }
+    if (target === `coach-${me}` && postVisibility !== "private") {
+      try {
+        await publishCreatorPost({
+          data: { text: text.trim(), audience: postVisibility },
+        });
+        setText("");
+        reload();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not post");
+      }
+      return;
+    }
     const { error } = await supabase.from("posts").insert({
       author_id: me,
       author_name: s.name,
       trybe: target,
       kind,
       text: text.trim(),
-      visibility: target === `coach-${me}` ? postVisibility : "private",
+      visibility: "private",
     });
     if (error) {
       toast.error("Couldn't post. Try again.");
@@ -394,7 +447,7 @@ function Trybes() {
     reload();
   };
   const removeOwn = async (id: string) => {
-    await supabase.from("posts").delete().eq("id", id);
+    await supabase.rpc("delete_community_post", { p_post: id });
     reload();
   };
   const moderate = async (
@@ -553,6 +606,8 @@ function Trybes() {
         /^[0-9a-f-]{36}$/i.test(trybe.slice(6)) && (
           <>
             <TrainerStorefront trainerId={trybe.slice(6)} />
+            <CreatorMembership trainerId={trybe.slice(6)} />
+            <CreatorVideos trainerId={trybe.slice(6)} />
             <div className="mb-6">
               <ProgramCatalog trainerId={trybe.slice(6)} />
             </div>
@@ -586,6 +641,23 @@ function Trybes() {
             {joined ? "Joined ✓" : "Join Trybe"}
           </button>
         </div>
+      )}
+      {trybe.startsWith("coach-") && (
+        <nav className="mb-4 flex gap-2" aria-label="Trybe audiences">
+          {(["community", "public", "subscribers"] as const).map((tab) => (
+            <button
+              className={`chip ${audienceTab === tab ? "chip-active" : ""}`}
+              key={tab}
+              onClick={() => setAudienceTab(tab)}
+            >
+              {tab === "community"
+                ? "Free community"
+                : tab === "public"
+                  ? "Public"
+                  : "Subscribers"}
+            </button>
+          ))}
+        </nav>
       )}
       <div className="mb-4 flex gap-2">
         <button
@@ -663,11 +735,18 @@ function Trybes() {
                     aria-label="Post visibility"
                     value={postVisibility}
                     onChange={(e) =>
-                      setPostVisibility(e.target.value as "public" | "private")
+                      setPostVisibility(
+                        e.target.value as
+                          "public" | "private" | "subscribers" | "both",
+                      )
                     }
                   >
                     <option value="private">Trybe members only</option>
-                    <option value="public">Public discovery</option>
+                    <option value="public">Public</option>
+                    <option value="subscribers">Subscribers Only</option>
+                    <option value="both">
+                      Both public and subscriber feeds
+                    </option>
                   </select>
                 )}
                 <button className="btn btn-primary ml-auto" onClick={post}>
@@ -754,173 +833,187 @@ function Trybes() {
                 </p>
               )}
               {posts.map((p) => (
-                <div key={p.id} id={`post-${p.id}`} className="card p-5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Avatar
-                      size="sm"
-                      initials={p.author_name.slice(0, 2).toUpperCase()}
-                    />
-                    <p className="font-semibold">
-                      {p.official === true ? "Tryumph Gym" : p.author_name}
-                    </p>
-                    {p.official === true && (
-                      <span className="chip chip-active">
-                        Official announcement
-                      </span>
-                    )}
-                    {!p.official &&
-                      p.author_id &&
-                      p.author_id !== me &&
-                      !isFriend(p.author_id) && (
-                        <button
-                          className="flex items-center gap-1 text-xs text-primary"
-                          onClick={() => addFriend(p.author_id!, p.author_name)}
-                        >
-                          <UserPlus className="h-3 w-3" />
-                          Add friend
-                        </button>
-                      )}
-                    {isFriend(p.author_id) && (
-                      <span className="text-xs text-muted-foreground">
-                        Friend
-                      </span>
-                    )}
-                    <span className="chip">
-                      {p.kind.toLowerCase() === "text" ? "Post" : p.kind}
-                    </span>
-                    {p.is_pinned && (
-                      <span className="chip chip-active">📌 Pinned</span>
-                    )}
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {trybeName(p.trybe)}
-                    </span>
-                  </div>
-                  {!p.official && me && p.author_id && p.author_id !== me && (
-                    <ReportContent
-                      targetType="user"
-                      targetId={p.author_id}
-                      label="Report user"
-                    />
-                  )}
-                  {p.kind === "Poll" ? (
-                    pollState.polls[p.id] ? (
-                      <TrybePollCard
-                        poll={pollState.polls[p.id]!}
-                        onUpdate={pollState.update}
-                        onRefresh={pollState.refresh}
+                <Fragment key={p.id}>
+                  <div id={`post-${p.id}`} className="card p-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Avatar
+                        size="sm"
+                        initials={p.author_name.slice(0, 2).toUpperCase()}
                       />
-                    ) : (
-                      <p role="status">
-                        {pollState.error
-                          ? "Poll unavailable."
-                          : "Loading poll…"}
+                      <p className="font-semibold">
+                        {p.official === true ? "Tryumph Gym" : p.author_name}
                       </p>
-                    )
-                  ) : (
-                    <p className="mt-3">{p.text}</p>
-                  )}
-                  {me && p.author_id !== me && (
-                    <ReportContent
-                      targetType="post"
-                      targetId={p.id}
-                      label="Report post"
-                    />
-                  )}
-                  <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
-                    <button
-                      className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
-                      onClick={() => like(p.id, p.liked)}
-                    >
-                      <Heart
-                        className={`h-4 w-4 ${p.liked ? "fill-primary" : ""}`}
-                      />
-                      {p.likes}
-                    </button>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      {p.comments.length}
-                    </span>
-                    {p.author_id && p.author_id === me && (
-                      <button
-                        className="ml-auto flex items-center gap-1"
-                        onClick={() => removeOwn(p.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    )}
-                    {isMod &&
-                      p.trybe === `coach-${me}` &&
-                      p.author_id !== me && (
-                        <>
+                      {p.official === true && (
+                        <span className="chip chip-active">
+                          Official announcement
+                        </span>
+                      )}
+                      {!p.official &&
+                        p.author_id &&
+                        p.author_id !== me &&
+                        !isFriend(p.author_id) && (
                           <button
-                            className="ml-auto flex items-center gap-1"
+                            className="flex items-center gap-1 text-xs text-primary"
                             onClick={() =>
-                              void moderate(p.id, "pin", !p.is_pinned)
+                              addFriend(p.author_id!, p.author_name)
                             }
                           >
-                            <Pin className="h-4 w-4" />
-                            {p.is_pinned ? "Unpin" : "Pin"}
+                            <UserPlus className="h-3 w-3" />
+                            Add friend
                           </button>
-                          <button
-                            className="flex items-center gap-1 text-destructive"
-                            onClick={() => void moderate(p.id, "hide", true)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Hide
-                          </button>
-                        </>
+                        )}
+                      {isFriend(p.author_id) && (
+                        <span className="text-xs text-muted-foreground">
+                          Friend
+                        </span>
                       )}
-                  </div>
-                  {p.comments.map((c) => (
-                    <div
-                      key={c.id}
-                      className="mt-2 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm"
-                    >
-                      <span>
-                        <b>{c.author_name}:</b> {c.text}
+                      <span className="chip">
+                        {p.kind.toLowerCase() === "text" ? "Post" : p.kind}
                       </span>
-                      {me && c.author_id !== me && (
-                        <ReportContent
-                          targetType="user"
-                          targetId={c.author_id}
-                          label="Report user"
-                        />
+                      {p.is_pinned && (
+                        <span className="chip chip-active">📌 Pinned</span>
                       )}
-                      {me && c.author_id !== me && (
-                        <ReportContent
-                          targetType="comment"
-                          targetId={c.id}
-                          label="Report comment"
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {trybeName(p.trybe)}
+                      </span>
+                    </div>
+                    {!p.official && me && p.author_id && p.author_id !== me && (
+                      <ReportContent
+                        targetType="user"
+                        targetId={p.author_id}
+                        label="Report user"
+                      />
+                    )}
+                    {p.kind === "Poll" ? (
+                      pollState.polls[p.id] ? (
+                        <TrybePollCard
+                          poll={pollState.polls[p.id]!}
+                          onUpdate={pollState.update}
+                          onRefresh={pollState.refresh}
                         />
-                      )}
-                      {c.author_id !== me && !isFriend(c.author_id) && (
+                      ) : (
+                        <p role="status">
+                          {pollState.error
+                            ? "Poll unavailable."
+                            : "Loading poll…"}
+                        </p>
+                      )
+                    ) : (
+                      <p className="mt-3">{p.text}</p>
+                    )}
+                    <CommunityPostPhotos
+                      postId={p.id}
+                      canEdit={p.author_id === me && p.kind !== "Poll"}
+                      onChange={reload}
+                    />
+                    {me && p.author_id !== me && (
+                      <ReportContent
+                        targetType="post"
+                        targetId={p.id}
+                        label="Report post"
+                      />
+                    )}
+                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
+                      <button
+                        className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
+                        onClick={() => like(p.id, p.liked)}
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${p.liked ? "fill-primary" : ""}`}
+                        />
+                        {p.likes}
+                      </button>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle className="h-4 w-4" />
+                        {p.comments.length}
+                      </span>
+                      {p.author_id && p.author_id === me && (
                         <button
-                          className="ml-auto text-xs text-primary"
-                          onClick={() => addFriend(c.author_id, c.author_name)}
+                          className="ml-auto flex items-center gap-1"
+                          onClick={() => removeOwn(p.id)}
                         >
-                          Add friend
+                          <Trash2 className="h-4 w-4" />
+                          Delete
                         </button>
                       )}
+                      {isMod &&
+                        p.trybe === `coach-${me}` &&
+                        p.author_id !== me && (
+                          <>
+                            <button
+                              className="ml-auto flex items-center gap-1"
+                              onClick={() =>
+                                void moderate(p.id, "pin", !p.is_pinned)
+                              }
+                            >
+                              <Pin className="h-4 w-4" />
+                              {p.is_pinned ? "Unpin" : "Pin"}
+                            </button>
+                            <button
+                              className="flex items-center gap-1 text-destructive"
+                              onClick={() => void moderate(p.id, "hide", true)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Hide
+                            </button>
+                          </>
+                        )}
                     </div>
-                  ))}
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      className="field"
-                      placeholder="Say something encouraging…"
-                      value={comment[p.id] ?? ""}
-                      onChange={(ev) =>
-                        setComment({ ...comment, [p.id]: ev.target.value })
-                      }
-                    />
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => reply(p.id)}
-                    >
-                      Reply
-                    </button>
+                    {p.comments.map((c) => (
+                      <div
+                        key={c.id}
+                        className="mt-2 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm"
+                      >
+                        <span>
+                          <b>{c.author_name}:</b> {c.text}
+                        </span>
+                        {me && c.author_id !== me && (
+                          <ReportContent
+                            targetType="user"
+                            targetId={c.author_id}
+                            label="Report user"
+                          />
+                        )}
+                        {me && c.author_id !== me && (
+                          <ReportContent
+                            targetType="comment"
+                            targetId={c.id}
+                            label="Report comment"
+                          />
+                        )}
+                        {c.author_id !== me && !isFriend(c.author_id) && (
+                          <button
+                            className="ml-auto text-xs text-primary"
+                            onClick={() =>
+                              addFriend(c.author_id, c.author_name)
+                            }
+                          >
+                            Add friend
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        className="field"
+                        placeholder="Say something encouraging…"
+                        value={comment[p.id] ?? ""}
+                        onChange={(ev) =>
+                          setComment({ ...comment, [p.id]: ev.target.value })
+                        }
+                      />
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => reply(p.id)}
+                      >
+                        Reply
+                      </button>
+                    </div>
                   </div>
-                </div>
+                  {adSlot?.afterPost === p.id && (
+                    <CommunityFeedAd creative={adSlot.creative} />
+                  )}
+                </Fragment>
               ))}
             </>
           )}

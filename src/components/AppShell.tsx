@@ -10,10 +10,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 const nav = [
   { to: "/", label: "Home" },
-  { to: "/on-demand", label: "On-Demand" },
+  { to: "/on-demand", label: "Workouts" },
   { to: "/live", label: "Live Classes" },
   { to: "/trainers", label: "Trainers" },
+  { to: "/programs", label: "Programs" },
   { to: "/trybes", label: "Trybes" },
+  { to: "/about", label: "About" },
   { to: "/wallet", label: "Wallet" },
   { to: "/account", label: "Account" },
 ] as const;
@@ -85,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="ml-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
                 activeProps={{ className: "bg-primary/10" }}
               >
-                Teach on Tryumph
+                Become a Trainer
               </Link>
             )}
           </nav>
@@ -152,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => setOpen(false)}
                 className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
               >
-                Teach on Tryumph →
+                Become a Trainer →
               </Link>
             )}
             {s.role === "trainer" && s.signedIn && userId && (
@@ -216,10 +218,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <footer className="border-t">
         <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 px-4 py-8 text-sm text-muted-foreground">
           <p>© 2026 Tryumph Gym — bring the gym home.</p>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <Link to="/terms">Terms & waiver</Link>
             <Link to="/privacy">Privacy Policy</Link>
             <Link to="/contact">Contact Us</Link>
+            <Link to="/about">About Tryumph</Link>
+            <Link to="/policies/$page" params={{ page: "accessibility" }}>
+              Policies & accessibility
+            </Link>
             <Link to="/for-trainers">For trainers</Link>
           </div>
         </div>

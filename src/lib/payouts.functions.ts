@@ -72,7 +72,10 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
     let enabled = acct?.payouts_enabled ?? false;
     if (acct?.stripe_account_id) {
       const a = await stripe().accounts.retrieve(acct.stripe_account_id);
-      enabled = !!a.payouts_enabled;
+      enabled =
+        !a.deleted &&
+        !!a.payouts_enabled &&
+        a.capabilities?.transfers === "active";
       await supabaseAdmin
         .from("trainer_accounts")
         .update({ payouts_enabled: enabled })

@@ -1,5 +1,7 @@
 # CODEX HANDOFF: Tryumph Gym January 1 launch completion
 
+> **November 2 override:** The later founder marketplace/addendum requests supersede the dated no-subscription and five-video requirements below. Optional trainer memberships use 90/10 after actual fees; hosted programs use 95/5; community feed ads are 100% Tryumph. The video quota is removed after 0060; current credential verification remains. Use [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) and [MARKETPLACE_IMPLEMENTATION.md](MARKETPLACE_IMPLEMENTATION.md) as the current engineering/release record. Historical SQL/catalog fixtures are preserved.
+
 You are acting as lead engineer, QA and release-preparation owner. Finish launch-critical implementation **in this repository**, keeping production unchanged. This is real code work, not a planning-only exercise. Work autonomously, inspect repo and migrations before editing, and use testable incremental changes. Never claim a feature done because only a document or UI was added. Do not stop after a checklist; implement until launch gates are met or dependencies genuinely prevent progress, and accurately enumerate blockers.
 
 ## Starting point and safety

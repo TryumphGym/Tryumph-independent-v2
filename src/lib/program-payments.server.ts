@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { executeConnectOperation } from "./native-commerce.server";
 import { supabaseAdmin as db } from "@/integrations/supabase/client.server";
 import { runtimeEnv } from "./runtime-env.server";
 import { appOrigin } from "./app-origin.server";
@@ -95,14 +96,23 @@ export async function createProgramCheckout(
       .select("video_id")
       .eq("edition_id", order.edition_id);
     if (used.error) throw used.error;
-    const protectedVideos = await db
-      .from("trainer_videos")
-      .select("id")
-      .in(
-        "id",
-        used.data.map((v) => v.video_id),
-      )
-      .eq("access_scope", "program");
+    const document = edition.data.document as Record<string, unknown>;
+    if (
+      Array.isArray(document["downloads"]) &&
+      document["downloads"].length &&
+      runtimeEnv("PROGRAM_DOWNLOADS_VERIFIED") !== "true"
+    )
+      throw new Error("Protected download delivery awaits verification");
+    const protectedVideos = used.data.length
+      ? await db
+          .from("trainer_videos")
+          .select("id")
+          .in(
+            "id",
+            used.data.map((v) => v.video_id),
+          )
+          .eq("access_scope", "program")
+      : { data: [], error: null };
     if (protectedVideos.error) throw protectedVideos.error;
     if (protectedVideos.data.length) assertProgramMediaReady();
     const account = await stripe.accounts.retrieve(order.destination);
@@ -118,7 +128,6 @@ export async function createProgramCheckout(
       userId: order.user_id,
       editionId: order.edition_id,
     };
-    const document = edition.data.document as Record<string, unknown>;
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
@@ -208,6 +217,18 @@ export async function settleProgramCheckout(
     paid.metadata["editionId"] !== order.edition_id
   )
     throw new Error("Program intent identity or amount mismatch");
+  const account = await stripe.accounts.retrieve(order.destination);
+  if (
+    account.deleted ||
+    !account.payouts_enabled ||
+    account.capabilities?.transfers !== "active"
+  ) {
+    const updated = await db
+      .from("trainer_accounts")
+      .update({ payouts_enabled: false })
+      .eq("stripe_account_id", order.destination);
+    if (updated.error) throw updated.error;
+  }
   const settled = await db.rpc("confirm_program_order", {
     p_order: order.id,
     p_checkout: session.id,
@@ -295,36 +316,15 @@ export async function reconcileProgramTransfers(stripe = programStripe()) {
         break;
       }
       const idempotencyKey = `program-payout:${op.id}`;
-      let provider: string;
-      if (op.kind === "reversal" && op.transfer_id) {
-        const r = await stripe.transfers.createReversal(
-          op.transfer_id,
-          { amount: op.amount },
-          { idempotencyKey },
-        );
-        if (r.amount !== op.amount)
-          throw new Error("Reversal confirmation mismatch");
-        provider = r.id;
-        reversed++;
-      } else {
-        const account = await stripe.accounts.retrieve(o.destination);
-        if (account.deleted || !account.payouts_enabled)
-          throw new Error("Program transfer account unavailable");
-        const t = await stripe.transfers.create(
-          {
-            amount: op.amount,
-            currency: "usd",
-            destination: o.destination,
-            transfer_group: `program:${o.id}`,
-            metadata: { program_order: o.id },
-          },
-          { idempotencyKey },
-        );
-        if (t.amount !== op.amount)
-          throw new Error("Transfer confirmation mismatch");
-        provider = t.id;
-        paid++;
-      }
+      const provider = await executeConnectOperation(stripe, {
+        ...op,
+        destination: o.destination,
+        idempotencyKey,
+        group: `program:${o.id}`,
+        metadata: { program_order: o.id },
+      });
+      if (op.kind === "reversal") reversed++;
+      else paid++;
       const saved = await db.rpc("finish_program_payout", {
         p_operation: op.id,
         p_provider: provider,

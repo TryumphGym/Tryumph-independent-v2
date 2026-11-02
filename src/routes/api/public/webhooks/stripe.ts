@@ -154,6 +154,8 @@ async function settleCheckout(
 }
 
 async function handleRefund(stripe: Stripe, charge: Stripe.Charge) {
+  const { adjustCreatorCharge } = await import("@/lib/creator-payments.server");
+  if (await adjustCreatorCharge(stripe, charge)) return;
   const { adjustProgramCharge } = await import("@/lib/program-payments.server");
   if (await adjustProgramCharge(stripe, charge)) return;
   const paymentIntent =
@@ -204,6 +206,10 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           return new Response("Invalid signature", { status: 401 });
         }
         try {
+          const { handleCreatorBillingEvent } =
+            await import("@/lib/creator-payments.server");
+          if (await handleCreatorBillingEvent(stripe, event))
+            return new Response("ok", { status: 200 });
           if (
             event.type === "checkout.session.completed" ||
             event.type === "checkout.session.async_payment_succeeded"
@@ -222,10 +228,17 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             }
           }
           if (event.type === "account.updated") {
-            const account = event.data.object as Stripe.Account;
+            const account = await stripe.accounts.retrieve(
+              (event.data.object as Stripe.Account).id,
+            );
             const updated = await supabaseAdmin
               .from("trainer_accounts")
-              .update({ payouts_enabled: account.payouts_enabled === true })
+              .update({
+                payouts_enabled:
+                  !account.deleted &&
+                  account.payouts_enabled === true &&
+                  account.capabilities?.transfers === "active",
+              })
               .eq("stripe_account_id", account.id);
             if (updated.error) throw updated.error;
           }
@@ -240,6 +253,10 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               typeof dispute.charge === "string"
                 ? await stripe.charges.retrieve(dispute.charge)
                 : dispute.charge;
+            const { adjustCreatorCharge } =
+              await import("@/lib/creator-payments.server");
+            if (await adjustCreatorCharge(stripe, charge, dispute))
+              return new Response("ok", { status: 200 });
             const { adjustProgramCharge } =
               await import("@/lib/program-payments.server");
             if (await adjustProgramCharge(stripe, charge, dispute))

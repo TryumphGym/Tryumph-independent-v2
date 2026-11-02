@@ -1,3 +1,5 @@
+import { CommunitySafetyAdmin } from "@/components/CommunitySafetyAdmin";
+import { CreatorAdmin } from "@/components/CreatorAdmin";
 import { ProgramAdmin } from "@/components/ProgramAdmin";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
@@ -292,6 +294,8 @@ function Admin() {
       <AdminAnnouncements />
       <AdminSafetyCenter />
       <ProgramAdmin />
+      <CreatorAdmin />
+      <CommunitySafetyAdmin />
       {LAUNCH.youth && (
         <section className="card space-y-3 p-5">
           <div>

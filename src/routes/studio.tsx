@@ -1,3 +1,11 @@
+import { offersPrivateCoaching } from "@/lib/trainer-services";
+import { WorkoutFocusEditor } from "@/components/WorkoutFocusEditor";
+import {
+  CreatorOfferStudio,
+  CreatorVideoStudio,
+} from "@/components/CreatorMembership";
+import { DiscoveryFilters } from "@/components/DiscoveryFilters";
+import { TrainerFocusEditor } from "@/components/TrainerFocusEditor";
 import { TrainerProgramBuilder } from "@/components/TrainerProgramBuilder";
 import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
@@ -72,7 +80,6 @@ export const Route = createFileRoute("/studio")({
   component: Studio,
 });
 
-const UNLOCK = 5;
 const TABS = [
   "Overview",
   "My Profile",
@@ -189,7 +196,12 @@ function Studio() {
           {!credentialsPaused && <Overview />}
         </>
       )}
-      {tab === "My Profile" && <TrainerProfileTab />}
+      {tab === "My Profile" && (
+        <>
+          <TrainerProfileTab />
+          <TrainerFocusEditor />
+        </>
+      )}
       {tab === "Calendar" && !credentialsPaused && (
         <>
           <CalendarTab />
@@ -207,7 +219,13 @@ function Studio() {
           </details>
         </>
       )}
-      {tab === "Programs" && <TrainerProgramBuilder />}
+      {tab === "Programs" && (
+        <>
+          <CreatorOfferStudio />
+          <CreatorVideoStudio />
+          <TrainerProgramBuilder />
+        </>
+      )}
       {tab === "Store" && <StoreTab />}
       {tab === "Messages" && <TrainerMessages />}
       {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && (
@@ -271,6 +289,10 @@ function Overview() {
   const [live, setLive] = useState(false);
   const [approvedCount, setApprovedCount] = useState(0);
   const [cprApproved, setCprApproved] = useState(false);
+  const [liveTags, setLiveTags] = useState<string[]>([]),
+    [equipmentNotes, setEquipmentNotes] = useState(""),
+    [modifications, setModifications] = useState(""),
+    [liveIntensity, setLiveIntensity] = useState("");
   const [countLoaded, setCountLoaded] = useState(false);
   useEffect(() => {
     let active = true;
@@ -281,24 +303,21 @@ function Overview() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", data.user.id)
         .eq("review_status", "approved");
-      const certs = await supabase
-        .from("certifications")
-        .select("name,status,expires,verified_at,verified_by")
-        .eq("user_id", data.user.id);
       if (active) {
         setApprovedCount(result.error ? 0 : (result.count ?? 0));
-        setCprApproved(
-          !certs.error &&
-            hasVerifiedCpr((certs.data ?? []) as CredentialRecord[]),
-        );
-        setCountLoaded(!result.error && !certs.error);
+        const eligible = await supabase.rpc("trainer_is_eligible", {
+          p_user_id: data.user!.id,
+          p_live: true,
+        });
+        setCprApproved(!eligible.error && eligible.data === true);
+        setCountLoaded(!eligible.error);
       }
     });
     return () => {
       active = false;
     };
   }, [s.signedIn, s.extra.trainer.videos.length]);
-  const unlocked = countLoaded && approvedCount >= UNLOCK && cprApproved;
+  const unlocked = countLoaded && cprApproved;
   const [st, setSt] = useState<Awaited<
     ReturnType<typeof getPayoutStatus>
   > | null>(null);
@@ -339,22 +358,14 @@ function Overview() {
           <h2 className="text-xl font-bold">Schedule a live class</h2>
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
-              <p className="flex items-center gap-2 font-semibold">
-                <Lock className="h-4 w-4" />
-                Lives unlock after {UNLOCK} approved on-demand videos and
-                verified, current CPR/AED
+              <p className="font-semibold">
+                Current verified credentials are required to host. There is no
+                video-upload quota.
               </p>
-              <div className="mt-2 h-2 rounded-full bg-background">
-                <div
-                  className="h-2 rounded-full bg-brand"
-                  style={{
-                    width: `${Math.min(100, (approvedCount / UNLOCK) * 100)}%`,
-                  }}
-                />
-              </div>
               <p className="mt-2 text-muted-foreground">
-                Approved videos: {countLoaded ? approvedCount : "Checking…"}/
-                {UNLOCK} · CPR/AED: {cprApproved ? "Verified" : "Required"}
+                Optional profile checklist: add a photo, biography,
+                introduction, sample workouts and your first service. These
+                recommendations do not gate live classes.
               </p>
             </div>
           ) : (
@@ -403,13 +414,56 @@ function Overview() {
                 value={f.description}
                 onChange={(e) => setF({ ...f, description: e.target.value })}
               />
+              <label className="block">
+                Intensity
+                <select
+                  className="field"
+                  value={liveIntensity}
+                  onChange={(e) => setLiveIntensity(e.target.value)}
+                >
+                  <option value="">Not assessed</option>
+                  {["gentle", "moderate", "challenging"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </label>
+              <DiscoveryFilters
+                value={liveTags}
+                onChange={setLiveTags}
+                editor
+              />
+              <label>
+                Equipment requirements
+                <input
+                  className="field"
+                  value={equipmentNotes}
+                  onChange={(e) => setEquipmentNotes(e.target.value)}
+                  maxLength={1000}
+                />
+              </label>
+              <label>
+                Modifications and intensity
+                <textarea
+                  className="field"
+                  value={modifications}
+                  onChange={(e) => setModifications(e.target.value)}
+                  maxLength={2000}
+                />
+              </label>
+              {!st?.enabled && (
+                <p className="text-sm">
+                  Connect an eligible payout account before scheduling a new
+                  paid class. Existing paid sessions keep their credential and
+                  attendance checks.
+                </p>
+              )}
               <button
                 className="btn btn-primary w-full"
-                disabled={!f.title || !f.when || !unlocked}
+                disabled={!f.title || !f.when || !unlocked || !st?.enabled}
                 onClick={async () => {
                   if (!me || !unlocked) {
                     toast.error(
-                      "Five approved videos and verified CPR are required to schedule.",
+                      "Current verified credentials and payout eligibility are required to schedule.",
                     );
                     return;
                   }
@@ -431,6 +485,10 @@ function Overview() {
                       level: f.level,
                       starts_at: when.toISOString(),
                       description: f.description,
+                      discovery_tags: liveTags,
+                      intensity: liveIntensity,
+                      equipment_notes: equipmentNotes,
+                      modification_notes: modifications,
                     });
                   if (error) {
                     toast.error(
@@ -864,6 +922,9 @@ function Uploads() {
   const [accessScope, setAccessScope] = useState<"public" | "program">(
     "public",
   );
+  const [workoutTags, setWorkoutTags] = useState<string[]>([]);
+  const [workoutIntensity, setWorkoutIntensity] = useState(""),
+    [workoutModifications, setWorkoutModifications] = useState("");
   const [file, setFile] = useState<File | null>(null);
   // Fill duration from the actual video metadata; trainers can correct it.
   useEffect(() => {
@@ -1034,6 +1095,9 @@ function Uploads() {
         pregnancy_safe: f.pregnancySafe,
         playlist,
         break_seconds: f.breakSecs,
+        discovery_tags: workoutTags,
+        intensity: workoutIntensity,
+        modification_notes: workoutModifications,
         required_equipment: requiredEquipment,
         optional_equipment: optionalEquipment,
       })
@@ -1207,9 +1271,8 @@ function Uploads() {
           videos.
         </p>
         <p className="text-sm text-muted-foreground">
-          {approvedCount >= UNLOCK
-            ? "Live classes unlocked 🎉"
-            : `${UNLOCK - approvedCount} more approved workouts to unlock live classes.`}
+          Choose your services. Sample workouts are optional; current
+          verification and payment eligibility are checked for paid offerings.
         </p>
         {youthLocked && (
           <p className="rounded-lg bg-secondary p-3 text-sm text-warning">
@@ -1281,6 +1344,33 @@ function Uploads() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
+            <label className="block">
+              Intensity
+              <select
+                className="field"
+                value={workoutIntensity}
+                onChange={(e) => setWorkoutIntensity(e.target.value)}
+              >
+                <option value="">Not assessed</option>
+                {["gentle", "moderate", "challenging"].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              Modifications and experience guidance
+              <textarea
+                className="field"
+                maxLength={2000}
+                value={workoutModifications}
+                onChange={(e) => setWorkoutModifications(e.target.value)}
+              />
+            </label>{" "}
+            <DiscoveryFilters
+              value={workoutTags}
+              onChange={setWorkoutTags}
+              editor
+            />
             <MultiDropdown
               label="Fitness goals"
               values={f.goals}
@@ -1400,7 +1490,7 @@ function Uploads() {
             checked={f.pregnancySafe}
             onChange={(e) => setF({ ...f, pregnancySafe: e.target.checked })}
           />
-          Pregnancy safe
+          Pregnancy / prenatal focus (trainer-labeled; not medical clearance)
         </label>
         <label className="block text-sm font-medium">
           Rest / water breaks
@@ -1535,6 +1625,7 @@ function Uploads() {
                   Remove
                 </button>
               </span>
+              <WorkoutFocusEditor id={v.id} />
             </li>
           ))}
         </ul>
@@ -1552,6 +1643,21 @@ function TrainerProfileTab() {
   return (
     <section className="card space-y-4 p-6">
       <h2 className="text-xl font-bold">My Trainer Profile</h2>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={offersPrivateCoaching(trainer)}
+          onChange={(e) =>
+            update({ services: e.target.checked ? ["coaching"] : [] })
+          }
+        />
+        Offer private one-on-one coaching at my listed rate
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Choose the services that suit you. Coaching is optional; programs,
+        memberships, live classes and your free community are managed
+        separately. Disabling new bookings preserves existing accepted sessions.
+      </p>
       <p className="text-sm text-muted-foreground">
         To upload or change your profile photo, open{" "}
         <Link to="/account" className="text-primary underline">

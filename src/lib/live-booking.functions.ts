@@ -42,6 +42,8 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
     const key = runtimeEnv("STRIPE_SECRET_KEY");
     if (!key) throw new Error("Stripe not configured");
     const stripe = new Stripe(key);
+    const { checkCreatorConnect } = await import("./creator-payments.server");
+    await checkCreatorConnect(session.trainer_id, stripe);
     const origin = appOrigin();
     const intent = await supabaseAdmin.rpc("get_live_checkout_intent", {
       p_user_id: context.userId,

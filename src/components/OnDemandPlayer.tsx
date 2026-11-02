@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { WorkoutFeedback } from "./WorkoutFeedback";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Droplets, X } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +51,8 @@ export function OnDemandPlayer({
   });
   const ref = useRef<HTMLVideoElement>(null);
   const previous = useRef(0);
+  const watched = useRef(0);
+  const [feedbackEligible, setFeedbackEligible] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const sign = useServerFn(getVideoUrl);
   const bunny =
@@ -71,6 +80,12 @@ export function OnDemandPlayer({
       if (ad > 0 || !Number.isFinite(seconds)) return;
       const last = previous.current;
       previous.current = seconds;
+      const delta = seconds - last;
+      if (delta > 0 && delta <= 3) {
+        watched.current += delta;
+        if (watched.current >= video.minutes * 60 * 0.7)
+          setFeedbackEligible(true);
+      }
       if (seconds - last > 3) {
         setDone(
           (old) =>
@@ -117,6 +132,9 @@ export function OnDemandPlayer({
   );
   useEffect(() => {
     setDone(new Set());
+    previous.current = 0;
+    watched.current = 0;
+    setFeedbackEligible(false);
     setAd(0);
     setActiveBreak(null);
     setUrl(null);
@@ -130,7 +148,7 @@ export function OnDemandPlayer({
         toast.error("Unable to open this workout. Please try again.");
       });
   }, [video.id, initialUrl, sign]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!bunny) return;
     const frame = frameRef.current;
     const origin = new URL(url!).origin;
@@ -304,6 +322,12 @@ export function OnDemandPlayer({
         </button>
       </div>
       <p className="p-4 font-semibold">{video.title}</p>
+      <p className="px-4 pt-3 text-xs text-muted-foreground">
+        Trainer focus labels are not medical clearance. Pregnancy, postpartum
+        recovery and individual health needs vary. Seek appropriate professional
+        guidance and do not assume exercising while holding a baby is safe.
+      </p>
+      <WorkoutFeedback videoId={video.id} eligible={feedbackEligible} />
     </div>
   );
 }

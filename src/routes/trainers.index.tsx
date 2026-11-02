@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import type { PublicTrainer } from "@/lib/public-trainers";
+import { DiscoveryFilters } from "@/components/DiscoveryFilters";
+import { matchesDiscovery } from "@/lib/discovery";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/trainers/")({
@@ -38,6 +40,9 @@ function Trainers() {
   const [trainers, setTrainers] = useState<PublicTrainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [focus, setFocus] = useState<string[]>([]);
+  const [service, setService] = useState("all");
+  const [query, setQuery] = useState("");
   const [spec, setSpec] = useState("All");
   const [price, setPrice] = useState("Any price");
   const [sort, setSort] = useState("name");
@@ -67,7 +72,15 @@ function Trainers() {
         spec === "All" ||
         t.specialties.some((x) => x.toLowerCase().includes(spec.toLowerCase())),
     )
-    .filter((t) => t.rate < max)
+    .filter(
+      (t) =>
+        (max === Infinity || (t.rate > 0 && t.rate < max)) &&
+        matchesDiscovery(t, focus) &&
+        (service === "all" || t.services?.includes(service)) &&
+        `${t.name} ${t.bio} ${t.specialties.join(" ")}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+    )
     .sort((a, b) =>
       sort === "low"
         ? a.rate - b.rate
@@ -80,7 +93,7 @@ function Trainers() {
       <PageHeader
         eyebrow="Directory"
         title="Fitness Trainers"
-        sub="Verified independent trainers, custom rates, private 1-on-1 sessions."
+        sub="Discover independent fitness creators, programs, communities, workouts and coaching."
       />
       {!(s.signedIn && s.role === "trainer") && (
         <div className="card mb-6 flex flex-col gap-3 border-primary/40 bg-primary/5 p-5 sm:flex-row sm:items-center">
@@ -98,6 +111,37 @@ function Trainers() {
           </Link>
         </div>
       )}
+      <label className="block">
+        Search trainers
+        <input
+          className="field"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
+      <DiscoveryFilters value={focus} onChange={setFocus} />
+      <label className="block my-3">
+        Services available
+        <select
+          className="field"
+          value={service}
+          onChange={(e) => setService(e.target.value)}
+        >
+          {[
+            ["all", "All services"],
+            ["programs", "Hosted programs"],
+            ["live", "Live classes"],
+            ["coaching", "One-on-one coaching"],
+            ["workouts", "On-demand workouts"],
+            ["community", "Free Trybe"],
+            ["membership", "Optional membership"],
+          ].map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="mb-3 flex flex-wrap gap-2">
         {["All", ...SPECS].map((r) => (
           <button
@@ -173,9 +217,16 @@ function Trainers() {
             <p className="mt-4 font-display text-lg font-bold">{t.name}</p>
             <p className="text-sm text-primary">Verified trainer</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {t.specialties.join(" · ")}
+              Self-described focus: {t.specialties.join(" · ") || "See profile"}
             </p>
-            <div className="mt-4 text-sm font-semibold">${t.rate}/session</div>
+            <p className="mt-2 text-xs">
+              Verified qualifications: {t.qualifications.join(" · ")}
+            </p>
+            <div className="mt-4 text-sm font-semibold">
+              {t.rate > 0
+                ? `$${t.rate}/coaching session`
+                : "Explore available services"}
+            </div>
           </Link>
         ))}
       </div>

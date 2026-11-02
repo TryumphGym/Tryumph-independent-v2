@@ -68,6 +68,7 @@ beforeAll(async () => {
   await db.exec(`INSERT INTO user_roles(user_id,role) VALUES('${admin}','admin');
  UPDATE profiles SET extra='{"trainer":{"rate":100}}' WHERE id='${trainer}';
  INSERT INTO certifications(user_id,name,expires,status,verified_at,verified_by) VALUES('${trainer}','CPR/AED',(current_date+365)::text,'verified',now(),'${admin}');
+ INSERT INTO trainer_accounts(user_id,stripe_account_id,payouts_enabled) VALUES('${trainer}','acct_completion',true);
  INSERT INTO trainer_videos(user_id,title,path,minutes,review_status) SELECT '${trainer}','Approved','${trainer}/workout.mp4',20,'approved' FROM generate_series(1,5);`);
 }, 30000);
 afterAll(async () => {

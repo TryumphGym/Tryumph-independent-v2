@@ -88,10 +88,10 @@ function Terms() {
           safety concern.
         </p>
         <p>
-          Trainers must have five approved on-demand workouts before hosting
-          live classes. Trainer access, review and payout eligibility are
-          subject to platform verification. Trainer listings, certifications and
-          reviews do not guarantee any particular fitness result.
+          Trainers must have current verified required credentials before
+          hosting live classes. Trainer access, review and payout eligibility
+          are subject to platform verification. Trainer listings, certifications
+          and reviews do not guarantee any particular fitness result.
         </p>
       </Section>
       <Section title="4. Prices, reservations, deposits and refunds">

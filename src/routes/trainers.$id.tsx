@@ -1,3 +1,8 @@
+import { discoveryLabels } from "@/lib/discovery";
+import {
+  CreatorMembership,
+  CreatorVideos,
+} from "@/components/CreatorMembership";
 import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -76,11 +81,35 @@ function TrainerProfile() {
               {trainer.bio || "This trainer has not added a bio yet."}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[...trainer.qualifications, ...trainer.specialties].map((q) => (
-                <span key={q} className="chip">
-                  {q}
-                </span>
-              ))}
+              <div>
+                <p className="text-sm font-semibold">
+                  Independently verified current qualifications
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {trainer.qualifications.map((q) => (
+                    <span key={q} className="chip">
+                      {q}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-sm font-semibold">
+                Self-described areas of focus
+              </p>
+              <p className="mt-1 text-sm">
+                {[
+                  ...new Set([
+                    ...trainer.specialties,
+                    ...discoveryLabels(trainer.focus_tags ?? []),
+                  ]),
+                ].join(" · ") || "See trainer introduction"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Focus labels are not medical qualifications or individual
+                medical clearance.
+              </p>
             </div>
             <div className="mt-3 flex gap-3">
               {trainer.website && (
@@ -129,10 +158,18 @@ function TrainerProfile() {
           {showMessages && <TrainerMessages selectedTrainerId={trainer.id} />}
         </section>
       )}
-      {trainer && trainer.rate > 0 && (
-        <PrivateBookingForm trainerId={trainer.id} rate={trainer.rate} />
-      )}
+      {trainer &&
+        trainer.rate > 0 &&
+        (!trainer.services || trainer.services.includes("coaching")) && (
+          <PrivateBookingForm trainerId={trainer.id} rate={trainer.rate} />
+        )}
       {trainer && <TrainerStorefront trainerId={trainer.id} />}
+      {trainer && (
+        <>
+          <CreatorMembership trainerId={trainer.id} />
+          <CreatorVideos trainerId={trainer.id} />
+        </>
+      )}
       {trainer && <ProgramCatalog trainerId={trainer.id} />}
     </div>
   );

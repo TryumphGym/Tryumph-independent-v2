@@ -4,6 +4,8 @@ const f = vi.hoisted(() => ({
   result: {} as { data: unknown; error: unknown },
   filters: [] as unknown[],
   sign: vi.fn(),
+  authorize: vi.fn(),
+  protectedSign: vi.fn(),
 }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
@@ -20,6 +22,7 @@ vi.mock("@/integrations/supabase/auth-middleware", () => ({
 }));
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
+    rpc: f.authorize,
     from: () => {
       const b = {
         select: () => b,
@@ -34,9 +37,12 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 vi.mock("./video-playback.server", () => ({ signVideoPath: f.sign }));
+vi.mock("./program-media.server", () => ({ signProgramPath: f.protectedSign }));
 import { getVideoUrl } from "./videos.functions";
 beforeEach(() => {
   f.filters = [];
+  f.authorize.mockReset().mockResolvedValue({ data: [], error: null });
+  f.protectedSign.mockReset().mockResolvedValue("signed-release");
   f.sign.mockReset().mockResolvedValue("signed-public-url");
 });
 describe("legacy public playback cannot bypass premium program access", () => {
@@ -53,7 +59,7 @@ describe("legacy public playback cannot bypass premium program access", () => {
     ).rejects.toThrow("not found");
     expect(f.sign).not.toHaveBeenCalled();
   });
-  it("continues signing approved public workouts and explicitly excludes protected rows", async () => {
+  it("continues signing approved public workouts and requires approved status", async () => {
     f.result = {
       data: {
         path: "bunny:123:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -66,7 +72,7 @@ describe("legacy public playback cannot bypass premium program access", () => {
         data: { id: "11111111-1111-4111-8111-111111111111" },
       }),
     ).toBe("signed-public-url");
-    expect(f.filters).toContainEqual(["access_scope", "public"]);
+    expect(f.authorize).not.toHaveBeenCalled();
     expect(f.filters).toContainEqual(["review_status", "approved"]);
   });
 });
