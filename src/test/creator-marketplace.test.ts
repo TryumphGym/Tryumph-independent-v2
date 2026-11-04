@@ -125,9 +125,12 @@ afterEach(async () => {
   await db.exec("ROLLBACK");
 });
 describe("creator membership SQL authority and independent paid periods", () => {
-  it("permits verified live-only trainers with zero workouts but separately gates payouts", async () => {
+  it("requires five approved videos for lives and separately gates payout eligibility", async () => {
     expect(await q(`SELECT trainer_is_eligible('${trainer}',true) ok`)).toEqual(
-      [{ ok: true }],
+      [{ ok: false }],
+    );
+    await q(
+      `INSERT INTO trainer_videos(user_id,title,path,minutes,review_status) SELECT '${trainer}','Approved','bunny:123:'||gen_random_uuid(),20,'approved' FROM generate_series(1,5)`,
     );
     await as(
       trainer,

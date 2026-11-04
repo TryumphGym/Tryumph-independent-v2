@@ -1,3 +1,5 @@
+import { useUserId } from "@/lib/community";
+import { trackDiscoveryDemand } from "@/lib/demand";
 import { DiscoveryFilters } from "@/components/DiscoveryFilters";
 import { matchesDiscovery } from "@/lib/discovery";
 import {
@@ -39,17 +41,23 @@ export const Route = createFileRoute("/live")({
 });
 
 function Live() {
+  const me = useUserId();
+  return <LiveForIdentity key={me ?? "signed-out"} />;
+}
+function LiveForIdentity() {
   const { s, reserve } = useStore();
   const navigate = useNavigate();
   const [room, setRoom] = useState<
     | (LiveClass & {
         hostName?: string;
+        session_type?: string;
         discovery_tags?: string[];
         equipment_notes?: string;
         modification_notes?: string;
       })
     | null
   >(null);
+  const [subscribed, setSubscribed] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState<string[]>([]);
   const [needTokens, setNeedTokens] = useState<LiveClass | null>(null);
   const [access, setAccess] = useState<Set<string>>(new Set());
@@ -106,6 +114,7 @@ function Live() {
   const [coachLives, setCoachLives] = useState<
     (LiveClass & {
       hostName: string;
+      session_type?: string;
       discovery_tags?: string[];
       equipment_notes?: string;
       modification_notes?: string;
@@ -167,6 +176,16 @@ function Live() {
           return [id, !result.error && result.data === true] as const;
         }),
       );
+      const subscriberIds = await Promise.all(
+        trainerIds.map(async (id) => {
+          const r = await supabase.rpc("is_creator_subscriber", {
+            p_trainer: id,
+          });
+          return !r.error && r.data ? id : null;
+        }),
+      );
+      setSubscribed(new Set(subscriberIds.filter((id): id is string => !!id)));
+      if (s.signedIn) trackDiscoveryDemand({ source: "live", tags: focus });
       const eligibleIds = new Set(
         checks.filter(([, eligible]) => eligible).map(([id]) => id),
       );
@@ -174,6 +193,7 @@ function Live() {
         candidates
           .filter((r) => eligibleIds.has(r.trainer_id))
           .map((r) => ({
+            session_type: r.session_type ?? "scheduled",
             discovery_tags: r.discovery_tags,
             equipment_notes: r.equipment_notes,
             modification_notes: r.modification_notes,
@@ -196,9 +216,10 @@ function Live() {
           })),
       );
     });
-  }, [focus]);
+  }, [focus, s.signedIn]);
   const allLives: (LiveClass & {
     hostName?: string;
+    session_type?: string;
     discovery_tags?: string[];
     equipment_notes?: string;
     modification_notes?: string;
@@ -285,7 +306,12 @@ function Live() {
                 </p>
                 <p className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  {l.level} · $5 drop-in · no subscription
+                  {l.level} ·{" "}
+                  {l.session_type === "subscriber"
+                    ? "Subscriber live — no entry charge"
+                    : subscribed.has(l.trainerId)
+                      ? "Included with your subscription — no token"
+                      : "$5 drop-in · included for this trainer’s subscribers"}
                 </p>
                 <p className="text-sm">
                   Equipment: {l.equipment_notes || "See trainer instructions"}
@@ -307,7 +333,9 @@ function Live() {
                           toast.success(
                             reserved
                               ? "Reservation removed"
-                              : "Reserved free. One token will be spent only on verified entry.",
+                              : subscribed.has(l.trainerId)
+                                ? "Reserved with your subscription. No token is spent."
+                                : "Reserved free. One token will be spent only on verified entry.",
                           ),
                         )
                         .catch((error) => toast.error(error.message));
@@ -325,13 +353,22 @@ function Live() {
                     onClick={() => {
                       void join(l);
                     }}
-                    disabled={busyCheckout === l.id}
+                    disabled={
+                      busyCheckout === l.id ||
+                      (l.session_type === "subscriber" &&
+                        !subscribed.has(l.trainerId) &&
+                        s.role !== "trainer")
+                    }
                   >
                     {busyCheckout === l.id
                       ? "Opening checkout…"
                       : paid
                         ? "Join paid room"
-                        : "Book class · $5"}
+                        : subscribed.has(l.trainerId)
+                          ? "Join with subscription"
+                          : l.session_type === "subscriber"
+                            ? "Subscription required"
+                            : "Book class · $5"}
                   </button>
                 </div>
               </div>
@@ -348,6 +385,7 @@ function Room({
 }: {
   live: LiveClass & {
     hostName?: string;
+    session_type?: string;
     discovery_tags?: string[];
     equipment_notes?: string;
     modification_notes?: string;

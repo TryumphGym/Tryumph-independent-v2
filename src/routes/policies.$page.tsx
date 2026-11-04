@@ -5,7 +5,7 @@ const policies: Record<string, { title: string; body: string[] }> = {
     body: [
       "Trainers retain ownership of their original content and grant the platform the limited license needed to host, deliver, display and moderate authorized content. Content must respect copyright and community rules.",
       "Paid fitness offerings require current independently reviewed credentials and separately eligible payout accounts. Choosing focus tags does not establish clinical qualification. Required credentials and professional-title evidence must be accurate.",
-      "There is no mandatory recurring platform fee. Native monthly memberships allocate 90% to the trainer and 10% to Tryumph; native programs 95% / 5%; private coaching 90% / 10%; live classes and eligible water-break workout video advertising 50% / 50%; community-feed advertising 100% Tryumph, after applicable actual processing fees and before hosting. External stores and affiliate commissions remain 100% trainer earnings.",
+      "There is no mandatory recurring platform fee. Native monthly memberships allocate 90% to the trainer and 10% to Tryumph; native programs 90% / 10%; private coaching 90% / 10%; live classes and eligible water-break workout video advertising 50% / 50%; community-feed advertising 100% Tryumph, after applicable actual processing fees and before hosting. External stores and affiliate commissions remain 100% trainer earnings.",
       "Verification expiry blocks new paid sales and stops future renewals. Eligible already-paid access remains until its paid period ends unless refunded, disputed or restricted for safety. Historical records and legally owed earnings are retained.",
     ],
   },

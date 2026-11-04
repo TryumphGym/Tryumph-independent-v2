@@ -58,6 +58,15 @@ it("applies all marketplace modules to the actual inspected mixed schema after r
       "migrations/0062_discovery_and_downloads.sql",
       "migrations/0063_everyday_discovery.sql",
       "migrations/0064_community_photos_and_ads.sql",
+      "migrations/0065_creator_studio_core.sql",
+      "migrations/0066_creator_studio_access.sql",
+      "migrations/0067_creator_program_benefits.sql",
+      "migrations/0068_creator_demand.sql",
+      "migrations/0069_creator_business_metrics.sql",
+      "migrations/0070_creator_spotlight_foundation.sql",
+      "migrations/0071_creator_program_analytics.sql",
+      "migrations/0072_creator_comment_moderation.sql",
+      "migrations/0073_included_live_payment_reconciliation.sql",
     ])
       await db.exec(
         await readFile(new URL("../../" + path, import.meta.url), "utf8"),

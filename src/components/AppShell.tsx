@@ -15,6 +15,7 @@ const nav = [
   { to: "/trainers", label: "Trainers" },
   { to: "/programs", label: "Programs" },
   { to: "/trybes", label: "Trybes" },
+  { to: "/school", label: "School" },
   { to: "/about", label: "About" },
   { to: "/wallet", label: "Wallet" },
   { to: "/account", label: "Account" },
@@ -58,6 +59,41 @@ export function AppShell({ children }: { children: ReactNode }) {
         s.extra.trainer.specialties.length > 0);
   const showNudge =
     s.signedIn && !profileDone && !hideNudge && loc.pathname !== "/welcome";
+  if (loc.pathname === "/studio")
+    return (
+      <div className="min-h-screen">
+        <ReminderWatcher />
+        <header className="border-b p-4 flex flex-wrap items-center justify-between gap-3">
+          <Link to="/studio" className="font-display text-xl font-bold">
+            Tryumph Creator Studio
+          </Link>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Link to="/admin" className="btn btn-outline">
+                Admin
+              </Link>
+            )}
+            <Link
+              to="/"
+              className="btn btn-outline"
+              onClick={() => {
+                if (userId)
+                  sessionStorage.setItem(
+                    `tryumph-experience:${userId}`,
+                    "member",
+                  );
+              }}
+            >
+              Switch to member experience
+            </Link>
+            <Link to="/account" className="btn btn-ghost">
+              Account
+            </Link>
+          </div>
+        </header>
+        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      </div>
+    );
   return (
     <div className="min-h-screen">
       <ReminderWatcher />

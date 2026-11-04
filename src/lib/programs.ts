@@ -81,7 +81,8 @@ export const programDraftSchema = z
     postpartum: z.enum(["not_assessed", "trainer_labeled", "not_suitable"]),
     suitability_notes: text(2000),
     access_period: z.enum(["30", "90", "lifetime"]),
-    mode: z.enum(["free", "native", "external"]),
+    mode: z.enum(["free", "native", "external", "members"]),
+    subscription_access: z.boolean().default(false),
     price_cents: z.number().int().min(0).max(1000000),
     external_url: url,
     weeks: z
@@ -104,7 +105,7 @@ export const programDraftSchema = z
         code: "custom",
         message: "Native programs require a price of at least $0.50.",
       });
-    if (p.mode === "free" && p.price_cents !== 0)
+    if ((p.mode === "free" || p.mode === "members") && p.price_cents !== 0)
       c.addIssue({
         code: "custom",
         message: "Free programs must have a zero price.",
@@ -231,6 +232,7 @@ export const newProgram = (): FitnessProgram => ({
   postpartum: "not_assessed",
   suitability_notes: "",
   mode: "free",
+  subscription_access: false,
   access_period: "lifetime",
   price_cents: 0,
   external_url: "",

@@ -1,3 +1,5 @@
+> Historical November 2 release report. The November 4 [Creator Studio handoff](../creator-studio/IMPLEMENTATION.md) overrides its proposed 95/5 program rate and no-quota live rule: new hosted sales are 90/10 and live requires five approved on-demand videos.
+
 # Marketplace implementation — November 2, 2026
 
 This is development code on `codex/tryumph-january-launch`. No hosted SQL, deployment, merge, DNS change, real charge, refund, transfer, email or provider activation was performed. January 1, 2027 launch readiness is **not established** by local checks.

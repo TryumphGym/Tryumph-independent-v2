@@ -12,6 +12,10 @@ const state = vi.hoisted(() => ({
     trainer_video_id: null as string | null,
   },
   claimed: true,
+  subscriber: false,
+  protectedVerified: true,
+  tables: [] as string[],
+  mutations: [] as { table: string; value: Record<string, unknown> }[],
   inserted: null as null | Record<string, unknown>,
 }));
 vi.mock("@/integrations/supabase/client.server", () => ({
@@ -21,6 +25,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       error: null,
     }),
     from: (table: string) => {
+      state.tables.push(table);
       const b = {
         select: () => b,
         eq: () => b,
@@ -29,6 +34,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
           data:
             table === "live_sessions"
               ? {
+                  session_type: state.subscriber ? "subscriber" : "scheduled",
                   title: "Class",
                   category: "Strength",
                   level: "Beginner",
@@ -38,7 +44,8 @@ vi.mock("@/integrations/supabase/client.server", () => ({
           error: null,
         }),
         upsert: async (value: Record<string, unknown>) => {
-          state.inserted = value;
+          state.mutations.push({ table, value });
+          if (table === "trainer_videos") state.inserted = value;
           return { error: null };
         },
         update: () => b,
@@ -50,7 +57,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 }));
 vi.mock("./runtime-env.server", () => ({
   runtimeEnv: (name: string) =>
-    name === "BUNNY_STREAM_LIBRARY_ID" ? "123" : "test-only-api-key",
+    name === "BUNNY_STREAM_LIBRARY_ID"
+      ? "123"
+      : name === "BUNNY_PROGRAM_LIBRARY_ID"
+        ? "999"
+        : name === "BUNNY_PROGRAM_MEDIA_VERIFIED"
+          ? String(state.protectedVerified)
+          : "test-only-api-key",
 }));
 vi.mock("cloudflare:workers", () => ({
   env: { R2_RECORDINGS: { get: async () => ({ body: new ReadableStream() }) } },
@@ -60,6 +73,10 @@ beforeEach(() => {
   state.recording.import_status = "pending";
   state.recording.trainer_video_id = null;
   state.claimed = true;
+  state.subscriber = false;
+  state.protectedVerified = true;
+  state.tables = [];
+  state.mutations = [];
   state.inserted = null;
   vi.stubGlobal(
     "fetch",
@@ -93,4 +110,34 @@ describe("recording pipeline", () => {
     );
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+it("imports subscriber recordings into the protected library and subscriber audience, pending review with no automatic ads", async () => {
+  state.subscriber = true;
+  await finishRecordedClass("EG_test");
+  expect(fetch).toHaveBeenCalledWith(
+    expect.stringContaining("library/999/videos"),
+    expect.anything(),
+  );
+  expect(state.inserted).toMatchObject({
+    access_scope: "program",
+    review_status: "pending",
+    breaks: [],
+  });
+  expect(state.mutations).toContainEqual({
+    table: "creator_video_access",
+    value: {
+      video_id: "stable-id",
+      trainer_id: "trainer",
+      audience: "subscribers",
+    },
+  });
+});
+it("refuses subscriber recording import before protected media verification, without contacting Bunny", async () => {
+  state.subscriber = true;
+  state.protectedVerified = false;
+  await expect(finishRecordedClass("EG_test")).rejects.toThrow(
+    "independently verified",
+  );
+  expect(fetch).not.toHaveBeenCalled();
 });

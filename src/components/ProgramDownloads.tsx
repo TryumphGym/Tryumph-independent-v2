@@ -115,39 +115,96 @@ export function ProgramDownloadEditor({
 export function ProgramDownloads({
   ids,
   editionId,
+  onCompletedChange,
+  recordProgress = true,
 }: {
+  onCompletedChange?: (count: number) => void;
+  recordProgress?: boolean;
   ids: string[];
   editionId: string;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const me = useUserId(),
+    [completed, setCompleted] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    setCompleted([]);
+    if (me)
+      void supabase
+        .from("program_download_progress")
+        .select("asset_id")
+        .eq("user_id", me)
+        .eq("edition_id", editionId)
+        .eq("completed", true)
+        .then((r) => {
+          if (active && !r.error) setCompleted(r.data.map((x) => x.asset_id));
+        });
+    return () => {
+      active = false;
+    };
+  }, [editionId, me]);
+  useEffect(() => {
+    onCompletedChange?.(completed.length);
+  }, [completed, onCompletedChange]);
   return ids.length > 0 ? (
     <section className="card space-y-3 p-4" aria-label="Included guides">
-      <h3 className="font-semibold">Included guides</h3>
+      <h3 className="font-semibold">
+        Included guides · {completed.length}/{ids.length} complete
+      </h3>
       <p className="text-sm">
         Download your personal copy. Sharing and redistribution require the
         creator’s permission.
       </p>
       {ids.map((id, i) => (
-        <button
-          key={id}
-          className="btn btn-outline mr-2"
-          disabled={!!busy}
-          onClick={async () => {
-            setBusy(id);
-            try {
-              const url = await getProgramDownload({
-                data: { editionId, assetId: id },
-              });
-              window.location.assign(url);
-            } catch (e) {
-              failure(e);
-            } finally {
-              setBusy(null);
-            }
-          }}
-        >
-          {busy === id ? "Preparing…" : `Download guide ${i + 1}`}
-        </button>
+        <div key={id} className="flex flex-wrap gap-3 items-center">
+          <label className="flex gap-2">
+            <input
+              type="checkbox"
+              checked={completed.includes(id)}
+              disabled={!!busy || !me || !recordProgress}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setBusy(id);
+                try {
+                  const r = await supabase.rpc("complete_program_download", {
+                    p_edition: editionId,
+                    p_asset: id,
+                    p_completed: checked,
+                  });
+                  if (r.error) throw r.error;
+                  setCompleted((v) =>
+                    checked ? [...v, id] : v.filter((x) => x !== id),
+                  );
+                } catch (e) {
+                  failure(e);
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            />
+            Guide {i + 1} complete (manual/offline)
+          </label>
+          <button
+            key={id}
+            className="btn btn-outline mr-2"
+            disabled={!!busy}
+            onClick={async () => {
+              setBusy(id);
+              try {
+                const url = await getProgramDownload({
+                  data: { editionId, assetId: id },
+                });
+                window.location.assign(url);
+              } catch (e) {
+                failure(e);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {busy === id ? "Preparing…" : `Download guide ${i + 1}`}
+          </button>
+        </div>
       ))}
     </section>
   ) : null;

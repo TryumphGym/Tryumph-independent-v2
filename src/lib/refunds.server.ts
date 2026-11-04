@@ -53,7 +53,9 @@ export async function processRefundJobs() {
       // identifies the authenticated purchaser without trusting a browser claim.
       const purchaser = session?.metadata?.["userId"];
       if (
-        job.reason === "paid_booking_unfulfillable" &&
+        ["paid_booking_unfulfillable", "subscription_included_live"].includes(
+          job.reason,
+        ) &&
         purchaser &&
         /^[0-9a-f-]{36}$/i.test(purchaser)
       ) {

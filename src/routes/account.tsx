@@ -1,3 +1,4 @@
+import { authenticatedExperience } from "@/lib/experience";
 import { MemberSubscriptions } from "@/components/CreatorMembership";
 import { Link as ProgramLink } from "@tanstack/react-router";
 import { MemberSessions } from "@/components/MemberSessions";
@@ -151,6 +152,9 @@ function Account() {
           password,
         });
         if (error) throw error;
+        const experience = await authenticatedExperience();
+        sessionStorage.removeItem(`tryumph-experience:${experience.userId}`);
+        await navigate({ to: experience.landing });
         toast.success("Welcome back!");
       }
     } catch (e) {

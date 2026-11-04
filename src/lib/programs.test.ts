@@ -40,10 +40,10 @@ describe("program input, safety, ordering and progress", () => {
       programSchema.safeParse({ ...p, mode: "free", price_cents: 500 }).success,
     ).toBe(false);
     expect(() => programSplit(10000, 300, Number.NaN)).toThrow();
-    expect(programSplit(10000, 300, 500)).toEqual({
+    expect(programSplit(10000, 300, 1000)).toEqual({
       net: 9700,
-      payout: 9215,
-      commission: 485,
+      payout: 8730,
+      commission: 970,
     });
   });
   it("rejects rest days with media, duplicate step ids and unlabeled variations", () => {
@@ -138,15 +138,15 @@ describe("program intervals and clearly separate cost estimates", () => {
       estimatedBandwidthUsd: 0.02,
       estimatedInfrastructureUsd: 0.005,
     });
-    expect(programSplit(5000, 175, 500)).toEqual({
+    expect(programSplit(5000, 175, 1000)).toEqual({
       net: 4825,
-      payout: 4583,
-      commission: 242,
+      payout: 4342,
+      commission: 483,
     });
-    expect(programSplit(5000, 175, 500, 1000)).toEqual({
+    expect(programSplit(5000, 175, 1000, 1000)).toEqual({
       net: 3825,
-      payout: 3633,
-      commission: 192,
+      payout: 3442,
+      commission: 383,
     });
   });
 });

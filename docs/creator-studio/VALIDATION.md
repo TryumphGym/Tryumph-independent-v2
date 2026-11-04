@@ -1,0 +1,81 @@
+# Creator Studio validation — November 4, 2026
+
+- `npm test`: **387 tests / 57 files passed**. Includes historical-order preservation, actual mixed-schema reconstruction, manual trainer inquiry policy preservation, RLS/ownership, both live-checkout/subscription settlement event orders, fee/refund/replay calculations, subscription live/program benefits, PDF/manual progress, privacy thresholds, comment moderation, authenticated landing and real signed JWT grants. PostgreSQL tests use isolated PGlite, never hosted SQL. Stripe/LiveKit/Bunny/R2 services are mocked where called.
+- `npm run typecheck`: passed.
+- `npm run lint`: zero errors, **72 existing warnings** (React hooks/refresh/shared UI exports), matching the baseline count. No new lint warning retained.
+- `npm run build`: production build passed. Existing chunk-size/CSS sourcemap/tool deprecation notices remain; no deployment occurred.
+- `npm run db:check`: all ordered migrations applied successfully to isolated PostgreSQL. Generated Supabase types updated from this local schema.
+- Local Chromium desktop (1440 px) and mobile (390 px): **16 checks, zero page errors, no horizontal overflow** for Studio navigation (including Live Studio/content discussion), privacy-insufficient tabs and the identity-preserving member experience switch. All remote requests/mutations were intercepted; no external integration claim follows from this run. Screenshots and the request/check report are kept outside the repository with the downloadable guide.
+- `git diff --check`: passed.
+- Read-only staged schema validation SQL executed successfully against isolated PostgreSQL (13 result sets); no hosted database connection.
+
+External acceptance is blocked on a fresh hosted read-only export, actual Supabase/Storage behavior and configured staging provider credentials/approval. No production behavior, real email, real payment/refund/transfer, signed Bunny delivery, real LiveKit eviction or R2/egress execution was verified. Spotlight paid placement is deliberately unavailable, School topics are drafts, and active partner perks require genuine reviewed content.
+
+## Changed files
+
+- `docs/creator-studio/AUDIT.md`
+- `docs/creator-studio/IMPLEMENTATION.md`
+- `docs/creator-studio/VALIDATION.md`
+- `docs/creator-studio/validate-staging.sql`
+- `docs/launch/CODEX_HANDOFF.md`
+- `docs/launch/CONFIGURATION.md`
+- `docs/launch/FOUNDER_GUIDE.md`
+- `docs/launch/FOUNDER_HANDOFF.md`
+- `docs/launch/MARKETPLACE_IMPLEMENTATION.md`
+- `migrations/0065_creator_studio_core.sql`
+- `migrations/0066_creator_studio_access.sql`
+- `migrations/0067_creator_program_benefits.sql`
+- `migrations/0068_creator_demand.sql`
+- `migrations/0069_creator_business_metrics.sql`
+- `migrations/0070_creator_spotlight_foundation.sql`
+- `migrations/0071_creator_program_analytics.sql`
+- `migrations/0072_creator_comment_moderation.sql`
+- `migrations/0073_included_live_payment_reconciliation.sql`
+- `src/components/AccountNoticeCenter.tsx`
+- `src/components/AppShell.tsx`
+- `src/components/CreatorBusiness.tsx`
+- `src/components/CreatorMembership.tsx`
+- `src/components/CreatorResourcesAdmin.tsx`
+- `src/components/OnDemandPlayer.tsx`
+- `src/components/ProgramAdmin.tsx`
+- `src/components/ProgramCatalog.tsx`
+- `src/components/ProgramDetail.tsx`
+- `src/components/ProgramDownloads.tsx`
+- `src/components/TrainerProgramBuilder.tsx`
+- `src/components/TryumphSpotlight.tsx`
+- `src/components/WorkoutComments.tsx`
+- `src/integrations/supabase/types.ts`
+- `src/lib/creators.ts`
+- `src/lib/demand.test.ts`
+- `src/lib/demand.ts`
+- `src/lib/experience.test.ts`
+- `src/lib/experience.ts`
+- `src/lib/live-access.server.ts`
+- `src/lib/live-booking.functions.ts`
+- `src/lib/live-token.test.ts`
+- `src/lib/maintenance.server.ts`
+- `src/lib/program-payments.server.test.ts`
+- `src/lib/programs.functions.ts`
+- `src/lib/programs.test.ts`
+- `src/lib/programs.ts`
+- `src/lib/recordings.server.ts`
+- `src/lib/recordings.test.ts`
+- `src/lib/refunds.server.ts`
+- `src/lib/subscriber-live.server.ts`
+- `src/routeTree.gen.ts`
+- `src/routes/account.tsx`
+- `src/routes/admin.tsx`
+- `src/routes/api/public/webhooks/stripe.ts`
+- `src/routes/for-trainers.tsx`
+- `src/routes/live.tsx`
+- `src/routes/on-demand.tsx`
+- `src/routes/policies.$page.tsx`
+- `src/routes/privacy.tsx`
+- `src/routes/school.tsx`
+- `src/routes/studio.tsx`
+- `src/routes/trainers.$id.tsx`
+- `src/test/creator-marketplace.test.ts`
+- `src/test/creator-studio.test.ts`
+- `src/test/launch-security.test.ts`
+- `src/test/marketplace-schema-compatibility.test.ts`
+- `src/test/workout-programs.test.ts`

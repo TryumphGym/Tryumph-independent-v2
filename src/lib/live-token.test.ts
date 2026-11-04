@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { TokenVerifier } from "livekit-server-sdk";
-const state = vi.hoisted(() => ({ rows: [] as unknown[], eligible: true }));
+const state = vi.hoisted(() => ({
+  rows: [] as unknown[],
+  eligible: true,
+  deadline: null as string | null,
+}));
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: () => {
@@ -18,7 +22,12 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       return builder;
     },
     rpc: async (name: string) => ({
-      data: name === "account_can_act" ? true : state.eligible,
+      data:
+        name === "account_can_act"
+          ? true
+          : name === "live_subscription_deadline"
+            ? state.deadline
+            : state.eligible,
       error: null,
     }),
   },
@@ -42,6 +51,7 @@ const session = () => ({
 });
 beforeEach(() => {
   state.rows = [];
+  state.deadline = null;
   state.eligible = true;
 });
 async function verify(token: string) {
@@ -162,4 +172,33 @@ describe("LiveKit authorization and actual signed token permissions", () => {
       canPublishSources: ["camera", "microphone"],
     });
   });
+});
+
+it("bounds subscriber attendee tokens by the real paid period, without broadcast/admin powers or a wallet booking", async () => {
+  state.rows = [{ ...session(), session_type: "subscriber" }];
+  state.deadline = new Date(Date.now() + 120000).toISOString();
+  const token = await verify(
+    (await issueLiveRoomToken("member", `live-${id}`, "Subscriber")).token,
+  );
+  expect(token.video).toMatchObject({
+    canPublish: false,
+    canSubscribe: true,
+    canPublishData: false,
+    roomAdmin: false,
+    roomRecord: false,
+  });
+  expect(token.exp! * 1000).toBeLessThanOrEqual(
+    Date.parse(state.deadline) + 1000,
+  );
+  expect(token.exp! * 1000).toBeGreaterThan(Date.now() + 110000);
+  expect(state.rows).toHaveLength(0);
+});
+it("rejects non-subscribers from spontaneous rooms even if they hold a paid drop-in", async () => {
+  state.rows = [
+    { ...session(), session_type: "subscriber" },
+    { id: "paid", status: "paid" },
+  ];
+  await expect(issueLiveRoomToken("member", `live-${id}`, "M")).rejects.toThrow(
+    "Active subscription",
+  );
 });

@@ -32,12 +32,14 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
     [edition, setEdition] = useState<Tables<"program_editions"> | null>(null),
     [doc, setDoc] = useState<FitnessProgram | null>(null),
     [enrollment, setEnrollment] =
-      useState<Tables<"program_enrollments"> | null>(null),
+      useState<Tables<"program_member_enrollments"> | null>(null),
     [progress, setProgress] = useState<Tables<"program_progress">[]>([]),
+    [downloadsCompleted, setDownloadsCompleted] = useState(0),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [nativeEnabled, setNativeEnabled] = useState(false),
+    [included, setIncluded] = useState(false),
     [week, setWeek] = useState(0),
     [day, setDay] = useState(0),
     [player, setPlayer] = useState<string | null>(null);
@@ -68,8 +70,13 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
       setProgress([]);
       if (!p.data) return;
       if (me) {
+        const benefit = await supabase.rpc("program_subscription_benefit", {
+          p_id: id,
+        });
+        if (request !== generation.current) return;
+        setIncluded(!benefit.error && benefit.data === true);
         const n = await supabase
-          .from("program_enrollments")
+          .from("program_member_enrollments")
           .select("*")
           .eq("program_id", id)
           .eq("user_id", me)
@@ -199,7 +206,19 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
   const expired =
     !!enrollment?.expires_at &&
     new Date(enrollment.expires_at).getTime() <= Date.now();
-  const totals = doc ? programProgress(doc, progress) : null;
+  const workoutTotals = doc ? programProgress(doc, progress) : null;
+  const totalItems = (workoutTotals?.total ?? 0) + (doc?.downloads.length ?? 0);
+  const completedItems = (workoutTotals?.completed ?? 0) + downloadsCompleted;
+  const totals = workoutTotals
+    ? {
+        ...workoutTotals,
+        total: totalItems,
+        completed: completedItems,
+        percent: totalItems
+          ? Math.round((completedItems / totalItems) * 100)
+          : 0,
+      }
+    : null;
   const selectedDay = doc?.weeks[week]?.days[day];
   return (
     <section className="space-y-5">
@@ -305,15 +324,20 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
             </p>
           )}
           <h2 className="text-xl font-bold">
-            {summary.mode === "free"
-              ? "Free enrollment"
-              : summary.mode === "external"
-                ? "Purchase from the trainer"
-                : `One-time purchase · $${(summary.price_cents / 100).toFixed(2)}`}
+            {included
+              ? "Included with your subscription"
+              : summary.mode === "free"
+                ? "Free enrollment"
+                : summary.mode === "members"
+                  ? "Members Only — active subscription required"
+                  : summary.mode === "external"
+                    ? "Purchase from the trainer"
+                    : `One-time purchase · $${(summary.price_cents / 100).toFixed(2)}`}
           </h2>
           {summary.mode === "native" && (
             <p className="text-sm text-muted-foreground">
-              One-time purchase; no subscription.{" "}
+              One-time purchase, independent of subscription. This edition is
+              also included with a subscription only when explicitly configured.{" "}
               {summary.access_period === "lifetime"
                 ? "Lifetime access."
                 : `${summary.access_period} days of access from payment confirmation.`}{" "}
@@ -362,9 +386,18 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
             </>
           ) : !me ? (
             <Link className="btn btn-primary" to="/account">
-              Sign in to {summary.mode === "free" ? "enroll" : "purchase"}
+              Sign in to{" "}
+              {summary.mode === "free" || included ? "enroll" : "purchase"}
             </Link>
-          ) : summary.mode === "free" ? (
+          ) : summary.mode === "members" && !included ? (
+            <Link
+              to="/trainers/$id"
+              params={{ id: program.trainer_id }}
+              className="btn btn-outline"
+            >
+              View trainer subscription
+            </Link>
+          ) : summary.mode === "free" || included ? (
             <button
               className="btn btn-primary"
               disabled={busy || program.blocked}
@@ -375,7 +408,7 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
                 })
               }
             >
-              Enroll free
+              {included ? "Enroll with your subscription" : "Enroll free"}
             </button>
           ) : (
             <>
@@ -407,7 +440,12 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
         </div>
       )}
       {doc && edition && (
-        <ProgramDownloads ids={doc.downloads} editionId={edition.id} />
+        <ProgramDownloads
+          ids={doc.downloads}
+          editionId={edition.id}
+          onCompletedChange={setDownloadsCompleted}
+          recordProgress={enrollment?.state === "active" && !expired}
+        />
       )}
       {doc && edition && (
         <>
@@ -443,8 +481,8 @@ function ProgramDetailForViewer({ id, me }: { id: string; me: string | null }) {
             {totals && (
               <>
                 <label className="block">
-                  {totals.completed} / {totals.total} workouts complete (
-                  {totals.percent}%)
+                  {totals.completed} / {totals.total} lessons / guides complete
+                  ({totals.percent}%)
                   <progress
                     className="mt-1 h-3 w-full"
                     max={100}

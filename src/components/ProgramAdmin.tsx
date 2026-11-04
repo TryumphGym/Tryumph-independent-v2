@@ -39,7 +39,7 @@ export function ProgramAdmin() {
   const [member, setMember] = useState(""),
     [reference, setReference] = useState(""),
     [verified, setVerified] = useState(false),
-    [bps, setBps] = useState("500"),
+    [bps, setBps] = useState("1000"),
     [version, setVersion] = useState(""),
     [enabled, setEnabled] = useState(false),
     [approved, setApproved] = useState(false);
@@ -416,8 +416,8 @@ export function ProgramAdmin() {
               <input
                 className="field"
                 type="number"
-                min={0}
-                max={10000}
+                min={1000}
+                max={1000}
                 step={1}
                 required
                 value={bps}
@@ -457,7 +457,7 @@ export function ProgramAdmin() {
                   approveProgramTerms({
                     data: {
                       enabled,
-                      commissionBps: Number(bps),
+                      commissionBps: 1000,
                       termsVersion: version,
                       approved: true,
                     },

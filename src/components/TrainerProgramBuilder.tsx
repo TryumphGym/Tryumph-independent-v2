@@ -517,10 +517,13 @@ function ProgramBuilderForViewer({ me }: { me: string | null }) {
               >
                 <option value="free">Free enrollment</option>
                 <option value="native">Native one-time purchase</option>
+                <option value="members">
+                  Members Only — included subscription
+                </option>
                 <option value="external">External storefront purchase</option>
               </select>
             </label>
-            {doc.mode !== "free" && (
+            {doc.mode !== "free" && doc.mode !== "members" && (
               <label>
                 Price (USD)
                 <input
@@ -555,8 +558,27 @@ function ProgramBuilderForViewer({ me }: { me: string | null }) {
             )}
           </div>
           {doc.mode === "native" && (
+            <label className="flex gap-2">
+              <input
+                type="checkbox"
+                checked={doc.subscription_access}
+                onChange={(e) =>
+                  change({ ...doc, subscription_access: e.target.checked })
+                }
+              />
+              Also include this edition with an active subscription to me
+            </label>
+          )}
+          {doc.mode === "members" && (
+            <p>
+              Requires an active subscription to this trainer. Access expires
+              with the paid period; progress is preserved. Use approved
+              protected-library media.
+            </p>
+          )}
+          {doc.mode === "native" && (
             <p className="rounded border p-3 text-sm">
-              Native sales default to 95% trainer / 5% Tryumph after actual
+              Native sales default to 90% trainer / 10% Tryumph after actual
               payment fees, before hosting costs. Checkout stays disabled until
               the owner completes payment and delivery setup. Public-library
               videos remain free outside the program; use newly uploaded

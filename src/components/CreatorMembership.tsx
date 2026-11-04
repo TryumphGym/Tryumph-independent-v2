@@ -242,7 +242,12 @@ function CreatorOfferForViewer({ me }: { me: string | null }) {
   const [data, setData] = useState<CreatorDashboard | null>(null),
     [title, setTitle] = useState("My Trybe membership"),
     [description, setDescription] = useState(""),
-    [price, setPrice] = useState(""),
+    [price, setPrice] = useState("29.99"),
+    [limits, setLimits] = useState({
+      minimum: 50,
+      maximum: 1000000,
+      recommended: 2999,
+    }),
     [enabled, setEnabled] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -255,13 +260,24 @@ function CreatorOfferForViewer({ me }: { me: string | null }) {
     setData(null);
     setTitle("My Trybe membership");
     setDescription("");
-    setPrice("");
+    setPrice("29.99");
     setEnabled(false);
     setError("");
     if (me)
-      void getCreatorDashboard()
-        .then((r) => {
+      void Promise.all([
+        getCreatorDashboard(),
+        supabase.rpc("creator_price_limits"),
+      ])
+        .then(([r, bounds]) => {
           if (!active) return;
+          if (bounds.error) throw new Error("Monthly price bounds unavailable");
+          const limits = bounds.data as unknown as {
+            minimum: number;
+            maximum: number;
+            recommended: number;
+          };
+          setLimits(limits);
+          setPrice((limits.recommended / 100).toFixed(2));
           setData(r);
           if (r.offer) {
             setTitle(r.offer.title);
@@ -335,13 +351,14 @@ function CreatorOfferForViewer({ me }: { me: string | null }) {
           />
         </label>
         <label className="block">
-          Monthly price (USD)
+          Monthly price (USD) — ${(limits.recommended / 100).toFixed(2)}{" "}
+          recommended, your choice
           <input
             className="field"
             required
             type="number"
-            min={0.5}
-            max={10000}
+            min={limits.minimum / 100}
+            max={limits.maximum / 100}
             step={0.01}
             value={price}
             onChange={(e) => setPrice(e.target.value)}

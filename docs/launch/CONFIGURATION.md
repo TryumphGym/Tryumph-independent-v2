@@ -1,3 +1,5 @@
+> November 4 Creator Studio update: see [implementation and staging handoff](../creator-studio/IMPLEMENTATION.md). New hosted PDF/video/mixed program sales use 90/10 after actual fees, before hosting. Previous dated release evidence remains historical.
+
 # Runtime and provider configuration
 
 The code phase does not require entering these secrets or connecting production services. Configure them later, securely in Cloudflare environment settings; use `.dev.vars` for private local Workers bindings. No private credentials were present in this cloud machine. Existing public Supabase configuration was reused. Never paste secrets into chat, Git, a PR, or a `VITE_` variable.
@@ -73,7 +75,7 @@ Resend contact/sender/reply-to target is `mackenzie@tryumphgym.com` / Tryumph Gy
 
 ## November 2 marketplace additions
 
-The current [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) overrides older five-video/no-recurring-product wording. No mandatory platform subscription exists; optional trainer subscriptions use 90/10 after actual fees. Native programs remain 95/5, video-water-break ads 50/50 and community-feed ads 100% Tryumph.
+The current [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) overrides older five-video/no-recurring-product wording. No mandatory platform subscription exists; optional trainer subscriptions use 90/10 after actual fees. New native programs use 90/10, video-water-break ads 50/50 and community-feed ads 100% Tryumph.
 
 New false-by-default server gates: `CREATOR_MEMBERSHIPS_ENABLED`, `PROGRAM_DOWNLOADS_VERIFIED`, `COMMUNITY_PHOTOS_VERIFIED`, `COMMUNITY_FEED_ADS_VERIFIED`. Existing `PROGRAM_NATIVE_CHECKOUT_ENABLED` and `BUNNY_PROGRAM_MEDIA_VERIFIED` stay separately gated. Configure `CREATOR_PORTAL_CONFIGURATION_ID`; the existing `PROGRAM_TERMS_OWNER_ID` identifies the actual admin owner. Bind `COMMUNITY_IMAGES` only after the actual Cloudflare Images API/security workflow is verified. A vetted HTTPS `COMMUNITY_MODERATION_URL` and server-only `COMMUNITY_MODERATION_KEY` must satisfy the specialist-clearance contract in the handoff. Feed sponsorships require `COMMUNITY_AD_MODE=manual-sponsored` and a secure 32+ character server-only `COMMUNITY_AD_SESSION_KEY`. Do not invent a third-party ad-network integration or mark provider behavior verified from mock tests.
 

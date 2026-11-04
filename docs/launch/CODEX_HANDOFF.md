@@ -1,3 +1,5 @@
+> **November 4 override:** The [Creator Studio brief implementation](../creator-studio/IMPLEMENTATION.md) supersedes the November 2 rate/quota wording below: new hosted program sales are 90/10; live hosting requires five approved videos. Historical financial terms remain frozen.
+
 # CODEX HANDOFF: Tryumph Gym January 1 launch completion
 
 > **November 2 override:** The later founder marketplace/addendum requests supersede the dated no-subscription and five-video requirements below. Optional trainer memberships use 90/10 after actual fees; hosted programs use 95/5; community feed ads are 100% Tryumph. The video quota is removed after 0060; current credential verification remains. Use [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) and [MARKETPLACE_IMPLEMENTATION.md](MARKETPLACE_IMPLEMENTATION.md) as the current engineering/release record. Historical SQL/catalog fixtures are preserved.

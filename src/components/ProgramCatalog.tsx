@@ -1,3 +1,4 @@
+import { trackDiscoveryDemand } from "@/lib/demand";
 import { DiscoveryFilters } from "./DiscoveryFilters";
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -51,6 +52,13 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
         setError(true);
         setItems([]);
       } else {
+        if (me && !trainerId)
+          trackDiscoveryDemand({
+            source: "programs",
+            query: queryText,
+            tags: focus,
+            category: category === "all" ? "" : category,
+          });
         setItems(result.data.slice(0, 12) as Tables<"trainer_programs">[]);
         setHasNext(result.data.length > 12);
       }
@@ -66,7 +74,7 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
     void (async () => {
       if (me && !trainerId) {
         const n = await supabase
-          .from("program_enrollments")
+          .from("program_member_enrollments")
           .select("program_id")
           .eq("user_id", me)
           .order("created_at", { ascending: false })
@@ -76,7 +84,14 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
         const p = await supabase
           .from("trainer_programs")
           .select("*")
-          .in("id", [...new Set(n.data.slice(0, 20).map((x) => x.program_id))]);
+          .in("id", [
+            ...new Set(
+              n.data
+                .slice(0, 20)
+                .map((x) => x.program_id)
+                .filter((id): id is string => !!id),
+            ),
+          ]);
         if (active && !p.error) setMine(p.data);
       } else setMine([]);
     })();
@@ -106,9 +121,11 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
             {s.duration_weeks} weeks · {s.difficulty} ·{" "}
             {s.mode === "free"
               ? "Free enrollment"
-              : s.mode === "external"
-                ? "External seller"
-                : `$${(s.price_cents / 100).toFixed(2)}`}
+              : s.mode === "members"
+                ? "Members Only"
+                : s.mode === "external"
+                  ? "External seller"
+                  : `$${(s.price_cents / 100).toFixed(2)}`}
           </p>
           <p className="text-xs">
             {s.access_period === "lifetime"
@@ -189,6 +206,7 @@ export function ProgramCatalog({ trainerId }: { trainerId?: string }) {
           >
             <option value="all">All programs</option>
             <option value="free">Free</option>
+            <option value="members">Members Only</option>
             <option value="native">Native purchase</option>
             <option value="external">External seller</option>
           </select>

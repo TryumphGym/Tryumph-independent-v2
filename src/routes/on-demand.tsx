@@ -1,3 +1,4 @@
+import { trackDiscoveryDemand } from "@/lib/demand";
 import { PickForMe } from "@/components/PickForMe";
 import { EverydayTryumphs } from "@/components/EverydayTryumphs";
 import { CommunityTagBadges } from "@/components/WorkoutFeedback";
@@ -181,6 +182,26 @@ function OnDemand() {
   const explore = visible.filter(
     (x) => !best.includes(x) && !close.includes(x),
   );
+  const demandKey = JSON.stringify({ focus, cat, lvl, eq, dur, tab });
+  useEffect(() => {
+    if (loading || !s.signedIn || tab !== "all") return;
+    const timer = setTimeout(() => {
+      trackDiscoveryDemand({
+        source: "workouts",
+        tags: focus,
+        categories: cat,
+        equipment: eq,
+        minutes: preciseDuration
+          ? Number(preciseDuration[2])
+          : (duration?.max ?? 0),
+        minMinutes: preciseDuration ? 0 : (duration?.min ?? 0),
+        exact: preciseDuration?.[1] === "Exactly",
+        difficulty: lvl === "All levels" ? "" : lvl,
+      });
+    }, 600);
+    return () => clearTimeout(timer); // explicit controls only; private profile preferences are excluded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demandKey, loading, s.signedIn]);
   const openVideo = (x: Uploaded) => {
     watch(x.id);
     setOpen(x);

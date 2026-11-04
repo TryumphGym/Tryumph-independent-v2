@@ -463,6 +463,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      creator_comment_holds: {
+        Row: {
+          comment_id: string;
+          trainer_id: string;
+          hidden: boolean;
+          reason: string;
+          updated_at: string;
+        };
+        Insert: {
+          comment_id: string;
+          trainer_id: string;
+          hidden: boolean;
+          reason: string;
+          updated_at?: string;
+        };
+        Update: {
+          comment_id?: string;
+          trainer_id?: string;
+          hidden?: boolean;
+          reason?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       creator_commerce: {
         Row: {
           singleton: boolean;
@@ -471,6 +495,9 @@ export type Database = {
           terms_version: string | null;
           approved_by: string | null;
           approved_at: string | null;
+          min_price_cents: number;
+          max_price_cents: number;
+          recommended_price_cents: number;
         };
         Insert: {
           singleton?: boolean;
@@ -479,6 +506,9 @@ export type Database = {
           terms_version?: string | null;
           approved_by?: string | null;
           approved_at?: string | null;
+          min_price_cents?: number;
+          max_price_cents?: number;
+          recommended_price_cents?: number;
         };
         Update: {
           singleton?: boolean;
@@ -487,6 +517,9 @@ export type Database = {
           terms_version?: string | null;
           approved_by?: string | null;
           approved_at?: string | null;
+          min_price_cents?: number;
+          max_price_cents?: number;
+          recommended_price_cents?: number;
         };
         Relationships: [];
       };
@@ -500,6 +533,30 @@ export type Database = {
         Row: { id: string; order_id: string; status: string };
         Insert: { id: string; order_id: string; status: string };
         Update: { id?: string; order_id?: string; status?: string };
+        Relationships: [];
+      };
+      creator_follow_events: {
+        Row: {
+          id: number;
+          trainer_id: string;
+          user_id: string;
+          followed: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id: number;
+          trainer_id: string;
+          user_id: string;
+          followed: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          trainer_id?: string;
+          user_id?: string;
+          followed?: boolean;
+          created_at?: string;
+        };
         Relationships: [];
       };
       creator_maintenance_state: {
@@ -607,6 +664,135 @@ export type Database = {
           renewal_stop_requested?: boolean;
           created_at?: string;
           expires_at?: string;
+        };
+        Relationships: [];
+      };
+      creator_partnerships: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          sender_id: string;
+          name: string;
+          organization: string;
+          email: string;
+          collaboration: string;
+          description: string;
+          budget: string;
+          timeline: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          sender_id: string;
+          name: string;
+          organization: string;
+          email: string;
+          collaboration: string;
+          description: string;
+          budget?: string;
+          timeline?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          sender_id?: string;
+          name?: string;
+          organization?: string;
+          email?: string;
+          collaboration?: string;
+          description?: string;
+          budget?: string;
+          timeline?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      creator_perks: {
+        Row: {
+          id: string;
+          category: string;
+          partner: string;
+          description: string;
+          eligibility: string;
+          benefit: string;
+          expires_at: string | null;
+          redemption: string;
+          url: string | null;
+          disclosure: string;
+          credential_pattern: string;
+          published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: string;
+          partner: string;
+          description: string;
+          eligibility: string;
+          benefit: string;
+          expires_at?: string | null;
+          redemption: string;
+          url?: string | null;
+          disclosure: string;
+          credential_pattern?: string;
+          published?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          partner?: string;
+          description?: string;
+          eligibility?: string;
+          benefit?: string;
+          expires_at?: string | null;
+          redemption?: string;
+          url?: string | null;
+          disclosure?: string;
+          credential_pattern?: string;
+          published?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      creator_playbacks: {
+        Row: {
+          id: string;
+          user_id: string;
+          video_id: string;
+          trainer_id: string;
+          reported_seconds: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          video_id: string;
+          trainer_id: string;
+          reported_seconds?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          video_id?: string;
+          trainer_id?: string;
+          reported_seconds?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -840,6 +1026,7 @@ export type Database = {
           modification_notes: string | null;
           discovery_focus_tags: string[] | null;
           intensity: string | null;
+          session_type: string | null;
         };
         Insert: {
           id?: string | null;
@@ -860,6 +1047,7 @@ export type Database = {
           modification_notes?: string | null;
           discovery_focus_tags?: string[] | null;
           intensity?: string | null;
+          session_type?: string | null;
         };
         Update: {
           id?: string | null;
@@ -880,6 +1068,7 @@ export type Database = {
           modification_notes?: string | null;
           discovery_focus_tags?: string[] | null;
           intensity?: string | null;
+          session_type?: string | null;
         };
         Relationships: [];
       };
@@ -929,6 +1118,36 @@ export type Database = {
         Row: { id: string; group_name: string; label: string };
         Insert: { id: string; group_name: string; label: string };
         Update: { id?: string; group_name?: string; label?: string };
+        Relationships: [];
+      };
+      discovery_demand: {
+        Row: {
+          member_key: string;
+          day: string;
+          source: string;
+          topic: Json;
+          supply: number;
+        };
+        Insert: {
+          member_key: string;
+          day?: string;
+          source: string;
+          topic: Json;
+          supply: number;
+        };
+        Update: {
+          member_key?: string;
+          day?: string;
+          source?: string;
+          topic?: Json;
+          supply?: number;
+        };
+        Relationships: [];
+      };
+      discovery_privacy: {
+        Row: { singleton: boolean; salt: string };
+        Insert: { singleton?: boolean; salt?: string };
+        Update: { singleton?: boolean; salt?: string };
         Relationships: [];
       };
       friend_requests: {
@@ -1009,6 +1228,27 @@ export type Database = {
           user_id?: string;
           session_id?: string;
           expires_at?: string;
+        };
+        Relationships: [];
+      };
+      live_payment_links: {
+        Row: {
+          checkout_id: string;
+          user_id: string;
+          session_id: string;
+          created_at: string;
+        };
+        Insert: {
+          checkout_id: string;
+          user_id: string;
+          session_id: string;
+          created_at?: string;
+        };
+        Update: {
+          checkout_id?: string;
+          user_id?: string;
+          session_id?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -1109,6 +1349,7 @@ export type Database = {
           equipment_notes: string;
           modification_notes: string;
           intensity: string;
+          session_type: string;
         };
         Insert: {
           id?: string;
@@ -1128,6 +1369,7 @@ export type Database = {
           equipment_notes?: string;
           modification_notes?: string;
           intensity?: string;
+          session_type?: string;
         };
         Update: {
           id?: string;
@@ -1147,6 +1389,7 @@ export type Database = {
           equipment_notes?: string;
           modification_notes?: string;
           intensity?: string;
+          session_type?: string;
         };
         Relationships: [];
       };
@@ -1314,6 +1557,8 @@ export type Database = {
           friend_activity: boolean;
           share_live_activity: boolean;
           poll_updates: boolean;
+          creator_updates: boolean;
+          subscriber_lives: boolean;
         };
         Insert: {
           user_id: string;
@@ -1322,6 +1567,8 @@ export type Database = {
           friend_activity?: boolean;
           share_live_activity?: boolean;
           poll_updates?: boolean;
+          creator_updates?: boolean;
+          subscriber_lives?: boolean;
         };
         Update: {
           user_id?: string;
@@ -1330,6 +1577,8 @@ export type Database = {
           friend_activity?: boolean;
           share_live_activity?: boolean;
           poll_updates?: boolean;
+          creator_updates?: boolean;
+          subscriber_lives?: boolean;
         };
         Relationships: [];
       };
@@ -1942,6 +2191,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      program_download_progress: {
+        Row: {
+          user_id: string;
+          edition_id: string;
+          asset_id: string;
+          completed: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          edition_id: string;
+          asset_id: string;
+          completed?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          edition_id?: string;
+          asset_id?: string;
+          completed?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       program_drafts: {
         Row: { program_id: string; document: Json; updated_at: string };
         Insert: { program_id: string; document: Json; updated_at?: string };
@@ -2068,6 +2341,42 @@ export type Database = {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      program_member_enrollments: {
+        Row: {
+          user_id: string | null;
+          program_id: string | null;
+          edition_id: string | null;
+          source: string | null;
+          state: string | null;
+          verification_reference: string | null;
+          starts_at: string | null;
+          expires_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          user_id?: string | null;
+          program_id?: string | null;
+          edition_id?: string | null;
+          source?: string | null;
+          state?: string | null;
+          verification_reference?: string | null;
+          starts_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          user_id?: string | null;
+          program_id?: string | null;
+          edition_id?: string | null;
+          source?: string | null;
+          state?: string | null;
+          verification_reference?: string | null;
+          starts_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string | null;
         };
         Relationships: [];
       };
@@ -2229,6 +2538,27 @@ export type Database = {
           reason?: string;
           provider_id?: string | null;
           completed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      program_subscription_enrollments: {
+        Row: {
+          user_id: string;
+          edition_id: string;
+          program_id: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          edition_id: string;
+          program_id: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          edition_id?: string;
+          program_id?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -2471,6 +2801,138 @@ export type Database = {
         Row: { session_id: string; completed_at: string | null };
         Insert: { session_id: string; completed_at?: string | null };
         Update: { session_id?: string; completed_at?: string | null };
+        Relationships: [];
+      };
+      school_tutorials: {
+        Row: {
+          id: string;
+          audience: string;
+          category: string;
+          title: string;
+          instructions: string;
+          screenshots: Json;
+          video_id: string | null;
+          published: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          audience: string;
+          category: string;
+          title: string;
+          instructions?: string;
+          screenshots?: Json;
+          video_id?: string | null;
+          published?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          audience?: string;
+          category?: string;
+          title?: string;
+          instructions?: string;
+          screenshots?: Json;
+          video_id?: string | null;
+          published?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      spotlight_campaigns: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          target_type: string;
+          target_id: string;
+          package_id: string;
+          budget_cents: number;
+          tags: string[];
+          status: string;
+          admin_eligible: boolean;
+          admin_note: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          target_type: string;
+          target_id: string;
+          package_id: string;
+          budget_cents: number;
+          tags?: string[];
+          status?: string;
+          admin_eligible?: boolean;
+          admin_note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          target_type?: string;
+          target_id?: string;
+          package_id?: string;
+          budget_cents?: number;
+          tags?: string[];
+          status?: string;
+          admin_eligible?: boolean;
+          admin_note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      spotlight_packages: {
+        Row: {
+          id: string;
+          days: number;
+          price_cents: number;
+          available: boolean;
+          inventory: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          days: number;
+          price_cents: number;
+          available?: boolean;
+          inventory?: number;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          days?: number;
+          price_cents?: number;
+          available?: boolean;
+          inventory?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      subscriber_live_access: {
+        Row: {
+          session_id: string;
+          user_id: string;
+          reserved_at: string;
+          attended_at: string | null;
+          paid_rebooked_at: string | null;
+        };
+        Insert: {
+          session_id: string;
+          user_id: string;
+          reserved_at?: string;
+          attended_at?: string | null;
+          paid_rebooked_at?: string | null;
+        };
+        Update: {
+          session_id?: string;
+          user_id?: string;
+          reserved_at?: string;
+          attended_at?: string | null;
+          paid_rebooked_at?: string | null;
+        };
         Relationships: [];
       };
       trainer_accounts: {
@@ -3140,6 +3602,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      workout_comments: {
+        Row: {
+          id: string;
+          video_id: string;
+          author_id: string;
+          author_name: string;
+          text: string;
+          parent_id: string | null;
+          hidden: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          video_id: string;
+          author_id: string;
+          author_name: string;
+          text: string;
+          parent_id?: string | null;
+          hidden?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          video_id?: string;
+          author_id?: string;
+          author_name?: string;
+          text?: string;
+          parent_id?: string | null;
+          hidden?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       workout_feedback: {
         Row: {
           video_id: string;
@@ -3391,6 +3886,15 @@ export type Database = {
         };
         Returns: undefined;
       };
+      approve_program_terms_v58: {
+        Args: {
+          p_owner: string;
+          p_enabled: boolean;
+          p_bps: number;
+          p_terms: string;
+        };
+        Returns: undefined;
+      };
       assert_fitness_claims: {
         Args: { p_user: string; p_claims: string };
         Returns: undefined;
@@ -3485,6 +3989,14 @@ export type Database = {
         Args: { p_session: string; p_user: string; p_posts: string[] };
         Returns: string;
       };
+      complete_program_download: {
+        Args: { p_edition: string; p_asset: string; p_completed: boolean };
+        Returns: undefined;
+      };
+      configure_creator_prices: {
+        Args: { p_min: number; p_max: number; p_recommended: number };
+        Returns: undefined;
+      };
       configure_workout_feedback: {
         Args: { p_min: number; p_bps: number };
         Returns: undefined;
@@ -3508,17 +4020,53 @@ export type Database = {
         Args: { p_user_id: string; p_session_id: string };
         Returns: undefined;
       };
+      consume_attended_live_token_v53: {
+        Args: { p_user_id: string; p_session_id: string };
+        Returns: undefined;
+      };
+      creator_business_metrics: {
+        Args: { p_start: string; p_end: string };
+        Returns: Json;
+      };
       creator_can_read_post: {
         Args: { p_user: string; p_post: string };
         Returns: boolean;
       };
       creator_can_sell: { Args: { p_trainer: string }; Returns: boolean };
+      creator_comment_visible: { Args: { p_id: string }; Returns: boolean };
       creator_dashboard: { Args: Record<never, never>; Returns: Json };
+      creator_demand_insights: {
+        Args: { p_days?: number; p_audience?: boolean };
+        Returns: Json;
+      };
       creator_has_access: {
         Args: { p_user: string; p_trainer: string };
         Returns: boolean;
       };
+      creator_live_video_count: {
+        Args: { p_trainer: string };
+        Returns: number;
+      };
+      creator_notify: {
+        Args: {
+          p_user: string;
+          p_key: string;
+          p_body: string;
+          p_href?: string;
+        };
+        Returns: undefined;
+      };
       creator_offer_details: { Args: { p_trainer: string }; Returns: Json };
+      creator_price_limits: { Args: Record<never, never>; Returns: Json };
+      creator_program_access: {
+        Args: { p_user: string; p_edition: string };
+        Returns: boolean;
+      };
+      creator_program_analytics: { Args: Record<never, never>; Returns: Json };
+      creator_program_deadline: {
+        Args: { p_user: string; p_edition: string };
+        Returns: string;
+      };
       creator_renewal_batch: {
         Args: { p_limit?: number };
         Returns: Database["public"]["Tables"]["creator_orders"]["Row"][];
@@ -3539,6 +4087,7 @@ export type Database = {
         Returns: string[];
       };
       enroll_fitness_program: { Args: { p_id: string }; Returns: string };
+      enroll_fitness_program_v58: { Args: { p_id: string }; Returns: string };
       feedback_can_access: {
         Args: { p_user: string; p_video: string };
         Returns: boolean;
@@ -3592,6 +4141,10 @@ export type Database = {
       };
       is_creator_subscriber: { Args: { p_trainer: string }; Returns: boolean };
       joinable_trybe: { Args: { p_id: string }; Returns: boolean };
+      live_subscription_deadline: {
+        Args: { p_user: string; p_session: string };
+        Returns: string;
+      };
       maintain_private_bookings: {
         Args: Record<never, never>;
         Returns: undefined;
@@ -3604,6 +4157,10 @@ export type Database = {
         Args: { p_id: string; p_hidden: boolean; p_note: string };
         Returns: undefined;
       };
+      moderate_creator_comment: {
+        Args: { p_id: string; p_hidden: boolean; p_reason: string };
+        Returns: undefined;
+      };
       moderate_creator_offer: {
         Args: { p_trainer: string; p_blocked: boolean; p_reason: string };
         Returns: undefined;
@@ -3614,6 +4171,10 @@ export type Database = {
       };
       moderate_trybe_post: {
         Args: { p_post_id: string; p_action: string; p_value: boolean };
+        Returns: undefined;
+      };
+      moderate_workout_comment: {
+        Args: { p_id: string; p_hidden: boolean; p_reason: string };
         Returns: undefined;
       };
       moderate_workout_feedback: {
@@ -3711,6 +4272,10 @@ export type Database = {
       };
       program_member: { Args: { p_program: string }; Returns: boolean };
       program_metrics: { Args: Record<never, never>; Returns: Json };
+      program_subscription_benefit: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
       program_validate: {
         Args: { p_data: Json; p_trainer: string; p_allow_empty?: boolean };
         Returns: undefined;
@@ -3720,6 +4285,10 @@ export type Database = {
         Returns: undefined;
       };
       program_validate_v58: {
+        Args: { p_data: Json; p_trainer: string; p_allow_empty?: boolean };
+        Returns: undefined;
+      };
+      program_validate_v62: {
         Args: { p_data: Json; p_trainer: string; p_allow_empty?: boolean };
         Returns: undefined;
       };
@@ -3740,8 +4309,13 @@ export type Database = {
         Args: { p_body: string; p_audience: string };
         Returns: string;
       };
+      purge_discovery_demand: { Args: Record<never, never>; Returns: number };
       read_post_photos: { Args: { p_posts: string[] }; Returns: Json };
       read_trybe_polls: { Args: { p_ids: string[] }; Returns: Json };
+      reconcile_included_live_payment: {
+        Args: { p_checkout: string };
+        Returns: undefined;
+      };
       record_account_activity: { Args: { p_time_zone: string }; Returns: Json };
       record_creator_invoice: {
         Args: {
@@ -3758,6 +4332,21 @@ export type Database = {
         Returns: string;
       };
       record_creator_releases: { Args: Record<never, never>; Returns: number };
+      record_discovery_demand: {
+        Args: {
+          p_source: string;
+          p_query?: string;
+          p_tags?: string[];
+          p_category?: string;
+          p_equipment?: string[];
+          p_length?: number;
+          p_difficulty?: string;
+          p_min_length?: number;
+          p_exact?: boolean;
+          p_categories?: string[];
+        };
+        Returns: undefined;
+      };
       record_private_both_present: {
         Args: { p_booking: string };
         Returns: boolean;
@@ -3794,6 +4383,14 @@ export type Database = {
         Args: { p_program_id: string; p_video_ids: string[] };
         Returns: undefined;
       };
+      reply_creator_comment: {
+        Args: { p_id: string; p_text: string };
+        Returns: string;
+      };
+      report_creator_playback: {
+        Args: { p_id: string; p_seconds: number };
+        Returns: undefined;
+      };
       report_program_usage: {
         Args: { p_id: string; p_seconds: number };
         Returns: undefined;
@@ -3815,6 +4412,10 @@ export type Database = {
         Returns: boolean;
       };
       reserve_live_class: {
+        Args: { p_user_id: string; p_session_id: string };
+        Returns: undefined;
+      };
+      reserve_live_class_v53: {
         Args: { p_user_id: string; p_session_id: string };
         Returns: undefined;
       };
@@ -3884,6 +4485,18 @@ export type Database = {
         Args: { p_program_id: string; p_video_ids: string[] };
         Returns: undefined;
       };
+      save_spotlight_draft: {
+        Args: {
+          p_type: string;
+          p_target: string;
+          p_package: string;
+          p_budget: number;
+          p_tags: string[];
+          p_id?: string;
+          p_cancel?: boolean;
+        };
+        Returns: string;
+      };
       save_trybe_poll: {
         Args: {
           p_trybe: string;
@@ -3897,6 +4510,10 @@ export type Database = {
           p_id?: string;
           p_revision?: number;
         };
+        Returns: string;
+      };
+      save_workout_comment: {
+        Args: { p_video: string; p_text: string; p_parent?: string };
         Returns: string;
       };
       save_workout_feedback: {
@@ -3923,13 +4540,43 @@ export type Database = {
         Args: { p_kind: string; p_args: Json; p_refunded?: number };
         Returns: undefined;
       };
+      settle_paid_checkout_v54: {
+        Args: { p_kind: string; p_args: Json; p_refunded?: number };
+        Returns: undefined;
+      };
       share_menu: { Args: { _code: string }; Returns: string };
+      start_creator_playback: { Args: { p_video: string }; Returns: string };
       start_program_usage: {
         Args: {
           p_user: string;
           p_edition: string;
           p_step: string;
           p_variation?: string;
+        };
+        Returns: string;
+      };
+      start_subscriber_live: {
+        Args: {
+          p_title: string;
+          p_minutes?: number;
+          p_category?: string;
+          p_level?: string;
+          p_tags?: string[];
+          p_description?: string;
+          p_recording?: boolean;
+        };
+        Returns: string;
+      };
+      submit_creator_partnership: {
+        Args: {
+          p_trainer: string;
+          p_name: string;
+          p_organization: string;
+          p_email: string;
+          p_type: string;
+          p_description: string;
+          p_budget?: string;
+          p_timeline?: string;
         };
         Returns: string;
       };
@@ -3948,11 +4595,19 @@ export type Database = {
         Returns: boolean;
       };
       unfriend_user: { Args: { p_friend_id: string }; Returns: undefined };
+      update_creator_partnership: {
+        Args: { p_id: string; p_status: string };
+        Returns: undefined;
+      };
       valid_discovery_tags: { Args: { p_tags: string[] }; Returns: boolean };
       valid_iso_date: { Args: { p_value: string }; Returns: boolean };
       vote_trybe_poll: {
         Args: { p_id: string; p_options: string[]; p_revision: number };
         Returns: Json;
+      };
+      workout_comment_access: {
+        Args: { p_user: string; p_video: string };
+        Returns: boolean;
       };
       workout_community_tags: { Args: { p_ids: string[] }; Returns: Json };
     };

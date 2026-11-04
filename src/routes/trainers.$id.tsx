@@ -1,3 +1,4 @@
+import { WorkWithMe, TrainerUpcomingLives } from "@/components/CreatorBusiness";
 import { discoveryLabels } from "@/lib/discovery";
 import {
   CreatorMembership,
@@ -163,6 +164,8 @@ function TrainerProfile() {
         (!trainer.services || trainer.services.includes("coaching")) && (
           <PrivateBookingForm trainerId={trainer.id} rate={trainer.rate} />
         )}
+      {trainer && <TrainerUpcomingLives trainerId={trainer.id} />}
+      {trainer && <WorkWithMe trainerId={trainer.id} />}
       {trainer && <TrainerStorefront trainerId={trainer.id} />}
       {trainer && (
         <>

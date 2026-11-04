@@ -1,3 +1,15 @@
+import { WorkoutComments } from "@/components/WorkoutComments";
+import {
+  CreatorComments,
+  CreatorProgramAnalytics,
+  CreatorAnalytics,
+  AudienceDemandInsights,
+  PartnershipInbox,
+  CreatorPerks,
+  TryumphSchool,
+  SubscriberLive,
+} from "@/components/CreatorBusiness";
+import { TryumphSpotlight } from "@/components/TryumphSpotlight";
 import { offersPrivateCoaching } from "@/lib/trainer-services";
 import { WorkoutFocusEditor } from "@/components/WorkoutFocusEditor";
 import {
@@ -18,12 +30,7 @@ import {
   TrainerStoreManager,
   LegacyTrainerProgramManager,
 } from "@/components/TrainerLaunchTools";
-import {
-  hasVerifiedCpr,
-  isExpired,
-  isCurrentVerified,
-  type CredentialRecord,
-} from "@/lib/cpr";
+import { isExpired, isCurrentVerified, type CredentialRecord } from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -59,6 +66,8 @@ import { isLaunchWorkout } from "@/lib/launch";
 import { MultiDropdown } from "@/components/WorkoutFilters";
 
 export const Route = createFileRoute("/studio")({
+  validateSearch: (search: Record<string, unknown>): { section?: string } =>
+    typeof search["section"] === "string" ? { section: search["section"] } : {},
   head: () => ({
     meta: [
       { title: "Trainer Studio — Tryumph Gym" },
@@ -81,19 +90,50 @@ export const Route = createFileRoute("/studio")({
 });
 
 const TABS = [
-  "Overview",
-  "My Profile",
-  "Calendar",
-  "On-demand",
+  "Dashboard",
+  "Analytics",
+  "Content Library",
+  "Live Studio",
   "Programs",
-  "Store",
-  "Credentials",
-  "Messages",
+  "Trybe & Community",
+  "Messages & Partnerships",
+  "Bookings & Clients",
+  "Earnings & Payouts",
+  "Creator Perks",
+  "Tryumph School",
+  "Settings",
+  "Marketing & Spotlight",
 ] as const;
-
+const sectionKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 function Studio() {
+  const me = useUserId();
+  return <StudioForIdentity key={me ?? "signed-out"} me={me} />;
+}
+function StudioForIdentity({ me }: { me: string | null }) {
   const { s } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [profileRole, setProfileRole] = useState<string | null>(null);
+  const section = Route.useSearch().section;
+  const navigate = Route.useNavigate();
+  const tab = TABS.find((t) => sectionKey(t) === section) ?? "Dashboard";
+  const setTab = (t: (typeof TABS)[number]) =>
+    void navigate({ search: { section: sectionKey(t) } });
+  useEffect(() => {
+    let active = true;
+    setProfileRole(null);
+    if (me)
+      void supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", me)
+        .single()
+        .then((r) => {
+          if (active) setProfileRole(r.error ? "unavailable" : r.data.role);
+        });
+    return () => {
+      active = false;
+    };
+  }, [me]);
+  const [credentialsVerified, setCredentialsVerified] = useState(false);
   const [certStatus, setCertStatus] = useState<CredentialRecord[]>([]);
   useEffect(() => {
     let active = true;
@@ -110,13 +150,20 @@ function Studio() {
         .from("certifications")
         .select("name,status,expires,verified_at,verified_by")
         .eq("user_id", user.id);
-      if (active) setCertStatus((data ?? []) as CredentialRecord[]);
+      const eligibility = await supabase.rpc("trainer_is_eligible", {
+        p_user_id: user.id,
+        p_live: false,
+      });
+      if (active) {
+        setCertStatus((data ?? []) as CredentialRecord[]);
+        setCredentialsVerified(!eligibility.error && eligibility.data === true);
+      }
     });
     return () => {
       active = false;
     };
   }, [s.signedIn]);
-  if (!s.signedIn || s.role !== "trainer") {
+  if (!s.signedIn || profileRole !== "trainer") {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h1 className="text-2xl font-bold">Trainer Studio</h1>
@@ -135,7 +182,7 @@ function Studio() {
     );
   }
   const tr = s.extra.trainer;
-  const verified = hasVerifiedCpr(certStatus);
+  const verified = credentialsVerified;
   const expiredUnreplaced = certStatus.filter(
     (cert) =>
       isExpired(cert.expires) &&
@@ -150,7 +197,7 @@ function Studio() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Trainer Studio"
+        eyebrow="Tryumph Creator Studio"
         title="Your business at a glance"
         sub="Your verified trainer account, upcoming classes, video approvals, and earnings."
       >
@@ -169,7 +216,7 @@ function Studio() {
             Trainer certifications expired — activity paused
           </p>
           <p className="text-sm">
-            Please update your certification(s) in Credentials to continue
+            Please update your certification(s) in Settings to continue
             uploading new content or hosting live classes. Previously approved
             videos remain available.
           </p>
@@ -189,29 +236,33 @@ function Studio() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && (
+      {tab === "Dashboard" && (
         <>
           <AccountNoticeCenter trainer />
           <ActiveMilestones days={s.activeDays} role="trainer" />
-          {!credentialsPaused && <Overview />}
+          <CreatorAnalytics />
         </>
       )}
-      {tab === "My Profile" && (
+      {tab === "Settings" && (
         <>
           <TrainerProfileTab />
           <TrainerFocusEditor />
         </>
       )}
-      {tab === "Calendar" && !credentialsPaused && (
+      {tab === "Live Studio" && !credentialsPaused && (
         <>
+          <SubscriberLive />
+          <Overview />
           <CalendarTab />
           <MemberSessions trainer />
           <ClassManager />
           <RecordingManager />
         </>
       )}
-      {tab === "On-demand" && !credentialsPaused && (
+      {tab === "Content Library" && !credentialsPaused && (
         <>
+          <CreatorVideoStudio />
+          <WorkoutComments />
           <Uploads />
           <details className="card p-5">
             <summary>Legacy ordered playlists</summary>
@@ -222,20 +273,57 @@ function Studio() {
       {tab === "Programs" && (
         <>
           <CreatorOfferStudio />
-          <CreatorVideoStudio />
           <TrainerProgramBuilder />
         </>
       )}
-      {tab === "Store" && <StoreTab />}
-      {tab === "Messages" && <TrainerMessages />}
-      {credentialsPaused && (tab === "Calendar" || tab === "On-demand") && (
-        <p className="card p-6" role="alert">
-          New uploads and live hosting are paused until expired required
-          credentials are renewed and verified. Go to Credentials to submit
-          updated proof.
-        </p>
+      {tab === "Trybe & Community" && (
+        <>
+          <StoreTab />
+          <CreatorComments />
+          {me && (
+            <Link
+              className="btn btn-primary"
+              to="/trybes"
+              search={{ t: `coach-${me}` }}
+            >
+              Manage posts, photos, polls and announcements
+            </Link>
+          )}
+        </>
       )}
-      {tab === "Credentials" && (
+      {tab === "Messages & Partnerships" && (
+        <>
+          <h2 className="text-xl font-bold">Member messages</h2>
+          <TrainerMessages />
+          <PartnershipInbox />
+        </>
+      )}
+      {tab === "Analytics" && (
+        <>
+          <CreatorAnalytics />
+          <CreatorProgramAnalytics />
+          <AudienceDemandInsights />
+        </>
+      )}
+      {tab === "Bookings & Clients" && (
+        <>
+          <CalendarTab />
+          <MemberSessions trainer />
+        </>
+      )}
+      {tab === "Earnings & Payouts" && <Payouts />}
+      {tab === "Creator Perks" && <CreatorPerks />}
+      {tab === "Tryumph School" && <TryumphSchool />}
+      {tab === "Marketing & Spotlight" && <TryumphSpotlight />}
+      {credentialsPaused &&
+        (tab === "Live Studio" || tab === "Content Library") && (
+          <p className="card p-6" role="alert">
+            New uploads and live hosting are paused until expired required
+            credentials are renewed and verified. Go to Settings to submit
+            updated proof.
+          </p>
+        )}
+      {tab === "Settings" && (
         <div className="card space-y-6 p-6">
           <RolePicker />
           <CertManager />
@@ -298,13 +386,11 @@ function Overview() {
     let active = true;
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
-      const result = await supabase
-        .from("trainer_videos")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", data.user.id)
-        .eq("review_status", "approved");
+      const result = await supabase.rpc("creator_live_video_count", {
+        p_trainer: data.user.id,
+      });
       if (active) {
-        setApprovedCount(result.error ? 0 : (result.count ?? 0));
+        setApprovedCount(result.error ? 0 : (result.data ?? 0));
         const eligible = await supabase.rpc("trainer_is_eligible", {
           p_user_id: data.user!.id,
           p_live: true,
@@ -359,8 +445,8 @@ function Overview() {
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
               <p className="font-semibold">
-                Current verified credentials are required to host. There is no
-                video-upload quota.
+                Current verified credentials and at least five approved videos
+                are required to host.
               </p>
               <p className="mt-2 text-muted-foreground">
                 Optional profile checklist: add a photo, biography,

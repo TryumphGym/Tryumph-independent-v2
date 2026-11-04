@@ -6,7 +6,7 @@ export const Route = createFileRoute("/for-trainers")({
       {
         name: "description",
         content:
-          "Build your fitness business with programs, optional memberships, live classes, personal coaching and a free community. No mandatory platform subscription or video quota.",
+          "Build your fitness business with programs, optional memberships, live classes, personal coaching and a free community. No mandatory platform subscription.",
       },
     ],
   }),
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/for-trainers")({
 });
 const streams = [
   [
-    "95%",
+    "90%",
     "Hosted programs",
     "Sell workout programs, video courses, challenges and reviewed digital guides.",
   ],
@@ -98,9 +98,9 @@ function ForTrainers() {
             that suit your business.
           </p>
           <p>
-            No mandatory video-upload quota. No required monthly platform
-            subscription. Optional profile photos, an introduction and sample
-            workouts can help members understand your approach.
+            Five approved videos unlock live hosting. No required monthly
+            platform subscription. Optional profile photos, an introduction and
+            sample workouts can help members understand your approach.
           </p>
         </div>
         <div className="card space-y-3 p-6">

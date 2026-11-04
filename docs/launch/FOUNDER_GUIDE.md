@@ -1,4 +1,6 @@
-# Tryumph Gym founder guide — November 2, 2026
+> November 4 Creator Studio update: see [implementation and staging handoff](../creator-studio/IMPLEMENTATION.md). New hosted PDF/video/mixed program sales use 90/10 after actual fees, before hosting. Previous dated release evidence remains historical.
+
+# Tryumph Gym founder guide — updated November 4, 2026
 
 This is the consolidated memory and operating guide for the January 1, 2027 launch. Dates in this guide use America/Chicago. It covers the existing launch engineering and hosted-schema reconciliation, Resend preparation, trainer programs and exercise variations, Trybe community polls, optional 90/10 trainer memberships, inclusive discovery, Pick For Me, Everyday Tryumphs, community feedback and gated photo/feed-ad foundations.
 
@@ -9,7 +11,7 @@ The downloadable edition adds the complete active SQL scripts as numbered append
 
 ## November 2 marketplace continuation — current authority
 
-The subscription split was reconfirmed as **90% trainer / 10% Tryumph**, after actual payment-processing fees and before hosting. Programs remain 95/5. Community-feed advertisements belong 100% to Tryumph and never enter the 50/50 water-break video-ad ledger. Free Trybes/free on-demand remain available; subscriptions are optional trainer-specific products. The old five-video quota is removed, while all required current independently verified credentials remain.
+The subscription split was reconfirmed as **90% trainer / 10% Tryumph**, after actual payment-processing fees and before hosting. New hosted program sales use 90/10; historical orders retain their original terms. Community-feed advertisements belong 100% to Tryumph and never enter the 50/50 water-break video-ad ledger. Free Trybes/free on-demand remain available; subscriptions are optional trainer-specific products. The November 4 Creator Studio brief restores five approved videos for live hosting, alongside current required independently verified credentials.
 
 Read `MARKETPLACE_IMPLEMENTATION.md`, `MARKETPLACE_VALIDATION.md` and the current `FOUNDER_HANDOFF.md`. The download includes those complete current documents before the dated source references. New transactional modules are 0060 memberships, 0061 content, 0062 discovery/downloads, 0063 everyday feedback/recommendations and 0064 photos/feed ads, applied only after verified foundation/0058/0059. Never select a baseline because history is missing. No hosted schema was changed.
 
@@ -33,7 +35,7 @@ Inclusive focus categories filter trainers, public workouts, programs and live c
 | Ordinary on-demand workouts | Free to members; advertising only at explicitly marked water breaks, never mid-set. No marked breaks means no ads. |
 | Community live class | $5 drop-in unless an explicitly authorized change applies; reservation alone does not spend a token. |
 | Private one-on-one | Trainer-defined price; new installment bookings use a 25% deposit and 75% balance under the verified attendance/payment rules below. |
-| Native program sale | One-time purchase; trainer 95%, Tryumph 5% by default, after actual processing fees and before hosting/infrastructure. |
+| Native program sale | One-time purchase; trainer 90%, Tryumph 10%, after actual processing fees and before hosting/infrastructure. |
 | Independent storefront / affiliate link | Trainer keeps 100%; Tryumph processes no external sale and takes no commission. A link visit does not verify a purchase. |
 | Existing other splits | Private trainer 90%; community live and recognized advertising 50%. Actual processing fees precede each split. Program sales are a separate ledger. |
 | Subscriptions | No mandatory recurring membership for members or mandatory trainer platform subscription. A poll about optional memberships does not create one. |
@@ -57,7 +59,7 @@ Eligibility uses current independently verified required credentials, including 
 
 Expired credentials block new trainer activity and new sales where required; previously approved workouts and legitimate existing program editions are preserved unless moderation withdraws content. An eligible replacement credential restores current eligibility rather than leaving an old expired row as a permanent lock.
 
-All discovery groups exclude unapproved workouts. No-equipment workouts remain eligible regardless of owned equipment. Explicit safety incompatibilities cannot be overridden just to fill recommendations. The Best Matches, Close Matches and Explore All logic remains shared. The later marketplace requirement removes the five-video quota through 0060. Current verified required credentials remain mandatory; new paid scheduling separately requires eligible payouts. Programs do not replace credentials.
+All discovery groups exclude unapproved workouts. No-equipment workouts remain eligible regardless of owned equipment. Explicit safety incompatibilities cannot be overridden just to fill recommendations. The Best Matches, Close Matches and Explore All logic remains shared. The November 4 Creator Studio requirement restores five approved videos for live hosting through 0066. Current verified required credentials remain mandatory; new paid scheduling separately requires eligible payouts. Programs do not replace credentials.
 
 ### Live classes, private sessions and financial safety
 

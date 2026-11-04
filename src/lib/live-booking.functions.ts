@@ -14,7 +14,7 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
       await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("live_sessions")
-      .select("id,title,trainer_id,starts_at,status,minutes")
+      .select("id,title,trainer_id,starts_at,status,minutes,session_type")
       .eq("id", data.sessionId)
       .single();
     if (
@@ -31,6 +31,24 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
     });
     if (eligible.error || !eligible.data)
       throw new Error("Trainer is not currently eligible");
+    if (session.trainer_id === context.userId)
+      throw new Error("Hosts cannot book their own class");
+    const subscription = await supabaseAdmin.rpc("live_subscription_deadline", {
+      p_user: context.userId,
+      p_session: session.id,
+    });
+    if (subscription.error)
+      throw new Error("Unable to verify subscription access");
+    if (subscription.data && Date.parse(subscription.data) > Date.now()) {
+      const reservation = await supabaseAdmin.rpc("reserve_live_class", {
+        p_user_id: context.userId,
+        p_session_id: session.id,
+      });
+      if (reservation.error) throw new Error(reservation.error.message);
+      return { alreadyBooked: true, url: null };
+    }
+    if (session.session_type === "subscriber")
+      throw new Error("Active subscription to this trainer required");
     const { data: existing } = await supabaseAdmin
       .from("live_room_access")
       .select("id")

@@ -1,3 +1,8 @@
+import { SpotlightAdmin } from "@/components/TryumphSpotlight";
+import {
+  CreatorResourcesAdmin,
+  CreatorPriceBounds,
+} from "@/components/CreatorResourcesAdmin";
 import { CommunitySafetyAdmin } from "@/components/CommunitySafetyAdmin";
 import { CreatorAdmin } from "@/components/CreatorAdmin";
 import { ProgramAdmin } from "@/components/ProgramAdmin";
@@ -295,6 +300,9 @@ function Admin() {
       <AdminSafetyCenter />
       <ProgramAdmin />
       <CreatorAdmin />
+      <CreatorResourcesAdmin />
+      <CreatorPriceBounds />
+      <SpotlightAdmin />
       <CommunitySafetyAdmin />
       {LAUNCH.youth && (
         <section className="card space-y-3 p-5">

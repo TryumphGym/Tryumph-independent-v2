@@ -100,7 +100,7 @@ async function published(p: FitnessProgram) {
 async function paid() {
   const p = await published(document("native", premiumVideo));
   await owner(
-    "SELECT approve_program_terms($1,true,500,'fixture-approved-terms')",
+    "SELECT approve_program_terms($1,true,1000,'fixture-approved-terms')",
     [admin],
   );
   const o = (
@@ -177,10 +177,10 @@ afterEach(async () => {
   await db.exec("ROLLBACK");
 });
 describe("workout program creation, moderation, enrollment and immutable purchases", () => {
-  it("allows live-only and program-only verified trainers without a video quota", async () => {
+  it("allows verified program creators without a quota but requires five approved videos for live", async () => {
     expect(
       await owner("SELECT trainer_is_eligible($1,true) AS ok", [trainer]),
-    ).toEqual([{ ok: true }]);
+    ).toEqual([{ ok: false }]);
     const p = await published(document());
     await actor(member, "SELECT enroll_fitness_program($1)", [p.id]);
     const totals = (
@@ -601,15 +601,15 @@ describe("workout program creation, moderation, enrollment and immutable purchas
   });
 });
 describe("native program payment authority, refunds and exact configurable commission", () => {
-  it("starts disabled with the approved 5% default and denies client payment mutation", async () => {
+  it("starts disabled with the approved 10% default and denies client payment mutation", async () => {
     expect(
       await owner("SELECT enabled,commission_bps FROM program_commerce"),
-    ).toEqual([{ enabled: false, commission_bps: 500 }]);
+    ).toEqual([{ enabled: false, commission_bps: 1000 }]);
     const p = await published(document("native"));
     await expect(
       actor(
         member,
-        "SELECT approve_program_terms($1,true,500,'not-authorized')",
+        "SELECT approve_program_terms($1,true,1000,'not-authorized')",
         [member],
       ),
     ).rejects.toThrow("permission denied");
@@ -645,18 +645,20 @@ describe("native program payment authority, refunds and exact configurable commi
         p.edition,
       ]),
     ).toHaveLength(1);
-    await owner(
-      "SELECT approve_program_terms($1,true,9999,'different-future-terms')",
-      [admin],
-    );
+    await expect(
+      owner(
+        "SELECT approve_program_terms($1,true,9999,'different-future-terms')",
+        [admin],
+      ),
+    ).rejects.toThrow("90/10");
     expect(
       await owner(
         "SELECT price_cents,commission_bps FROM program_orders WHERE id=$1",
         [p.order],
       ),
-    ).toEqual([{ price_cents: 10000, commission_bps: 500 }]);
+    ).toEqual([{ price_cents: 10000, commission_bps: 1000 }]);
     const op = await claim(p.order);
-    expect(op).toMatchObject({ kind: "transfer", amount: 9215 });
+    expect(op).toMatchObject({ kind: "transfer", amount: 8730 });
   });
   it("rejects altered checkout identities, wrong amounts and changed fee allocations", async () => {
     const p = await paid();
@@ -690,7 +692,7 @@ describe("native program payment authority, refunds and exact configurable commi
     ).toEqual([{ state: "revoked" }]);
     expect(await claim(p.order)).toMatchObject({
       kind: "reversal",
-      amount: 4750,
+      amount: 4500,
       transfer_id: "tr_original",
     });
   });
@@ -715,7 +717,7 @@ describe("native program payment authority, refunds and exact configurable commi
     ).toEqual([{ state: "active" }]);
     expect(await claim(p.order)).toMatchObject({
       kind: "transfer",
-      amount: 9215,
+      amount: 8730,
     });
     await adjust(p.order, 10000);
     expect(
@@ -764,12 +766,12 @@ describe("native program payment authority, refunds and exact configurable commi
       "UPDATE program_payout_operations SET lease_until=now()-interval '1 second' WHERE id=$1",
       [op.id],
     );
-    expect(await claim(p.order)).toMatchObject({ id: op.id, amount: 9215 });
+    expect(await claim(p.order)).toMatchObject({ id: op.id, amount: 8730 });
     await owner("SELECT finish_program_payout($1,$2)", [op.id, "tr_raced"]);
     await owner("SELECT finish_program_payout($1,$2)", [op.id, "tr_raced"]);
     expect(await claim(p.order)).toMatchObject({
       kind: "reversal",
-      amount: 9215,
+      amount: 8730,
     });
   });
 });
@@ -781,9 +783,10 @@ describe("program access periods, rich exercises and delivery accounting", () =>
       const doc = document("native", premiumVideo);
       doc.access_period = period;
       const p = await published(doc);
-      await owner("SELECT approve_program_terms($1,true,500,'approved-95-5')", [
-        admin,
-      ]);
+      await owner(
+        "SELECT approve_program_terms($1,true,1000,'approved-90-10')",
+        [admin],
+      );
       const order = (
         await owner<{ id: string }>(
           "SELECT * FROM begin_program_order($1,$2)",
@@ -866,11 +869,11 @@ describe("program access periods, rich exercises and delivery accounting", () =>
       ),
     ).toEqual([{ expires_at: null }]);
   });
-  it("allocates a $50 sale with $1.75 actual fee to trainer $45.83 / Tryumph $2.42 and keeps hosting separate", async () => {
+  it("allocates a $50 sale with $1.75 actual fee to trainer $43.42 / Tryumph $4.83 and keeps hosting separate", async () => {
     const doc = document("native", premiumVideo);
     doc.price_cents = 5000;
     const p = await published(doc);
-    await owner("SELECT approve_program_terms($1,true,500,'approved-95-5')", [
+    await owner("SELECT approve_program_terms($1,true,1000,'approved-90-10')", [
       admin,
     ]);
     const order = (
@@ -886,7 +889,7 @@ describe("program access periods, rich exercises and delivery accounting", () =>
     ]);
     expect(await claim(order)).toMatchObject({
       kind: "transfer",
-      amount: 4583,
+      amount: 4342,
     });
     const report = (
       await actor<{
@@ -898,8 +901,8 @@ describe("program access periods, rich exercises and delivery accounting", () =>
       }>(admin, "SELECT program_admin_report() AS r")
     )[0]!.r;
     expect(report[0]).toMatchObject({
-      trainer_cents: 4583,
-      platform_cents: 242,
+      trainer_cents: 4342,
+      platform_cents: 483,
       processing_cents: 175,
     });
     await expect(
@@ -941,7 +944,7 @@ describe("program access periods, rich exercises and delivery accounting", () =>
       { id: crypto.randomUUID(), label: "Recover", kind: "rest", seconds: 15 },
     ];
     const p = await published(doc);
-    await owner("SELECT approve_program_terms($1,true,500,'approved-95-5')", [
+    await owner("SELECT approve_program_terms($1,true,1000,'approved-90-10')", [
       admin,
     ]);
     const order = (

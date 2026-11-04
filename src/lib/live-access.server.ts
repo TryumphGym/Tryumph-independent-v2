@@ -59,7 +59,7 @@ export async function authorizeLiveRoom(userId: string, room: string) {
   }
   const { data: session, error } = await supabaseAdmin
     .from("live_sessions")
-    .select("id,trainer_id,starts_at,status,minutes")
+    .select("id,trainer_id,starts_at,status,minutes,session_type")
     .eq("id", match[1]!)
     .single();
   if (error || !session || !["scheduled", "live"].includes(session.status))
@@ -86,6 +86,24 @@ export async function authorizeLiveRoom(userId: string, room: string) {
       waiting: false,
       expiresAt: start + (session.minutes + 15) * 60000,
     };
+  const subscription = await supabaseAdmin.rpc("live_subscription_deadline", {
+    p_user: userId,
+    p_session: session.id,
+  });
+  if (subscription.error)
+    throw new Error("Unable to verify subscription access");
+  if (subscription.data && Date.parse(subscription.data) > now)
+    return {
+      isHost: false,
+      isPrivate: false,
+      waiting: false,
+      expiresAt: Math.min(
+        Date.parse(subscription.data),
+        start + (session.minutes + 15) * 60000,
+      ),
+    };
+  if (session.session_type === "subscriber")
+    throw new Error("Active subscription to this trainer required");
   const { data: booking, error: bookingError } = await supabaseAdmin
     .from("live_room_access")
     .select("id,status")

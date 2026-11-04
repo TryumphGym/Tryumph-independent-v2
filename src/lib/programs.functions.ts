@@ -193,7 +193,7 @@ export const approveProgramTerms = createServerFn({ method: "POST" })
     z
       .object({
         enabled: z.boolean(),
-        commissionBps: z.number().int().min(0).max(10000),
+        commissionBps: z.literal(1000),
         termsVersion: z.string().trim().min(3).max(120),
         approved: z.literal(true),
       })

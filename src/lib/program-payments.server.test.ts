@@ -55,7 +55,7 @@ const order = {
   trainer_id: "trainer",
   program_id: "program",
   price_cents: 10000,
-  commission_bps: 500,
+  commission_bps: 1000,
   terms_version: "fixture-approved",
   destination: "acct_fixture",
   checkout_id: null,
@@ -114,10 +114,10 @@ function stripe() {
       retrieve: vi.fn().mockResolvedValue({ id: "dp_fixture", status: "won" }),
     },
     transfers: {
-      create: vi.fn().mockResolvedValue({ id: "tr_fixture", amount: 9215 }),
+      create: vi.fn().mockResolvedValue({ id: "tr_fixture", amount: 8730 }),
       createReversal: vi
         .fn()
-        .mockResolvedValue({ id: "trr_fixture", amount: 9215 }),
+        .mockResolvedValue({ id: "trr_fixture", amount: 8730 }),
     },
     refunds: {
       create: vi
@@ -289,7 +289,7 @@ describe("program Stripe orchestration with mocked provider calls", () => {
     ];
     f.rpc
       .mockResolvedValueOnce({
-        data: [{ id: "operation-id", kind: "transfer", amount: 9215 }],
+        data: [{ id: "operation-id", kind: "transfer", amount: 8730 }],
         error: null,
       })
       .mockResolvedValueOnce({ data: null, error: null })
@@ -299,7 +299,7 @@ describe("program Stripe orchestration with mocked provider calls", () => {
       reversed: 0,
     });
     expect(s.transfers.create).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 9215, destination: "acct_fixture" }),
+      expect.objectContaining({ amount: 8730, destination: "acct_fixture" }),
       { idempotencyKey: "program-payout:operation-id" },
     );
     expect(f.rpc).toHaveBeenCalledWith("finish_program_payout", {

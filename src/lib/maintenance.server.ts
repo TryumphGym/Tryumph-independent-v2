@@ -46,6 +46,12 @@ export async function runMaintenance() {
     ...preparation,
     ...(await Promise.allSettled([
       processRefundJobs(),
+      import("./subscriber-live.server").then((m) =>
+        m.reconcileSubscriberRooms(),
+      ),
+      supabaseAdmin.rpc("purge_discovery_demand").then((r) => {
+        if (r.error) throw r.error;
+      }),
       closeRooms(),
       closePrivateRooms(),
     ])),

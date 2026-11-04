@@ -14,6 +14,8 @@ export function AccountNoticeCenter({
   const [preferences, setPreferences] = useState({
     session_updates: true,
     poll_updates: false,
+    creator_updates: true,
+    subscriber_lives: false,
     credential_updates: true,
     friend_activity: false,
     share_live_activity: false,
@@ -33,7 +35,7 @@ export function AccountNoticeCenter({
       supabase
         .from("notification_preferences")
         .select(
-          "session_updates,credential_updates,friend_activity,share_live_activity,poll_updates",
+          "session_updates,credential_updates,friend_activity,share_live_activity,poll_updates,creator_updates,subscriber_lives",
         )
         .eq("user_id", auth.data.user.id)
         .maybeSingle(),
@@ -122,6 +124,8 @@ export function AccountNoticeCenter({
             "session_updates",
             "poll_updates",
             ...(trainer ? ["credential_updates" as const] : []),
+            "creator_updates",
+            "subscriber_lives",
             "friend_activity",
             "share_live_activity",
           ] as const
@@ -134,6 +138,8 @@ export function AccountNoticeCenter({
             />
             {
               {
+                creator_updates: "Business and creator activity",
+                subscriber_lives: "Opt in to subscriber live announcements",
                 session_updates: "Session updates",
                 poll_updates: "New polls in my Trybes",
                 credential_updates: "Credential reminders",

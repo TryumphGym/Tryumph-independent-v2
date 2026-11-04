@@ -32,7 +32,7 @@ function Privacy() {
         <p className="eyebrow">Your information</p>
         <h1 className="text-3xl font-extrabold">Privacy Policy</h1>
         <p className="text-muted-foreground">
-          Updated October 27, 2026. This policy describes Tryumph Gym's online
+          Updated November 4, 2026. This policy describes Tryumph Gym's online
           fitness service and its currently planned features. Actual vendors and
           advertising settings must be confirmed before activation.
         </p>
@@ -55,6 +55,25 @@ function Privacy() {
           billing data. Technical systems may process IP address, device/browser
           information, logs, diagnostic events, session identifiers and
           cookie-like technologies.
+        </p>
+      </Section>
+      <Section title="Search demand insights">
+        <p>
+          Signed-in discovery can record allowlisted fitness searches and
+          explicitly selected non-sensitive filters, alongside the available
+          public content supply. Arbitrary search text, medical terms, diagnoses
+          and life-stage filters are discarded. We do not copy private health
+          preferences into this tracker or require health disclosures to browse.
+        </p>
+        <p>
+          Events use a pseudonymous member key to avoid duplicate counting and
+          are retained for up to 90 days. Trainers receive aggregates only: at
+          least 20 different members in a reporting group and 10 per displayed
+          topic, using complete-day reporting windows. They cannot see
+          individual searches or member keys. My Audience uses current followers
+          and authorized playback engagement solely for these protected
+          aggregates. This information is not sold to advertisers or used to
+          guarantee content performance.
         </p>
       </Section>
       <Section title="2. Why we use information">

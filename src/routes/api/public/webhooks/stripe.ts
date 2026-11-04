@@ -53,6 +53,9 @@ async function settleCheckout(
       p_tokens: tokens,
       p_gross_cents: gross,
       p_fee_cents: fee,
+      ...(meta["sessionId"] && uuid.test(meta["sessionId"])
+        ? { p_session_id: meta["sessionId"] }
+        : {}),
     });
   } else if (meta["type"] === "private_deposit") {
     if (!uuid.test(meta["holdId"] ?? ""))

@@ -1,3 +1,5 @@
+import { WorkoutComments } from "./WorkoutComments";
+import { supabase } from "@/integrations/supabase/client";
 import { WorkoutFeedback } from "./WorkoutFeedback";
 import {
   useCallback,
@@ -75,9 +77,23 @@ export function OnDemandPlayer({
     if (bunny) command("play");
     else void ref.current?.play().catch(() => {});
   };
+  const metricStarted = useRef(false);
+  const recordStart = useRef(() => {});
+  recordStart.current = () => {
+    if (metricStarted.current) return;
+    metricStarted.current = true;
+    void supabase.rpc("start_creator_playback", { p_video: video.id }).then(
+      () => {},
+      () => {},
+    );
+  };
+  useEffect(() => {
+    metricStarted.current = false;
+  }, [video.id]);
   const progress = useCallback(
     (seconds: number) => {
       if (ad > 0 || !Number.isFinite(seconds)) return;
+      if (seconds > 0) recordStart.current();
       const last = previous.current;
       previous.current = seconds;
       const delta = seconds - last;
@@ -328,6 +344,7 @@ export function OnDemandPlayer({
         guidance and do not assume exercising while holding a baby is safe.
       </p>
       <WorkoutFeedback videoId={video.id} eligible={feedbackEligible} />
+      <WorkoutComments videoId={video.id} />
     </div>
   );
 }

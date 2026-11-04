@@ -42,4 +42,4 @@ export type CreatorWorkout = {
   isPublic: boolean;
 };
 export const MEMBERSHIP_POLICY =
-  "Optional monthly membership to this trainer only. Renews automatically until cancelled. Cancel future renewal at any time; an already paid period remains available until its end unless refunded, disputed or moderated. Programs sold separately are not included.";
+  "Optional monthly membership to this trainer only. Renews automatically until cancelled. Cancel future renewal at any time; an already paid period remains available until its end unless refunded, disputed or moderated. Includes this trainer’s scheduled and subscriber lives, subscriber workouts and posts, and members-only programs. Separately sold programs are included only when explicitly configured. No live-entry token is deducted for included attendance.";

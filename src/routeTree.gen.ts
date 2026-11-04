@@ -19,6 +19,7 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as NutritionRouteImport } from './routes/nutrition'
 import { Route as OnDemandRouteImport } from './routes/on-demand'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SchoolRouteImport } from './routes/school'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -85,6 +86,11 @@ const OnDemandRoute = OnDemandRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchoolRoute = SchoolRouteImport.update({
+  id: '/school',
+  path: '/school',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
   '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
   '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -245,6 +253,7 @@ export interface FileRoutesById {
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
   '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/nutrition'
     | '/on-demand'
     | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/nutrition'
     | '/on-demand'
     | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -334,6 +345,7 @@ export interface FileRouteTypes {
     | '/nutrition'
     | '/on-demand'
     | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -364,6 +376,7 @@ export interface RootRouteChildren {
   NutritionRoute: typeof NutritionRoute
   OnDemandRoute: typeof OnDemandRoute
   PrivacyRoute: typeof PrivacyRoute
+  SchoolRoute: typeof SchoolRoute
   ShopRoute: typeof ShopRoute
   StudioRoute: typeof StudioRoute
   TermsRoute: typeof TermsRoute
@@ -453,6 +466,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/school': {
+      id: '/school'
+      path: '/school'
+      fullPath: '/school'
+      preLoaderRoute: typeof SchoolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -588,6 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   NutritionRoute: NutritionRoute,
   OnDemandRoute: OnDemandRoute,
   PrivacyRoute: PrivacyRoute,
+  SchoolRoute: SchoolRoute,
   ShopRoute: ShopRoute,
   StudioRoute: StudioRoute,
   TermsRoute: TermsRoute,
