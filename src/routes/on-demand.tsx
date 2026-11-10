@@ -70,6 +70,7 @@ function OnDemand() {
   const { v } = Route.useSearch();
   const { s, toggleWatchLater, watch } = useStore();
   const [focus, setFocus] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string[]>([]),
     [lvl, setLvl] = useState("All levels");
   const [eq, setEq] = useState<string[]>([]),
@@ -157,7 +158,8 @@ function OnDemand() {
       isLaunchWorkout(x) &&
       matchesDiscovery(x, focus) &&
       isSafetyCompatible(norm(x), preferences) &&
-      matchesDuration(x.minutes),
+      matchesDuration(x.minutes) &&
+      (!query.trim() || [x.title,x.category,x.level,x.description].join(" ").toLowerCase().includes(query.trim().toLowerCase())),
   );
   const visible =
     tab === "later"
@@ -228,9 +230,9 @@ function OnDemand() {
           No workouts in this group yet.
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
           {group.map((x) => (
-            <article className="card overflow-hidden" key={x.id}>
+            <article className="group min-w-0 overflow-hidden rounded-xl border border-border bg-card" key={x.id}>
               <button
                 onClick={() => openVideo(x)}
                 className="relative grid aspect-video w-full place-items-center overflow-hidden bg-brand"
@@ -246,67 +248,32 @@ function OnDemand() {
                   loading="lazy"
                   className="h-full w-full object-cover"
                 />
-                <span className="absolute inset-0 grid place-items-center bg-black/20">
-                  <Play className="h-8 w-8 text-white" />
+                <span className="absolute inset-0 grid place-items-center bg-black/10 transition-colors group-hover:bg-black/30">
+                  <Play className="h-9 w-9 text-white drop-shadow" />
                 </span>
+                <span className="absolute bottom-2 right-2 rounded bg-black/80 px-2 py-1 text-xs font-semibold text-white">{x.minutes} min</span>
               </button>
-              <div className="p-4">
-                <p className="eyebrow">
-                  {x.category} · {x.level}
-                  {x.pregnancy_safe
-                    ? " · Prenatal focus (trainer-labeled)"
-                    : ""}
-                </p>
-                <p className="font-semibold">{x.title}</p>
-                <p className="text-sm text-muted-foreground">{x.description}</p>
-                {x.spotify_url?.startsWith(
-                  "https://open.spotify.com/playlist/",
-                ) && (
-                  <a
-                    className="text-sm text-primary underline"
-                    href={x.spotify_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Spotify playlist
-                  </a>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  {x.minutes} minutes ·{" "}
-                  {(x.required_equipment ?? gearOf(x.equipment)).join(", ") ||
-                    "No equipment"}{" "}
-                  ·{" "}
-                  {(x.breaks ?? []).length
-                    ? `${x.breaks.length} water breaks`
-                    : "Ad-free"}
-                </p>
+              <div className="space-y-2 p-4">
+                <p className="text-xs font-medium text-primary">{x.category} · {x.level}{x.pregnancy_safe ? " · Prenatal focus" : ""}</p>
+                <button type="button" className="block text-left text-base font-semibold leading-snug hover:text-primary" onClick={() => openVideo(x)}>{x.title}</button>
+                <p className="line-clamp-2 text-sm text-muted-foreground">{x.description}</p>
+                <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                  <span>{(x.required_equipment ?? gearOf(x.equipment)).join(", ") || "No equipment"}</span>
+                  <span>· {x.breaks?.length ? `${x.breaks.length} water breaks` : "Ad-free"}</span>
+                </div>
                 <CommunityTagBadges value={communityTags[x.id]} />
-                <p className="text-sm">
-                  Experience: {x.level} · Intensity:{" "}
-                  {x.intensity || "Not specified"}
-                </p>
-                <p className="whitespace-pre-wrap text-sm">
-                  {x.modification_notes}
-                </p>
-                <div className="mt-2 flex justify-between gap-3">
-                  <button
-                    className="text-primary underline"
-                    onClick={() => openVideo(x)}
-                  >
-                    Watch
-                  </button>
-                  <button
-                    onClick={() => save(x.id)}
-                    aria-label="Save workout"
-                    className="text-primary"
-                  >
-                    {s.watchLater.includes(x.id) ? (
-                      <BookmarkCheck className="h-5 w-5" />
-                    ) : (
-                      <Bookmark className="h-5 w-5" />
-                    )}
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <button type="button" className="text-sm font-semibold text-primary" onClick={() => openVideo(x)}>Watch workout →</button>
+                  <button type="button" onClick={() => save(x.id)} aria-label={s.watchLater.includes(x.id) ? "Remove saved workout" : "Save workout"} className="text-primary">
+                    {s.watchLater.includes(x.id) ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
                   </button>
                 </div>
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer">Workout details & music</summary>
+                  <p className="mt-2">Intensity: {x.intensity || "Not specified"}</p>
+                  {x.modification_notes && <p className="mt-1 whitespace-pre-wrap">{x.modification_notes}</p>}
+                  {x.spotify_url?.startsWith("https://open.spotify.com/playlist/") && <a className="mt-2 inline-block text-primary underline" href={x.spotify_url} target="_blank" rel="noopener noreferrer">Spotify playlist</a>}
+                </details>
               </div>
             </article>
           ))}
@@ -316,12 +283,24 @@ function OnDemand() {
   );
   return (
     <div>
-      <DiscoveryFilters value={focus} onChange={setFocus} />
       <PageHeader
-        eyebrow="Free · Approved trainer videos"
-        title="On-Demand Library"
-        sub="Sponsored messages are shown only during water breaks, never during a set."
+        eyebrow="Watch anytime · Free workouts"
+        title="Find your next workout"
+        sub="Discover trainer-led workouts that fit your time, equipment and goals. Ads appear only during water breaks, never mid-set."
       />
+      <div className="card mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+        <label htmlFor="workout-search" className="sr-only">Search workouts</label>
+        <input
+          id="workout-search"
+          type="search"
+          className="field min-w-0 flex-1"
+          placeholder="Search workouts, styles and levels…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+        />
+        <span className="text-xs text-muted-foreground">Only approved trainer workouts are shown</span>
+      </div>
+      <DiscoveryFilters value={focus} onChange={setFocus} />
       <PickForMe />
       <EverydayTryumphs />
 
@@ -332,7 +311,7 @@ function OnDemand() {
           onClose={() => setOpen(null)}
         />
       )}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <nav className="mb-5 flex flex-wrap gap-2 border-b border-border pb-3" aria-label="Browse workout library">
         {(["all", "programs", "later", "history"] as Tab[])
           .filter((t) => s.signedIn || t === "all" || t === "programs")
           .map((t) => (
@@ -350,7 +329,7 @@ function OnDemand() {
                     : "History"}
             </Button>
           ))}
-      </div>
+      </nav>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {!s.signedIn && (
           <>
