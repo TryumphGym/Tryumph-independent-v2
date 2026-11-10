@@ -36,5 +36,12 @@
     "crons": [
       "*/5 * * * *"
     ]
+  },
+  "previews": {
+    "vars": {
+      "SUPABASE_URL": "https://preview.invalid",
+      "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_preview_disabled",
+      "BUNNY_STREAM_LIBRARY_ID": "0"
+    }
   }
 }
