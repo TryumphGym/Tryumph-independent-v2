@@ -7,7 +7,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    maxWorkers: 4,
+    // PGlite schema fixtures are CPU-heavy on small GitHub-hosted runners.
+    maxWorkers: 2,
+    testTimeout: 30000,
     setupFiles: ["./src/test/setup.ts"],
     include: ["**/*.{test,spec}.{ts,tsx}"],
   },
