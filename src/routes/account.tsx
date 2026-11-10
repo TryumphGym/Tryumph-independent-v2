@@ -5,6 +5,7 @@ import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
 import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
+import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { cancelPrivateSession } from "@/lib/session-management.functions";
 import {
   credentialLabel,
@@ -529,12 +530,24 @@ function SignedInAccount() {
           </button>
         </div>
       </PageHeader>
-      {s.signedIn && !editing && (
-        <div className="mb-6">
-          <GearPicker />
-        </div>
-      )}
       {s.signedIn && <AccountNoticeCenter trainer={s.role === "trainer"} />}
+      <details className="card mb-6 p-5" id="account-settings">
+        <summary className="cursor-pointer text-lg font-semibold">
+          Account settings
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            Notifications, workout equipment and preferences
+          </span>
+        </summary>
+        <div className="mt-5 space-y-6 border-t border-border pt-5">
+          <NotificationPreferences trainer={s.role === "trainer"} />
+          {!editing && (
+            <div className="border-t border-border pt-5">
+              <h3 className="mb-3 font-semibold">Workout equipment & preferences</h3>
+              <GearPicker />
+            </div>
+          )}
+        </div>
+      </details>
       {s.signedIn && (
         <div className="mb-6">
           <ActiveMilestones
