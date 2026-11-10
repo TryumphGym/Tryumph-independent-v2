@@ -674,7 +674,7 @@ function Trybes() {
         </button>
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main className="min-w-0 space-y-5" aria-label="Trybe feed">
+        <section className="min-w-0 space-y-5" aria-label="Trybe feed">
           {ownedGroups.some((g) => g.id === target) && (
             <div>
               <button
@@ -1033,7 +1033,7 @@ function Trybes() {
               {feedLoading ? "Loading…" : "Load more posts"}
             </button>
           )}
-        </main>
+        </section>
         <aside className="space-y-4">
           <div className="card p-5">
             <p className="eyebrow">Find accountability partners</p>
