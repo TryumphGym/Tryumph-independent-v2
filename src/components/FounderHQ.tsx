@@ -11,7 +11,7 @@ import { getFounderHQSnapshot } from "@/lib/founder-hq.functions";
 
 type Snapshot = Awaited<ReturnType<typeof getFounderHQSnapshot>>;
 
-export function FounderHQ() {
+export function FounderHQ({ onOpenSection }: { onOpenSection?: (destination: string) => void }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -160,11 +160,10 @@ export function FounderHQ() {
                   </p>
                   <button
                     className="btn btn-outline mt-3"
-                    onClick={() =>
-                      document
-                        .getElementById(item.destination)
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
+                    onClick={() => {
+                      if (onOpenSection) onOpenSection(item.destination);
+                      else document.getElementById(item.destination)?.scrollIntoView({ behavior: "smooth" });
+                    }}
                   >
                     Open review section
                   </button>
