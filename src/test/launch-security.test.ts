@@ -32,6 +32,10 @@ beforeAll(async () => {
     `INSERT INTO certifications(user_id,name,expires,status,verified_at,verified_by) VALUES($1,'CPR/AED',(current_date+365)::text,'verified',now(),$2)`,
     [trainer, admin],
   );
+  await db.query(
+    "INSERT INTO trainer_accounts(user_id,stripe_account_id,payouts_enabled) VALUES($1,'acct_launch',true)",
+    [trainer],
+  );
   for (let i = 0; i < 5; i++)
     await db.query(
       "INSERT INTO trainer_videos(user_id,title,path,minutes,review_status,breaks) VALUES($1,'Approved','owned/test.mp4',20,'approved',ARRAY[180,600])",
@@ -100,7 +104,7 @@ describe("launch database authorization and lifecycle", () => {
       `UPDATE certifications SET name='CPR/AED' WHERE user_id='${trainer}'`,
     );
   });
-  it("five pending workouts cannot qualify; five approved workouts can", async () => {
+  it("requires five approved videos plus current credentials and payout eligibility", async () => {
     await db.exec(
       `UPDATE trainer_videos SET review_status='pending' WHERE user_id='${trainer}'`,
     );
@@ -108,16 +112,29 @@ describe("launch database authorization and lifecycle", () => {
       asUser(
         db,
         trainer,
-        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Class',now()+interval '2 hours')`,
+        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Live-only trainer',now()+interval '2 hours')`,
       ),
-    ).rejects.toThrow("five approved");
+    ).rejects.toThrow("five approved videos");
     await db.exec(
       `UPDATE trainer_videos SET review_status='approved' WHERE user_id='${trainer}'`,
     );
     await asUser(
       db,
       trainer,
-      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Class',now()+interval '2 hours')`,
+      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Eligible trainer',now()+interval '2 hours')`,
+    );
+    await db.exec(
+      `UPDATE trainer_accounts SET payouts_enabled=false WHERE user_id='${trainer}'`,
+    );
+    await expect(
+      asUser(
+        db,
+        trainer,
+        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Blocked',now()+interval '2 hours')`,
+      ),
+    ).rejects.toThrow("payout");
+    await db.exec(
+      `UPDATE trainer_accounts SET payouts_enabled=true WHERE user_id='${trainer}';UPDATE trainer_videos SET review_status='approved' WHERE user_id='${trainer}'`,
     );
   });
   it("keeps pending/rejected videos private to their owner and admins", async () => {
@@ -142,13 +159,19 @@ describe("launch database authorization and lifecycle", () => {
     ).toHaveLength(1);
   });
   it("prevents trainer self-approval through direct writes", async () => {
-    await expect(
-      asUser(
-        db,
-        other,
-        "UPDATE trainer_videos SET review_status='approved' WHERE title='Private'",
-      ),
-    ).rejects.toThrow("Admins review");
+    const result = await asUser(
+      db,
+      other,
+      "UPDATE trainer_videos SET review_status='approved' WHERE title='Private'",
+    );
+    expect(result.affectedRows).toBe(0);
+    expect(
+      (
+        await scalar(
+          "SELECT review_status FROM trainer_videos WHERE title='Private'",
+        )
+      )?.["review_status"],
+    ).toBe("pending");
   });
   it("accepts immutable evidence only in the submitter folder", async () => {
     await expect(
@@ -283,7 +306,7 @@ describe("launch database authorization and lifecycle", () => {
         other,
         "SELECT moderate_trybe_post((SELECT id FROM posts WHERE visibility='public'),'hide',true)",
       ),
-    ).rejects.toThrow("Only this Trybe");
+    ).rejects.toThrow("Only leader or admin");
   });
   it("deduplicates paid token webhooks and revokes refunded lots", async () => {
     const q = `SELECT apply_paid_token_checkout('cs_test_tokens','${member}',2,1000,100)`;
@@ -545,11 +568,11 @@ describe("launch database authorization and lifecycle", () => {
   it("returns a cancelled class token once and keeps its old earning history", async () => {
     const session = (
       await db.query<{ id: string }>(
-        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Wallet cancellation',now()+interval '5 hours') RETURNING id`,
+        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Wallet cancellation',now()+interval '5 minutes') RETURNING id`,
       )
     ).rows[0]!.id;
     await db.exec(
-      `SELECT redeem_paid_live_token('${member}','${session}'); SELECT redeem_paid_live_token('${member}','${session}')`,
+      `SELECT consume_attended_live_token('${member}','${session}'); SELECT consume_attended_live_token('${member}','${session}')`,
     );
     const balance = (
       await scalar(`SELECT tokens FROM profiles WHERE id='${member}'`)
@@ -584,10 +607,12 @@ describe("launch database authorization and lifecycle", () => {
     );
     const session = (
       await db.query<{ id: string }>(
-        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Unit test class',now()+interval '7 hours') RETURNING id`,
+        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Unit test class',now()+interval '5 minutes') RETURNING id`,
       )
     ).rows[0]!.id;
-    await db.exec(`SELECT redeem_paid_live_token('${member}','${session}')`);
+    await db.exec(
+      `SELECT consume_attended_live_token('${member}','${session}')`,
+    );
     await db.exec("SELECT apply_checkout_refund('cs_ordered_units',500,false)");
     expect(
       (

@@ -32,7 +32,9 @@ export function AdminOperations() {
           onClick={() =>
             void retryPendingRefunds()
               .then((r) => {
-                toast.success(`${r.completed} refunds confirmed`);
+                toast.success(
+                  `${r.completed} refunds confirmed; ${r.failed} require retry`,
+                );
                 return load();
               })
               .catch((e) =>
@@ -59,7 +61,27 @@ export function AdminOperations() {
       <ul className="text-sm">
         {data?.refunds.map((row) => (
           <li key={row.checkout_id}>
-            {row.reason} · {row.completed_at ? "Confirmed by Stripe" : "Queued"}
+            {row.reason}
+            {row.last_error
+              ? ` · ${row.last_error} (${row.attempts} attempts)`
+              : ""}{" "}
+            · {row.completed_at ? "Confirmed by Stripe" : "Queued"}
+          </li>
+        ))}
+      </ul>
+      <h3 className="font-semibold">Private balance operations</h3>
+      <ul className="text-sm">
+        {data?.balances.map((row) => (
+          <li key={row.booking_id}>
+            {row.booking_id} · {row.status} · {row.last_error ?? ""}
+          </li>
+        ))}
+      </ul>
+      <h3 className="font-semibold">Pending private room shutdowns</h3>
+      <ul className="text-sm">
+        {data?.shutdowns.map((row) => (
+          <li key={row.booking_id}>
+            {row.booking_id} · {row.last_error ?? "Awaiting maintenance"}
           </li>
         ))}
       </ul>

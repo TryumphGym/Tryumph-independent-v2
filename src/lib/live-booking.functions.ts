@@ -14,14 +14,15 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
       await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("live_sessions")
-      .select("id,title,trainer_id,starts_at,status")
+      .select("id,title,trainer_id,starts_at,status,minutes,session_type")
       .eq("id", data.sessionId)
       .single();
     if (
       error ||
       !session ||
       !["scheduled", "live"].includes(session.status) ||
-      new Date(session.starts_at).getTime() <= Date.now()
+      new Date(session.starts_at).getTime() + session.minutes * 60000 <=
+        Date.now()
     )
       throw new Error("Class is unavailable");
     const eligible = await supabaseAdmin.rpc("trainer_is_eligible", {
@@ -30,6 +31,24 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
     });
     if (eligible.error || !eligible.data)
       throw new Error("Trainer is not currently eligible");
+    if (session.trainer_id === context.userId)
+      throw new Error("Hosts cannot book their own class");
+    const subscription = await supabaseAdmin.rpc("live_subscription_deadline", {
+      p_user: context.userId,
+      p_session: session.id,
+    });
+    if (subscription.error)
+      throw new Error("Unable to verify subscription access");
+    if (subscription.data && Date.parse(subscription.data) > Date.now()) {
+      const reservation = await supabaseAdmin.rpc("reserve_live_class", {
+        p_user_id: context.userId,
+        p_session_id: session.id,
+      });
+      if (reservation.error) throw new Error(reservation.error.message);
+      return { alreadyBooked: true, url: null };
+    }
+    if (session.session_type === "subscriber")
+      throw new Error("Active subscription to this trainer required");
     const { data: existing } = await supabaseAdmin
       .from("live_room_access")
       .select("id")
@@ -41,6 +60,8 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
     const key = runtimeEnv("STRIPE_SECRET_KEY");
     if (!key) throw new Error("Stripe not configured");
     const stripe = new Stripe(key);
+    const { checkCreatorConnect } = await import("./creator-payments.server");
+    await checkCreatorConnect(session.trainer_id, stripe);
     const origin = appOrigin();
     const intent = await supabaseAdmin.rpc("get_live_checkout_intent", {
       p_user_id: context.userId,
@@ -74,7 +95,8 @@ export const createLiveClassCheckout = createServerFn({ method: "POST" })
           },
         ],
         metadata: {
-          type: "live",
+          type: "tokens",
+          tokens: "1",
           userId: context.userId,
           sessionId: session.id,
         },

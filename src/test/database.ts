@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 
 /** Real isolated PostgreSQL engine; only Supabase platform schemas are emulated.
  * This never connects to the hosted project or applies production SQL. */
-export async function createTestDatabase() {
+export async function createPlatformDatabase() {
   const db = new PGlite();
   await db.exec(`
     CREATE ROLE anon NOLOGIN;
@@ -26,9 +26,14 @@ export async function createTestDatabase() {
     GRANT ALL ON ALL TABLES IN SCHEMA storage TO authenticated,service_role;
     CREATE PUBLICATION supabase_realtime;
   `);
+  return db;
+}
+
+export async function createTestDatabase(through?: string) {
+  const db = await createPlatformDatabase();
   const directory = new URL("../../migrations/", import.meta.url);
   for (const file of (await readdir(directory))
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith(".sql") && (!through || f <= through))
     .sort()) {
     try {
       await db.exec(await readFile(new URL(file, directory), "utf8"));

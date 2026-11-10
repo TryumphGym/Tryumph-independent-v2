@@ -30,36 +30,16 @@ export const Route = createFileRoute("/api/public/webhooks/livekit")({
           event.room?.name &&
           event.participant?.identity
         ) {
-          const match = /^live-([0-9a-f-]{36})$/i.exec(event.room.name);
-          if (match) {
-            const session = await supabaseAdmin
-              .from("live_sessions")
-              .select("trainer_id,status")
-              .eq("id", match[1]!)
-              .single();
-            if (session.error)
-              return new Response("Retry attendance", { status: 500 });
-            if (
-              session.data.trainer_id === event.participant.identity &&
-              session.data.status === "scheduled"
-            ) {
-              const updated = await supabaseAdmin
-                .from("live_sessions")
-                .update({ status: "live" })
-                .eq("id", match[1]!);
-              if (updated.error)
-                return new Response("Retry class state", { status: 500 });
-            } else {
-              const updated = await supabaseAdmin
-                .from("live_room_access")
-                .update({ first_joined_at: new Date().toISOString() })
-                .eq("session_id", match[1]!)
-                .eq("user_id", event.participant.identity)
-                .eq("status", "paid")
-                .is("first_joined_at", null);
-              if (updated.error)
-                return new Response("Retry attendance", { status: 500 });
-            }
+          try {
+            const { handleVerifiedAttendance } =
+              await import("@/lib/attendance.server");
+            await handleVerifiedAttendance(
+              event.room.name,
+              event.participant.identity,
+            );
+          } catch (error) {
+            console.error("Attendance will retry", error);
+            return new Response("Retry attendance", { status: 500 });
           }
           return new Response("ok");
         }

@@ -10,12 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ForTrainersRouteImport } from './routes/for-trainers'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as NutritionRouteImport } from './routes/nutrition'
 import { Route as OnDemandRouteImport } from './routes/on-demand'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SchoolRouteImport } from './routes/school'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -23,6 +27,9 @@ import { Route as TrybesRouteImport } from './routes/trybes'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as ApiBunnyUploadRouteImport } from './routes/api/bunny-upload'
+import { Route as PoliciesPageRouteImport } from './routes/policies.$page'
+import { Route as ProgramsIndexRouteImport } from './routes/programs.index'
+import { Route as ProgramsIdRouteImport } from './routes/programs.$id'
 import { Route as TrainersIndexRouteImport } from './routes/trainers.index'
 import { Route as TrainersIdRouteImport } from './routes/trainers.$id'
 import { Route as ApiPublicTrainersRouteImport } from './routes/api/public/trainers'
@@ -36,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -44,6 +56,11 @@ const AccountRoute = AccountRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForTrainersRoute = ForTrainersRouteImport.update({
@@ -64,6 +81,16 @@ const NutritionRoute = NutritionRouteImport.update({
 const OnDemandRoute = OnDemandRouteImport.update({
   id: '/on-demand',
   path: '/on-demand',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchoolRoute = SchoolRouteImport.update({
+  id: '/school',
+  path: '/school',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -99,6 +126,21 @@ const WelcomeRoute = WelcomeRouteImport.update({
 const ApiBunnyUploadRoute = ApiBunnyUploadRouteImport.update({
   id: '/api/bunny-upload',
   path: '/api/bunny-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PoliciesPageRoute = PoliciesPageRouteImport.update({
+  id: '/policies/$page',
+  path: '/policies/$page',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgramsIndexRoute = ProgramsIndexRouteImport.update({
+  id: '/programs/',
+  path: '/programs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgramsIdRoute = ProgramsIdRouteImport.update({
+  id: '/programs/$id',
+  path: '/programs/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrainersIndexRoute = TrainersIndexRouteImport.update({
@@ -141,12 +183,16 @@ const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -154,7 +200,10 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs/': typeof ProgramsIndexRoute
   '/trainers/': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -164,12 +213,16 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -177,7 +230,10 @@ export interface FileRoutesByTo {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs': typeof ProgramsIndexRoute
   '/trainers': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -188,12 +244,16 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/contact': typeof ContactRoute
   '/for-trainers': typeof ForTrainersRoute
   '/live': typeof LiveRoute
   '/nutrition': typeof NutritionRoute
   '/on-demand': typeof OnDemandRoute
+  '/privacy': typeof PrivacyRoute
+  '/school': typeof SchoolRoute
   '/shop': typeof ShopRoute
   '/studio': typeof StudioRoute
   '/terms': typeof TermsRoute
@@ -201,7 +261,10 @@ export interface FileRoutesById {
   '/wallet': typeof WalletRoute
   '/welcome': typeof WelcomeRoute
   '/api/bunny-upload': typeof ApiBunnyUploadRoute
+  '/policies/$page': typeof PoliciesPageRoute
+  '/programs/$id': typeof ProgramsIdRoute
   '/trainers/$id': typeof TrainersIdRoute
+  '/programs/': typeof ProgramsIndexRoute
   '/trainers/': typeof TrainersIndexRoute
   '/api/public/trainers': typeof ApiPublicTrainersRoute
   '/api/public/hooks/push-reminders': typeof ApiPublicHooksPushRemindersRoute
@@ -213,12 +276,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -226,7 +293,10 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs/'
     | '/trainers/'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -236,12 +306,16 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -249,7 +323,10 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs'
     | '/trainers'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -259,12 +336,16 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/account'
     | '/admin'
+    | '/contact'
     | '/for-trainers'
     | '/live'
     | '/nutrition'
     | '/on-demand'
+    | '/privacy'
+    | '/school'
     | '/shop'
     | '/studio'
     | '/terms'
@@ -272,7 +353,10 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/welcome'
     | '/api/bunny-upload'
+    | '/policies/$page'
+    | '/programs/$id'
     | '/trainers/$id'
+    | '/programs/'
     | '/trainers/'
     | '/api/public/trainers'
     | '/api/public/hooks/push-reminders'
@@ -283,12 +367,16 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
+  ContactRoute: typeof ContactRoute
   ForTrainersRoute: typeof ForTrainersRoute
   LiveRoute: typeof LiveRoute
   NutritionRoute: typeof NutritionRoute
   OnDemandRoute: typeof OnDemandRoute
+  PrivacyRoute: typeof PrivacyRoute
+  SchoolRoute: typeof SchoolRoute
   ShopRoute: typeof ShopRoute
   StudioRoute: typeof StudioRoute
   TermsRoute: typeof TermsRoute
@@ -296,7 +384,10 @@ export interface RootRouteChildren {
   WalletRoute: typeof WalletRoute
   WelcomeRoute: typeof WelcomeRoute
   ApiBunnyUploadRoute: typeof ApiBunnyUploadRoute
+  PoliciesPageRoute: typeof PoliciesPageRoute
+  ProgramsIdRoute: typeof ProgramsIdRoute
   TrainersIdRoute: typeof TrainersIdRoute
+  ProgramsIndexRoute: typeof ProgramsIndexRoute
   TrainersIndexRoute: typeof TrainersIndexRoute
   ApiPublicTrainersRoute: typeof ApiPublicTrainersRoute
   ApiPublicHooksPushRemindersRoute: typeof ApiPublicHooksPushRemindersRoute
@@ -314,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -326,6 +424,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/for-trainers': {
@@ -354,6 +459,20 @@ declare module '@tanstack/react-router' {
       path: '/on-demand'
       fullPath: '/on-demand'
       preLoaderRoute: typeof OnDemandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/school': {
+      id: '/school'
+      path: '/school'
+      fullPath: '/school'
+      preLoaderRoute: typeof SchoolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -403,6 +522,27 @@ declare module '@tanstack/react-router' {
       path: '/api/bunny-upload'
       fullPath: '/api/bunny-upload'
       preLoaderRoute: typeof ApiBunnyUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/policies/$page': {
+      id: '/policies/$page'
+      path: '/policies/$page'
+      fullPath: '/policies/$page'
+      preLoaderRoute: typeof PoliciesPageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programs/': {
+      id: '/programs/'
+      path: '/programs'
+      fullPath: '/programs/'
+      preLoaderRoute: typeof ProgramsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programs/$id': {
+      id: '/programs/$id'
+      path: '/programs/$id'
+      fullPath: '/programs/$id'
+      preLoaderRoute: typeof ProgramsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trainers/': {
@@ -459,12 +599,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
+  ContactRoute: ContactRoute,
   ForTrainersRoute: ForTrainersRoute,
   LiveRoute: LiveRoute,
   NutritionRoute: NutritionRoute,
   OnDemandRoute: OnDemandRoute,
+  PrivacyRoute: PrivacyRoute,
+  SchoolRoute: SchoolRoute,
   ShopRoute: ShopRoute,
   StudioRoute: StudioRoute,
   TermsRoute: TermsRoute,
@@ -472,7 +616,10 @@ const rootRouteChildren: RootRouteChildren = {
   WalletRoute: WalletRoute,
   WelcomeRoute: WelcomeRoute,
   ApiBunnyUploadRoute: ApiBunnyUploadRoute,
+  PoliciesPageRoute: PoliciesPageRoute,
+  ProgramsIdRoute: ProgramsIdRoute,
   TrainersIdRoute: TrainersIdRoute,
+  ProgramsIndexRoute: ProgramsIndexRoute,
   TrainersIndexRoute: TrainersIndexRoute,
   ApiPublicTrainersRoute: ApiPublicTrainersRoute,
   ApiPublicHooksPushRemindersRoute: ApiPublicHooksPushRemindersRoute,

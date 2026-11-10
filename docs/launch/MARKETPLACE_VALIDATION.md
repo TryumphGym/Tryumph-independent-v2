@@ -1,0 +1,45 @@
+# Validation record — November 2, 2026
+
+Repository: `TryumphGym/Tryumph-independent-v2`; branch `codex/tryumph-january-launch`; task baseline `3d4f658`. Validation ran in the existing isolated cloud workspace. No hosted SQL, production changes, deployment, merge, DNS change, provider activation, real payment, email or moderation scan was executed.
+
+| Check                                                       | Actual final result                                                                                                                                                           |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm ci --cache /workspace/.cache/npm --no-audit --no-fund` | PASS; 609 packages installed with lockfile preserved                                                                                                                          |
+| `npm test`                                                  | PASS; **354 tests, 54 files**; final run 17.53 seconds                                                                                                                        |
+| `npm run typecheck`                                         | PASS; TypeScript `--noEmit`, no errors                                                                                                                                        |
+| `npm run lint`                                              | PASS; **0 errors, 72 existing warnings**                                                                                                                                      |
+| `npm run build`                                             | PASS; Vite client/server Cloudflare build; existing CSS sourcemap warning remains                                                                                             |
+| `npm run db:types`                                          | PASS; types generated from all ordered migrations in isolated PostgreSQL                                                                                                      |
+| `npm run db:check`                                          | PASS; all ordered migrations through 0064 applied to isolated PostgreSQL                                                                                                      |
+| `marketplace-postchecks.sql`                                | PASS locally; all privilege assertions true; read-only catalog/aggregate checks                                                                                               |
+| `git diff --check`                                          | PASS                                                                                                                                                                          |
+| Browser                                                     | PASS; **20 checks** at desktop 1440×1000 and mobile 390×844; 14 route renders, 4 interaction sequences and 2 keyboard-focus checks; no page exceptions or horizontal overflow |
+| Client build secret-module scan                             | No `COMMUNITY_MODERATION_KEY`, `BUNNY_PROGRAM_TOKEN_KEY` or `STRIPE_SECRET_KEY` string in client JavaScript; this is bundling evidence, not a live secret/key audit           |
+
+The final checks were run sequentially after installation to avoid competing with PostgreSQL WASM startup. An earlier contended test/build run hit the existing five-second empty-database startup timeout; standalone sequential full reruns passed. Assertions were not removed or skipped. Earlier functional failures in quota expectations/payout fixtures, void Supabase mutation handling and Bunny ready-message timing were investigated and corrected.
+
+## What the tests cover
+
+- Existing signup/profile security, friend/inquiry messaging, credential evidence, live/private booking, actual-fee settlement rules, refunds/disputes/transfer recovery, water-break ads, recordings, programs, exercise variations/timers and polls remain in the full suite.
+- New real SQL tests cover zero-video eligibility plus separate payout gates; paid invoice authority; separate program/subscription entitlements; after-fee 90/10 amounts; payout leases/reversals; cancellation/expiry preservation; refund/dispute replay; subscriber post/report/raw-read boundaries; approval/release timing and credential expiry; old tag mapping and combined filters; protected titles; PDF review, delivery and revocation.
+- New recurring provider tests mock Stripe while exercising the actual orchestration code, including null-data Supabase mutations, price/customer/invoice/intent identity, fee availability, subscription cancellation, renewal prevention and collectible invoice voiding. They do not make real Stripe calls.
+- Feedback SQL/UI tests exercise one active response, updates/removal, minimum ten respondents/seventy percent agreement, stricter thresholds, private rows, direct-write denial, moderation blocks, premium/pending exclusions and safe Pick For Me filtering/variety.
+- Photo tests cover upload ownership, four-photo limits, immutable private objects, pending-post hiding, independent specialist-cleared review, specialist-hold preview denial, current-revision checks, private/subscriber access, anonymous null identity, removal and preservation. Decoder/header/EXIF tests use bounded fixtures; image-service and moderation tests use mocked providers and exercise outage/uncertain/prohibited fail-closed behavior.
+- Feed-ad SQL tests cover sparse/empty feeds, sixth-post start, eight-organic spacing, deduplication across page/feed calls, unsafe/sponsored exclusions, disabling, client placement/revenue denial and 100% platform accounting separate from trainer earnings.
+- The new schema compatibility test reconstructs the supplied hosted 978-row catalog, applies the reviewed foundation/0058/0059 and new 0060–0064 locally, compares preserved profiles/posts/messages/requests/videos/stores/financial records and all message policies, then verifies a legitimate trainer inquiry still works. PostgreSQL in PGlite is local platform emulation, not the actual hosted PostgreSQL 17.11 project.
+
+## Browser evidence and boundaries
+
+Local Chromium exercised `/`, `/about`, `/for-trainers`, `/policies/subscription-terms`, `/trainers`, `/programs` and `/on-demand` at both sizes. Interactions combined duration/postpartum/low-impact/seated filters, Pick Again preserving selections, prenatal no-match, and Everyday seated/time filtering. Forms and movement suggestions were made expandable after visual review so existing workouts remain easy to reach. Browser tests waited for hydration before interacting; public Supabase responses/thumbnails were intercepted with explicit browser-only fixtures. No fictional production content was created.
+
+Browser results and four screenshots are in the downloadable artifact directory `tryumph-marketplace-2026-11-02`. This does not verify actual signup/email, authenticated media/purchases/admin workflows, native screen readers, Storage HTTP, realtime, LiveKit, recurring billing, provider permissions, CDN enforcement, specialist moderation, advertising delivery or revenue recognition. Complete the real staging scripts in `FOUNDER_HANDOFF.md` before enabling each gate.
+
+## Remaining external blockers
+
+Runtime presence checks found no `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, Stripe secret/webhook keys, protected Bunny token key, moderation key or activated new feature gates in the process. No secret values were printed or requested in chat. Cloudflare Images binding and the moderation adapter contract still require actual provider verification; the attempt to read current Cloudflare Images documentation returned HTTP 403. Photos, protected downloads, native sales and feed sponsorships remain separately gated. Third-party ad-network integration/automated advertiser billing is deferred pending provider approval.
+
+The cloud onboarding `start_skill` draft was updated and saved to recognize the new homepage, current branch and safe local workflow. Saving did not apply or publish it. Review/save and publication of that development-environment snapshot happen in environment settings; this is separate from application deployment. No repository membership, private credential binding, network allowlist or production setting was changed in that draft update.
+
+## Operational handoff
+
+Use `FOUNDER_HANDOFF.md` for exact ordered staging SQL and provider setup, `MARKETPLACE_IMPLEMENTATION.md` for scope/costs/limitations, and `MARKETPLACE_CHANGED_FILES.md` for every changed source path. Versioned SQL is engineering history; the downloadable guide embeds complete source text and hashes, with copy buttons in HTML. Opening or copying the guide never executes SQL. Current hosted catalog comparison and all production actions remain founder-controlled prerequisites.

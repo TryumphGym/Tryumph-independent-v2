@@ -1,3 +1,5 @@
+> October 27 follow-up: see [the founder handoff](FOUNDER_HANDOFF.md) for the current implementation, SQL sequence and verification boundaries. The historical descriptions below are retained as context; use the handoff where they conflict, including deposits, attendance and messaging policy.
+
 # January launch engineering and verification
 
 Date: 2026-10-26. Branch: `codex/tryumph-january-launch`, based on main commit `86e04f31b8cb6122c184538234171e0553d2e6fd`.

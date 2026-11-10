@@ -10,10 +10,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 const nav = [
   { to: "/", label: "Home" },
-  { to: "/on-demand", label: "On-Demand" },
+  { to: "/on-demand", label: "Workouts" },
   { to: "/live", label: "Live Classes" },
   { to: "/trainers", label: "Trainers" },
+  { to: "/programs", label: "Programs" },
   { to: "/trybes", label: "Trybes" },
+  { to: "/school", label: "School" },
+  { to: "/about", label: "About" },
   { to: "/wallet", label: "Wallet" },
   { to: "/account", label: "Account" },
 ] as const;
@@ -56,6 +59,41 @@ export function AppShell({ children }: { children: ReactNode }) {
         s.extra.trainer.specialties.length > 0);
   const showNudge =
     s.signedIn && !profileDone && !hideNudge && loc.pathname !== "/welcome";
+  if (loc.pathname === "/studio")
+    return (
+      <div className="min-h-screen">
+        <ReminderWatcher />
+        <header className="border-b p-4 flex flex-wrap items-center justify-between gap-3">
+          <Link to="/studio" className="font-display text-xl font-bold">
+            Tryumph Creator Studio
+          </Link>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Link to="/admin" className="btn btn-outline">
+                Admin
+              </Link>
+            )}
+            <Link
+              to="/"
+              className="btn btn-outline"
+              onClick={() => {
+                if (userId)
+                  sessionStorage.setItem(
+                    `tryumph-experience:${userId}`,
+                    "member",
+                  );
+              }}
+            >
+              Switch to member experience
+            </Link>
+            <Link to="/account" className="btn btn-ghost">
+              Account
+            </Link>
+          </div>
+        </header>
+        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      </div>
+    );
   return (
     <div className="min-h-screen">
       <ReminderWatcher />
@@ -79,13 +117,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {n.label}
               </Link>
             ))}
-            {!(s.signedIn && s.role === "trainer") && <Link
-              to="/for-trainers"
-              className="ml-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
-              activeProps={{ className: "bg-primary/10" }}
-            >
-              Teach on Tryumph
-            </Link>}
+            {!(s.signedIn && s.role === "trainer") && (
+              <Link
+                to="/for-trainers"
+                className="ml-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                activeProps={{ className: "bg-primary/10" }}
+              >
+                Become a Trainer
+              </Link>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <GetAppButton className="btn btn-ghost hidden md:inline-flex" />
@@ -98,7 +138,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             )}
             {s.role === "trainer" && s.signedIn && userId && (
-              <Link to="/trybes" search={{t: `coach-${userId}`}} className="btn btn-ghost hidden sm:inline-flex">My Trybe</Link>
+              <Link
+                to="/trybes"
+                search={{ t: `coach-${userId}` }}
+                className="btn btn-ghost hidden sm:inline-flex"
+              >
+                My Trybe
+              </Link>
             )}
             {s.role === "trainer" && s.signedIn && (
               <Link
@@ -138,21 +184,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {open && (
           <nav className="grid gap-1 border-t px-4 py-3 lg:hidden">
-            {!(s.signedIn && s.role === "trainer") && <Link
-              to="/for-trainers"
-              onClick={() => setOpen(false)}
-              className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
-            >
-              Teach on Tryumph →
-            </Link>}
-            {s.role === "trainer" && s.signedIn && userId && (
-              <Link to="/trybes" search={{t: `coach-${userId}`}} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm">My Trybe</Link>
+            {!(s.signedIn && s.role === "trainer") && (
+              <Link
+                to="/for-trainers"
+                onClick={() => setOpen(false)}
+                className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+              >
+                Become a Trainer →
+              </Link>
             )}
-            {[
-              ...nav,
-              { to: "/studio", label: "Trainer Studio" },
-              { to: "/shop", label: "Shop" },
-            ].map((n) => (
+            {s.role === "trainer" && s.signedIn && userId && (
+              <Link
+                to="/trybes"
+                search={{ t: `coach-${userId}` }}
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm"
+              >
+                My Trybe
+              </Link>
+            )}
+            {[...nav, { to: "/studio", label: "Trainer Studio" }].map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
@@ -161,9 +212,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 activeProps={{ className: "bg-secondary" }}
               >
                 {n.label}
-                {n.to === "/shop" && (
-                  <span className="chip ml-2 text-xs">Coming soon</span>
-                )}
               </Link>
             ))}
             {isAdmin && (
@@ -206,9 +254,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <footer className="border-t">
         <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 px-4 py-8 text-sm text-muted-foreground">
           <p>© 2026 Tryumph Gym — bring the gym home.</p>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <Link to="/terms">Terms & waiver</Link>
-            <Link to="/shop">Shop (coming soon)</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/contact">Contact Us</Link>
+            <Link to="/about">About Tryumph</Link>
+            <Link to="/policies/$page" params={{ page: "accessibility" }}>
+              Policies & accessibility
+            </Link>
             <Link to="/for-trainers">For trainers</Link>
           </div>
         </div>

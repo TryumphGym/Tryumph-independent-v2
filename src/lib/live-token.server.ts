@@ -6,7 +6,10 @@ export async function issueLiveRoomToken(
   room: string,
   name: string,
 ) {
-  const { isHost, isPrivate } = await authorizeLiveRoom(userId, room);
+  const { isHost, isPrivate, waiting, expiresAt } = await authorizeLiveRoom(
+    userId,
+    room,
+  );
   const key = runtimeEnv("LIVEKIT_API_KEY"),
     secret = runtimeEnv("LIVEKIT_API_SECRET"),
     url = runtimeEnv("LIVEKIT_URL");
@@ -14,19 +17,22 @@ export async function issueLiveRoomToken(
   const token = new AccessToken(key, secret, {
     identity: userId,
     name: name.slice(0, 80) || "Member",
-    ttl: "15m",
+    ttl: Math.max(
+      1,
+      Math.min(900, Math.floor((expiresAt - Date.now()) / 1000)),
+    ),
   });
   token.addGrant({
     room,
     roomJoin: true,
-    canPublish: isHost || isPrivate,
-    canSubscribe: true,
-    canPublishData: isHost || isPrivate,
-    roomAdmin: isHost,
+    canPublish: !waiting && (isHost || isPrivate),
+    canSubscribe: !waiting,
+    canPublishData: !waiting && !isPrivate && isHost,
+    roomAdmin: isHost && !isPrivate,
     roomRecord: false,
-    ...(isPrivate && !isHost
+    ...(isPrivate
       ? { canPublishSources: [TrackSource.CAMERA, TrackSource.MICROPHONE] }
       : {}),
   });
-  return { token: await token.toJwt(), url, isHost, isPrivate };
+  return { token: await token.toJwt(), url, isHost, isPrivate, waiting };
 }

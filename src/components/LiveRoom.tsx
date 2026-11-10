@@ -9,6 +9,7 @@ import type {
 import { getLiveKitToken } from "@/lib/livekit.functions";
 import { startClassRecording } from "@/lib/recordings.functions";
 import { useStore } from "@/lib/store";
+import { PrivatePaymentGate } from "./PrivatePaymentGate";
 import { Avatar } from "@/components/Avatar";
 
 // Real LiveKit video room. Loaded only on the client (dynamic import from the route).
@@ -48,10 +49,11 @@ export default function LiveRoom({
           url,
           isHost: serverHost,
           isPrivate,
+          waiting,
         } = await getLiveKitToken({ data: { room: roomId, name: s.name } });
         if (cancelled) return;
         setAuthorizedHost(serverHost);
-        setCanPublish(serverHost || isPrivate);
+        setCanPublish(!waiting && (serverHost || isPrivate));
         const { Room, RoomEvent, Track } = await import("livekit-client");
         room = new Room();
         roomRef.current = room;
@@ -64,6 +66,11 @@ export default function LiveRoom({
             ),
           );
         };
+        room.on(RoomEvent.ParticipantPermissionsChanged, () => {
+          setCanPublish(
+            Boolean(room?.localParticipant.permissions?.canPublish),
+          );
+        });
         room.on(RoomEvent.ParticipantConnected, refreshNames);
         room.on(RoomEvent.ParticipantDisconnected, refreshNames);
 
@@ -113,7 +120,7 @@ export default function LiveRoom({
         room.remoteParticipants.forEach((p) =>
           p.trackPublications.forEach((pub) => attach(pub, p)),
         );
-        if (serverHost) {
+        if (serverHost && !waiting) {
           const match = /^live-([0-9a-f-]{36})$/i.exec(roomId);
           if (match)
             void startClassRecording({ data: { sessionId: match[1] } }).catch(
@@ -265,26 +272,29 @@ export default function LiveRoom({
           </button>
         </div>
       </div>
-      <div className="card p-4">
-        <p className="eyebrow">In the room</p>
-        <ul className="mt-3 space-y-2">
-          <li className="flex items-center gap-2 text-sm">
-            <Avatar size="sm" initials={s.name.slice(0, 2).toUpperCase()} />
-            {s.name}{" "}
-            <span className="text-xs text-muted-foreground">(you)</span>
-          </li>
-          {participants.map((n) => (
-            <li key={n} className="flex items-center gap-2 text-sm">
-              <Avatar size="sm" initials={n.slice(0, 2).toUpperCase()} />
-              {n}
+      <div className="space-y-4">
+        {roomId.startsWith("oneonone-") && <PrivatePaymentGate room={roomId} />}
+        <div className="card p-4">
+          <p className="eyebrow">In the room</p>
+          <ul className="mt-3 space-y-2">
+            <li className="flex items-center gap-2 text-sm">
+              <Avatar size="sm" initials={s.name.slice(0, 2).toUpperCase()} />
+              {s.name}{" "}
+              <span className="text-xs text-muted-foreground">(you)</span>
             </li>
-          ))}
-        </ul>
-        {participants.length === 0 && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            You're the first one here — others will appear as they join.
-          </p>
-        )}
+            {participants.map((n) => (
+              <li key={n} className="flex items-center gap-2 text-sm">
+                <Avatar size="sm" initials={n.slice(0, 2).toUpperCase()} />
+                {n}
+              </li>
+            ))}
+          </ul>
+          {participants.length === 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              You're the first one here — others will appear as they join.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

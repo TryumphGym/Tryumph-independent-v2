@@ -1,12 +1,36 @@
+import { WorkoutComments } from "@/components/WorkoutComments";
+import {
+  CreatorComments,
+  CreatorProgramAnalytics,
+  CreatorAnalytics,
+  AudienceDemandInsights,
+  PartnershipInbox,
+  CreatorPerks,
+  TryumphSchool,
+  SubscriberLive,
+} from "@/components/CreatorBusiness";
+import { TryumphSpotlight } from "@/components/TryumphSpotlight";
+import { offersPrivateCoaching } from "@/lib/trainer-services";
+import { WorkoutFocusEditor } from "@/components/WorkoutFocusEditor";
+import {
+  CreatorOfferStudio,
+  CreatorVideoStudio,
+} from "@/components/CreatorMembership";
+import { DiscoveryFilters } from "@/components/DiscoveryFilters";
+import { TrainerFocusEditor } from "@/components/TrainerFocusEditor";
+import { TrainerProgramBuilder } from "@/components/TrainerProgramBuilder";
 import { MemberSessions } from "@/components/MemberSessions";
+import { TrainerMessages } from "@/components/TrainerMessages";
+import { ActiveMilestones } from "@/components/ActiveMilestones";
+import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { RecordingManager } from "@/components/RecordingManager";
 import { ClassManager } from "@/components/ClassManager";
 import { TrainerWorkoutEditor } from "@/components/TrainerWorkoutEditor";
 import {
   TrainerStoreManager,
-  TrainerProgramManager,
+  LegacyTrainerProgramManager,
 } from "@/components/TrainerLaunchTools";
-import { hasVerifiedCpr, type CredentialRecord } from "@/lib/cpr";
+import { isExpired, isCurrentVerified, type CredentialRecord } from "@/lib/cpr";
 import { SessionJoinButton } from "@/components/SessionJoin";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { Lock, ShieldCheck } from "lucide-react";
@@ -42,6 +66,8 @@ import { isLaunchWorkout } from "@/lib/launch";
 import { MultiDropdown } from "@/components/WorkoutFilters";
 
 export const Route = createFileRoute("/studio")({
+  validateSearch: (search: Record<string, unknown>): { section?: string } =>
+    typeof search["section"] === "string" ? { section: search["section"] } : {},
   head: () => ({
     meta: [
       { title: "Trainer Studio — Tryumph Gym" },
@@ -63,19 +89,51 @@ export const Route = createFileRoute("/studio")({
   component: Studio,
 });
 
-const UNLOCK = 5;
 const TABS = [
-  "Overview",
-  "My Profile",
-  "Calendar",
-  "On-demand",
-  "Store",
-  "Credentials",
+  "Dashboard",
+  "Analytics",
+  "Content Library",
+  "Live Studio",
+  "Programs",
+  "Trybe & Community",
+  "Messages & Partnerships",
+  "Bookings & Clients",
+  "Earnings & Payouts",
+  "Creator Perks",
+  "Tryumph School",
+  "Settings",
+  "Marketing & Spotlight",
 ] as const;
-
+const sectionKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 function Studio() {
+  const me = useUserId();
+  return <StudioForIdentity key={me ?? "signed-out"} me={me} />;
+}
+function StudioForIdentity({ me }: { me: string | null }) {
   const { s } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [profileRole, setProfileRole] = useState<string | null>(null);
+  const section = Route.useSearch().section;
+  const navigate = Route.useNavigate();
+  const tab = TABS.find((t) => sectionKey(t) === section) ?? "Dashboard";
+  const setTab = (t: (typeof TABS)[number]) =>
+    void navigate({ search: { section: sectionKey(t) } });
+  useEffect(() => {
+    let active = true;
+    setProfileRole(null);
+    if (me)
+      void supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", me)
+        .single()
+        .then((r) => {
+          if (active) setProfileRole(r.error ? "unavailable" : r.data.role);
+        });
+    return () => {
+      active = false;
+    };
+  }, [me]);
+  const [credentialsVerified, setCredentialsVerified] = useState(false);
   const [certStatus, setCertStatus] = useState<CredentialRecord[]>([]);
   useEffect(() => {
     let active = true;
@@ -92,13 +150,20 @@ function Studio() {
         .from("certifications")
         .select("name,status,expires,verified_at,verified_by")
         .eq("user_id", user.id);
-      if (active) setCertStatus((data ?? []) as CredentialRecord[]);
+      const eligibility = await supabase.rpc("trainer_is_eligible", {
+        p_user_id: user.id,
+        p_live: false,
+      });
+      if (active) {
+        setCertStatus((data ?? []) as CredentialRecord[]);
+        setCredentialsVerified(!eligibility.error && eligibility.data === true);
+      }
     });
     return () => {
       active = false;
     };
   }, [s.signedIn]);
-  if (!s.signedIn || s.role !== "trainer") {
+  if (!s.signedIn || profileRole !== "trainer") {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h1 className="text-2xl font-bold">Trainer Studio</h1>
@@ -117,11 +182,22 @@ function Studio() {
     );
   }
   const tr = s.extra.trainer;
-  const verified = hasVerifiedCpr(certStatus);
+  const verified = credentialsVerified;
+  const expiredUnreplaced = certStatus.filter(
+    (cert) =>
+      isExpired(cert.expires) &&
+      cert.status === "verified" &&
+      !certStatus.some(
+        (current) =>
+          current.name.toLowerCase() === cert.name.toLowerCase() &&
+          isCurrentVerified(current),
+      ),
+  );
+  const credentialsPaused = expiredUnreplaced.length > 0;
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Trainer Studio"
+        eyebrow="Tryumph Creator Studio"
         title="Your business at a glance"
         sub="Your verified trainer account, upcoming classes, video approvals, and earnings."
       >
@@ -134,6 +210,21 @@ function Studio() {
               : "Add CPR/AED certification"}
         </span>
       </PageHeader>
+      {credentialsPaused && (
+        <div role="alert" className="card border-amber-500/60 p-5">
+          <p className="font-bold">
+            Trainer certifications expired — activity paused
+          </p>
+          <p className="text-sm">
+            Please update your certification(s) in Settings to continue
+            uploading new content or hosting live classes. Previously approved
+            videos remain available.
+          </p>
+          <p className="mt-2 text-xs">
+            {expiredUnreplaced.map((x) => x.name).join(", ")}
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
@@ -145,24 +236,94 @@ function Studio() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && <Overview />}
-      {tab === "My Profile" && <TrainerProfileTab />}
-      {tab === "Calendar" && (
+      {tab === "Dashboard" && (
         <>
+          <AccountNoticeCenter trainer />
+          <ActiveMilestones days={s.activeDays} role="trainer" />
+          <CreatorAnalytics />
+        </>
+      )}
+      {tab === "Settings" && (
+        <>
+          <TrainerProfileTab />
+          <TrainerFocusEditor />
+        </>
+      )}
+      {tab === "Live Studio" && !credentialsPaused && (
+        <>
+          <SubscriberLive />
+          <Overview />
           <CalendarTab />
           <MemberSessions trainer />
           <ClassManager />
           <RecordingManager />
         </>
       )}
-      {tab === "On-demand" && (
+      {tab === "Content Library" && !credentialsPaused && (
         <>
+          <CreatorVideoStudio />
+          <WorkoutComments />
           <Uploads />
-          <TrainerProgramManager />
+          <details className="card p-5">
+            <summary>Legacy ordered playlists</summary>
+            <LegacyTrainerProgramManager />
+          </details>
         </>
       )}
-      {tab === "Store" && <StoreTab />}
-      {tab === "Credentials" && (
+      {tab === "Programs" && (
+        <>
+          <CreatorOfferStudio />
+          <TrainerProgramBuilder />
+        </>
+      )}
+      {tab === "Trybe & Community" && (
+        <>
+          <StoreTab />
+          <CreatorComments />
+          {me && (
+            <Link
+              className="btn btn-primary"
+              to="/trybes"
+              search={{ t: `coach-${me}` }}
+            >
+              Manage posts, photos, polls and announcements
+            </Link>
+          )}
+        </>
+      )}
+      {tab === "Messages & Partnerships" && (
+        <>
+          <h2 className="text-xl font-bold">Member messages</h2>
+          <TrainerMessages />
+          <PartnershipInbox />
+        </>
+      )}
+      {tab === "Analytics" && (
+        <>
+          <CreatorAnalytics />
+          <CreatorProgramAnalytics />
+          <AudienceDemandInsights />
+        </>
+      )}
+      {tab === "Bookings & Clients" && (
+        <>
+          <CalendarTab />
+          <MemberSessions trainer />
+        </>
+      )}
+      {tab === "Earnings & Payouts" && <Payouts />}
+      {tab === "Creator Perks" && <CreatorPerks />}
+      {tab === "Tryumph School" && <TryumphSchool />}
+      {tab === "Marketing & Spotlight" && <TryumphSpotlight />}
+      {credentialsPaused &&
+        (tab === "Live Studio" || tab === "Content Library") && (
+          <p className="card p-6" role="alert">
+            New uploads and live hosting are paused until expired required
+            credentials are renewed and verified. Go to Settings to submit
+            updated proof.
+          </p>
+        )}
+      {tab === "Settings" && (
         <div className="card space-y-6 p-6">
           <RolePicker />
           <CertManager />
@@ -216,34 +377,33 @@ function Overview() {
   const [live, setLive] = useState(false);
   const [approvedCount, setApprovedCount] = useState(0);
   const [cprApproved, setCprApproved] = useState(false);
+  const [liveTags, setLiveTags] = useState<string[]>([]),
+    [equipmentNotes, setEquipmentNotes] = useState(""),
+    [modifications, setModifications] = useState(""),
+    [liveIntensity, setLiveIntensity] = useState("");
   const [countLoaded, setCountLoaded] = useState(false);
   useEffect(() => {
     let active = true;
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
-      const result = await supabase
-        .from("trainer_videos")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", data.user.id)
-        .eq("review_status", "approved");
-      const certs = await supabase
-        .from("certifications")
-        .select("name,status,expires,verified_at,verified_by")
-        .eq("user_id", data.user.id);
+      const result = await supabase.rpc("creator_live_video_count", {
+        p_trainer: data.user.id,
+      });
       if (active) {
-        setApprovedCount(result.error ? 0 : (result.count ?? 0));
-        setCprApproved(
-          !certs.error &&
-            hasVerifiedCpr((certs.data ?? []) as CredentialRecord[]),
-        );
-        setCountLoaded(!result.error && !certs.error);
+        setApprovedCount(result.error ? 0 : (result.data ?? 0));
+        const eligible = await supabase.rpc("trainer_is_eligible", {
+          p_user_id: data.user!.id,
+          p_live: true,
+        });
+        setCprApproved(!eligible.error && eligible.data === true);
+        setCountLoaded(!eligible.error);
       }
     });
     return () => {
       active = false;
     };
   }, [s.signedIn, s.extra.trainer.videos.length]);
-  const unlocked = countLoaded && approvedCount >= UNLOCK && cprApproved;
+  const unlocked = countLoaded && cprApproved;
   const [st, setSt] = useState<Awaited<
     ReturnType<typeof getPayoutStatus>
   > | null>(null);
@@ -284,22 +444,14 @@ function Overview() {
           <h2 className="text-xl font-bold">Schedule a live class</h2>
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
-              <p className="flex items-center gap-2 font-semibold">
-                <Lock className="h-4 w-4" />
-                Lives unlock after {UNLOCK} approved on-demand videos and
-                verified, current CPR/AED
+              <p className="font-semibold">
+                Current verified credentials and at least five approved videos
+                are required to host.
               </p>
-              <div className="mt-2 h-2 rounded-full bg-background">
-                <div
-                  className="h-2 rounded-full bg-brand"
-                  style={{
-                    width: `${Math.min(100, (approvedCount / UNLOCK) * 100)}%`,
-                  }}
-                />
-              </div>
               <p className="mt-2 text-muted-foreground">
-                Approved videos: {countLoaded ? approvedCount : "Checking…"}/
-                {UNLOCK} · CPR/AED: {cprApproved ? "Verified" : "Required"}
+                Optional profile checklist: add a photo, biography,
+                introduction, sample workouts and your first service. These
+                recommendations do not gate live classes.
               </p>
             </div>
           ) : (
@@ -348,13 +500,56 @@ function Overview() {
                 value={f.description}
                 onChange={(e) => setF({ ...f, description: e.target.value })}
               />
+              <label className="block">
+                Intensity
+                <select
+                  className="field"
+                  value={liveIntensity}
+                  onChange={(e) => setLiveIntensity(e.target.value)}
+                >
+                  <option value="">Not assessed</option>
+                  {["gentle", "moderate", "challenging"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </label>
+              <DiscoveryFilters
+                value={liveTags}
+                onChange={setLiveTags}
+                editor
+              />
+              <label>
+                Equipment requirements
+                <input
+                  className="field"
+                  value={equipmentNotes}
+                  onChange={(e) => setEquipmentNotes(e.target.value)}
+                  maxLength={1000}
+                />
+              </label>
+              <label>
+                Modifications and intensity
+                <textarea
+                  className="field"
+                  value={modifications}
+                  onChange={(e) => setModifications(e.target.value)}
+                  maxLength={2000}
+                />
+              </label>
+              {!st?.enabled && (
+                <p className="text-sm">
+                  Connect an eligible payout account before scheduling a new
+                  paid class. Existing paid sessions keep their credential and
+                  attendance checks.
+                </p>
+              )}
               <button
                 className="btn btn-primary w-full"
-                disabled={!f.title || !f.when || !unlocked}
+                disabled={!f.title || !f.when || !unlocked || !st?.enabled}
                 onClick={async () => {
                   if (!me || !unlocked) {
                     toast.error(
-                      "Five approved videos and verified CPR are required to schedule.",
+                      "Current verified credentials and payout eligibility are required to schedule.",
                     );
                     return;
                   }
@@ -376,6 +571,10 @@ function Overview() {
                       level: f.level,
                       starts_at: when.toISOString(),
                       description: f.description,
+                      discovery_tags: liveTags,
+                      intensity: liveIntensity,
+                      equipment_notes: equipmentNotes,
+                      modification_notes: modifications,
                     });
                   if (error) {
                     toast.error(
@@ -484,6 +683,7 @@ function Payouts() {
             ["1-on-1 sessions (90%)", st?.bySource.oneonone ?? 0],
             ["Live tokens (50%)", st?.bySource.live ?? 0],
             ["On-demand ads (50%)", st?.bySource.ads ?? 0],
+            ["Programs (approved terms)", st?.bySource.programs ?? 0],
           ] as const
         ).map(([l, c]) => (
           <div key={l} className="flex justify-between py-3">
@@ -805,6 +1005,12 @@ function Uploads() {
     ),
   ];
   const breakErr = validateBreaks(toSecs(f.breaks), +f.minutes || 0);
+  const [accessScope, setAccessScope] = useState<"public" | "program">(
+    "public",
+  );
+  const [workoutTags, setWorkoutTags] = useState<string[]>([]);
+  const [workoutIntensity, setWorkoutIntensity] = useState(""),
+    [workoutModifications, setWorkoutModifications] = useState("");
   const [file, setFile] = useState<File | null>(null);
   // Fill duration from the actual video metadata; trainers can correct it.
   useEffect(() => {
@@ -814,7 +1020,10 @@ function Uploads() {
     media.preload = "metadata";
     media.onloadedmetadata = () => {
       if (Number.isFinite(media.duration) && media.duration > 0)
-        setF((current) => ({ ...current, minutes: String(Math.ceil(media.duration / 60)) }));
+        setF((current) => ({
+          ...current,
+          minutes: String(Math.ceil(media.duration / 60)),
+        }));
     };
     media.src = url;
     return () => {
@@ -827,6 +1036,9 @@ function Uploads() {
   const [playlistName, setPlaylistName] = useState("");
   const [playlistBusy, setPlaylistBusy] = useState(false);
   const vids = s.extra.trainer.videos.filter(isLaunchWorkout);
+  const approvedCount = vids.filter(
+    (v) => v.reviewStatus === "approved",
+  ).length;
   useEffect(() => {
     if (!me) return;
     supabase
@@ -904,7 +1116,7 @@ function Uploads() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.session.access_token}`,
         },
-        body: JSON.stringify({ title: f.title }),
+        body: JSON.stringify({ title: f.title, accessScope }),
       });
       const ticket = (await ticketResponse.json()) as {
         error?: string;
@@ -956,6 +1168,7 @@ function Uploads() {
       .from("trainer_videos")
       .insert({
         user_id: me,
+        access_scope: accessScope,
         title: f.title,
         description: f.description,
         spotify_url: f.spotify || null,
@@ -968,6 +1181,9 @@ function Uploads() {
         pregnancy_safe: f.pregnancySafe,
         playlist,
         break_seconds: f.breakSecs,
+        discovery_tags: workoutTags,
+        intensity: workoutIntensity,
+        modification_notes: workoutModifications,
         required_equipment: requiredEquipment,
         optional_equipment: optionalEquipment,
       })
@@ -1017,7 +1233,9 @@ function Uploads() {
     setFile(null);
     setBusy(false);
     toast.success(
-      "Video uploaded for review — it will appear publicly after approval.",
+      accessScope === "public"
+        ? "Video uploaded for review — it will appear publicly after approval."
+        : "Protected program video submitted for admin review; it will not enter the public on-demand library.",
     );
   };
   const assignPlaylist = async (video: TrainerVideo, playlist: string) => {
@@ -1119,11 +1337,28 @@ function Uploads() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="card space-y-3 p-6">
-        <h2 className="text-xl font-bold">Upload an on-demand workout</h2>
+        <h2 className="text-xl font-bold">Upload a workout</h2>
+        <label className="block text-sm">
+          Video access
+          <select
+            className="field"
+            value={accessScope}
+            onChange={(e) =>
+              setAccessScope(e.target.value as "public" | "program")
+            }
+          >
+            <option value="public">Free public on-demand</option>
+            <option value="program">Protected program library</option>
+          </select>
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Public workouts stay free. Protected videos require a separately
+          secured Bunny library and cannot be converted from previously public
+          videos.
+        </p>
         <p className="text-sm text-muted-foreground">
-          {vids.length >= UNLOCK
-            ? "Live classes unlocked 🎉"
-            : `${UNLOCK - vids.length} more to unlock live classes.`}
+          Choose your services. Sample workouts are optional; current
+          verification and payment eligibility are checked for paid offerings.
         </p>
         {youthLocked && (
           <p className="rounded-lg bg-secondary p-3 text-sm text-warning">
@@ -1195,6 +1430,33 @@ function Uploads() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
+            <label className="block">
+              Intensity
+              <select
+                className="field"
+                value={workoutIntensity}
+                onChange={(e) => setWorkoutIntensity(e.target.value)}
+              >
+                <option value="">Not assessed</option>
+                {["gentle", "moderate", "challenging"].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              Modifications and experience guidance
+              <textarea
+                className="field"
+                maxLength={2000}
+                value={workoutModifications}
+                onChange={(e) => setWorkoutModifications(e.target.value)}
+              />
+            </label>{" "}
+            <DiscoveryFilters
+              value={workoutTags}
+              onChange={setWorkoutTags}
+              editor
+            />
             <MultiDropdown
               label="Fitness goals"
               values={f.goals}
@@ -1314,7 +1576,7 @@ function Uploads() {
             checked={f.pregnancySafe}
             onChange={(e) => setF({ ...f, pregnancySafe: e.target.checked })}
           />
-          Pregnancy safe
+          Pregnancy / prenatal focus (trainer-labeled; not medical clearance)
         </label>
         <label className="block text-sm font-medium">
           Rest / water breaks
@@ -1449,6 +1711,7 @@ function Uploads() {
                   Remove
                 </button>
               </span>
+              <WorkoutFocusEditor id={v.id} />
             </li>
           ))}
         </ul>
@@ -1466,6 +1729,21 @@ function TrainerProfileTab() {
   return (
     <section className="card space-y-4 p-6">
       <h2 className="text-xl font-bold">My Trainer Profile</h2>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={offersPrivateCoaching(trainer)}
+          onChange={(e) =>
+            update({ services: e.target.checked ? ["coaching"] : [] })
+          }
+        />
+        Offer private one-on-one coaching at my listed rate
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Choose the services that suit you. Coaching is optional; programs,
+        memberships, live classes and your free community are managed
+        separately. Disabling new bookings preserves existing accepted sessions.
+      </p>
       <p className="text-sm text-muted-foreground">
         To upload or change your profile photo, open{" "}
         <Link to="/account" className="text-primary underline">
@@ -1536,7 +1814,11 @@ function TrainerProfileTab() {
         Changes save with your account. Public trainer profile synchronization
         must be verified before inviting trainers.
       </p>
-      <Link to="/trybes" search={{ t: me ? `coach-${me}` : undefined }} className="btn btn-outline inline-flex">
+      <Link
+        to="/trybes"
+        search={{ t: me ? `coach-${me}` : undefined }}
+        className="btn btn-outline inline-flex"
+      >
         Manage My Trybe
       </Link>
     </section>

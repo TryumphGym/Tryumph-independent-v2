@@ -1,17 +1,22 @@
-import { nextWaterBreak } from "@/lib/adBreaks";
+import { trackDiscoveryDemand } from "@/lib/demand";
+import { PickForMe } from "@/components/PickForMe";
+import { EverydayTryumphs } from "@/components/EverydayTryumphs";
+import { CommunityTagBadges } from "@/components/WorkoutFeedback";
+import type { CommunityTags } from "@/lib/workout-feedback";
+import { DiscoveryFilters } from "@/components/DiscoveryFilters";
+import { matchesDiscovery } from "@/lib/discovery";
+import { OnDemandPlayer } from "@/components/OnDemandPlayer";
+import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { goalScore } from "@/lib/fitness-goals";
 import { isLaunchWorkout } from "@/lib/launch";
-import { WaterBreakSponsor } from "@/components/WaterBreakSponsor";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { Bookmark, BookmarkCheck, Droplets, Play, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Bookmark, BookmarkCheck, Play } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CATEGORIES, LEVELS, EQUIPMENT, DURATIONS, gearOf } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { getVideoUrl } from "@/lib/videos.functions";
 import { thumbFor, workoutThumbFor } from "@/lib/thumbs";
 import { PageHeader } from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
@@ -40,6 +45,9 @@ export const Route = createFileRoute("/on-demand")({
 });
 
 type Uploaded = {
+  discovery_tags?: string[];
+  intensity?: string;
+  modification_notes?: string;
   description: string;
   spotify_url: string | null;
   id: string;
@@ -61,12 +69,14 @@ type Tab = "all" | "later" | "history" | "programs";
 function OnDemand() {
   const { v } = Route.useSearch();
   const { s, toggleWatchLater, watch } = useStore();
+  const [focus, setFocus] = useState<string[]>([]);
   const [cat, setCat] = useState<string[]>([]),
     [lvl, setLvl] = useState("All levels");
   const [eq, setEq] = useState<string[]>([]),
     [needs, setNeeds] = useState<string[]>([]);
   const [dur, setDur] = useState("Any length"),
     [tab, setTab] = useState<Tab>("all");
+  const [communityTags, setCommunityTags] = useState<CommunityTags>({});
   const [rows, setRows] = useState<Uploaded[]>([]),
     [open, setOpen] = useState<Uploaded | null>(null),
     [loading, setLoading] = useState(true);
@@ -90,39 +100,42 @@ function OnDemand() {
         quiet: false,
         equipmentChosen: eq.length > 0,
       };
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
-    void (async () => {
-      try {
-        const [videosResult, trainersResponse] = await Promise.all([
-          supabase
-            .from("trainer_videos")
-            .select("description,spotify_url,id,user_id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment")
-            .eq("review_status", "approved")
-            .order("created_at", { ascending: false })
-            .limit(250),
-          fetch("/api/public/trainers", { cache: "no-store" }),
-        ]);
-        if (videosResult.error || !trainersResponse.ok)
-          throw new Error("Public workout verification unavailable");
-        const { trainers } = (await trainersResponse.json()) as {
-          trainers: { id: string }[];
-        };
-        const verifiedTrainerIds = new Set(trainers.map((trainer) => trainer.id));
-        setRows(((videosResult.data ?? []) as Uploaded[]).filter(
-          (video) => Boolean(video.user_id && verifiedTrainerIds.has(video.user_id)),
-        ));
-      } catch {
-        toast.error("Cannot load verified workouts");
+    let query = supabase
+      .from("public_workout_catalog")
+      .select(
+        "description,spotify_url,id,user_id,title,category,level,path,minutes,breaks,equipment,pregnancy_safe,playlist,break_seconds,required_equipment,optional_equipment,discovery_tags,intensity,modification_notes",
+      )
+      .eq("review_status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(250);
+    if (focus.length) query = query.contains("discovery_focus_tags", focus);
+    void query.then(({ data, error }) => {
+      setLoading(false);
+      if (error) {
+        toast.error("Cannot load approved workouts");
         setRows([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  };
+      } else setRows((data ?? []) as Uploaded[]);
+    });
+  }, [focus]);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+  useEffect(() => {
+    let active = true;
+    setCommunityTags({});
+    if (rows.length)
+      void supabase
+        .rpc("workout_community_tags", { p_ids: rows.map((x) => x.id) })
+        .then((r) => {
+          if (active && !r.error)
+            setCommunityTags(r.data as unknown as CommunityTags);
+        });
+    return () => {
+      active = false;
+    };
+  }, [rows]);
   useEffect(() => {
     if (v) setOpen(rows.find((row) => row.id === v) ?? null);
   }, [v, rows]);
@@ -142,6 +155,7 @@ function OnDemand() {
   const safe = rows.filter(
     (x) =>
       isLaunchWorkout(x) &&
+      matchesDiscovery(x, focus) &&
       isSafetyCompatible(norm(x), preferences) &&
       matchesDuration(x.minutes),
   );
@@ -168,6 +182,26 @@ function OnDemand() {
   const explore = visible.filter(
     (x) => !best.includes(x) && !close.includes(x),
   );
+  const demandKey = JSON.stringify({ focus, cat, lvl, eq, dur, tab });
+  useEffect(() => {
+    if (loading || !s.signedIn || tab !== "all") return;
+    const timer = setTimeout(() => {
+      trackDiscoveryDemand({
+        source: "workouts",
+        tags: focus,
+        categories: cat,
+        equipment: eq,
+        minutes: preciseDuration
+          ? Number(preciseDuration[2])
+          : (duration?.max ?? 0),
+        minMinutes: preciseDuration ? 0 : (duration?.min ?? 0),
+        exact: preciseDuration?.[1] === "Exactly",
+        difficulty: lvl === "All levels" ? "" : lvl,
+      });
+    }, 600);
+    return () => clearTimeout(timer); // explicit controls only; private profile preferences are excluded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demandKey, loading, s.signedIn]);
   const openVideo = (x: Uploaded) => {
     watch(x.id);
     setOpen(x);
@@ -204,17 +238,24 @@ function OnDemand() {
               >
                 <img
                   src={workoutThumbFor(x.path, x.category)}
-                  onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = thumbFor(x.category); }}
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = thumbFor(x.category);
+                  }}
                   alt=""
                   loading="lazy"
                   className="h-full w-full object-cover"
                 />
-                <span className="absolute inset-0 grid place-items-center bg-black/20"><Play className="h-8 w-8 text-white" /></span>
+                <span className="absolute inset-0 grid place-items-center bg-black/20">
+                  <Play className="h-8 w-8 text-white" />
+                </span>
               </button>
               <div className="p-4">
                 <p className="eyebrow">
                   {x.category} · {x.level}
-                  {x.pregnancy_safe ? " · Pregnancy safe" : ""}
+                  {x.pregnancy_safe
+                    ? " · Prenatal focus (trainer-labeled)"
+                    : ""}
                 </p>
                 <p className="font-semibold">{x.title}</p>
                 <p className="text-sm text-muted-foreground">{x.description}</p>
@@ -238,6 +279,14 @@ function OnDemand() {
                   {(x.breaks ?? []).length
                     ? `${x.breaks.length} water breaks`
                     : "Ad-free"}
+                </p>
+                <CommunityTagBadges value={communityTags[x.id]} />
+                <p className="text-sm">
+                  Experience: {x.level} · Intensity:{" "}
+                  {x.intensity || "Not specified"}
+                </p>
+                <p className="whitespace-pre-wrap text-sm">
+                  {x.modification_notes}
                 </p>
                 <div className="mt-2 flex justify-between gap-3">
                   <button
@@ -267,13 +316,21 @@ function OnDemand() {
   );
   return (
     <div>
+      <DiscoveryFilters value={focus} onChange={setFocus} />
       <PageHeader
         eyebrow="Free · Approved trainer videos"
         title="On-Demand Library"
         sub="Sponsored messages are shown only during water breaks, never during a set."
       />
+      <PickForMe />
+      <EverydayTryumphs />
+
       {open && (
-        <RealPlayer key={open.id} video={open} onClose={() => setOpen(null)} />
+        <OnDemandPlayer
+          key={open.id}
+          video={open}
+          onClose={() => setOpen(null)}
+        />
       )}
       <div className="mb-4 flex flex-wrap gap-2">
         {(["all", "programs", "later", "history"] as Tab[])
@@ -330,7 +387,14 @@ function OnDemand() {
         <ChoiceDropdown
           label="Time"
           value={dur}
-          options={["Any length", ...DURATIONS.map((d) => d.label), ...[5, 10, 15, 20, 30, 45, 60, 90].flatMap((min) => [`Up to ${min} min`, `Exactly ${min} min`])]}
+          options={[
+            "Any length",
+            ...DURATIONS.map((d) => d.label),
+            ...[5, 10, 15, 20, 30, 45, 60, 90].flatMap((min) => [
+              `Up to ${min} min`,
+              `Exactly ${min} min`,
+            ]),
+          ]}
           onChange={setDur}
         />
         {s.signedIn && (
@@ -342,7 +406,10 @@ function OnDemand() {
       {loading ? (
         <p className="card p-6">Loading approved workouts…</p>
       ) : tab === "programs" ? (
-        <PublicPrograms onPlay={openVideo} workouts={safe} />
+        <>
+          <ProgramCatalog />
+          <PublicPrograms onPlay={openVideo} workouts={safe} />
+        </>
       ) : (
         <>
           {renderGroup(
@@ -383,7 +450,8 @@ function PublicPrograms({
       const { data, error } = await supabase
         .from("trainer_programs")
         .select("id,title,description")
-        .eq("published", true);
+        .eq("published", true)
+        .eq("builder_version", 1);
       if (error || !active) return;
       setPrograms(data ?? []);
       const { data: items } = await supabase
@@ -407,7 +475,7 @@ function PublicPrograms({
   if (!programs.length)
     return (
       <p className="card p-6 text-muted-foreground">
-        Published trainer programs will appear here.
+        Legacy public playlists will appear here.
       </p>
     );
   return (
@@ -439,229 +507,6 @@ function PublicPrograms({
           </ol>
         </section>
       ))}
-    </div>
-  );
-}
-
-function RealPlayer({
-  video,
-  onClose,
-}: {
-  video: Uploaded;
-  onClose: () => void;
-}) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [ad, setAd] = useState(0);
-  const [activeBreak, setActiveBreak] = useState<number | null>(null);
-  const [soon, setSoon] = useState(false);
-  const [done, setDone] = useState<Set<number>>(new Set());
-  const [playbackId] = useState(() => {
-    const key = `tryumph-playback:${video.id}`;
-    const saved = sessionStorage.getItem(key);
-    if (saved) return saved;
-    const id = crypto.randomUUID();
-    sessionStorage.setItem(key, id);
-    return id;
-  });
-  const ref = useRef<HTMLVideoElement>(null);
-  const previous = useRef(0);
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const sign = useServerFn(getVideoUrl);
-  const bunny =
-    !!url && /https:\/\/(?:iframe|player)\.mediadelivery\.net\//.test(url);
-  const command = (method: string) =>
-    frameRef.current?.contentWindow?.postMessage(
-      {
-        context: "player.js",
-        version: "0.0.11",
-        method,
-      },
-      new URL(url ?? "https://player.mediadelivery.net").origin,
-    );
-  const resume = () => {
-    setAd(0);
-    setActiveBreak(null);
-    if (bunny) command("play");
-    else void ref.current?.play().catch(() => {});
-  };
-  const progress = (seconds: number) => {
-    if (ad > 0 || !Number.isFinite(seconds)) return;
-    const last = previous.current;
-    previous.current = seconds;
-    if (seconds - last > 3) {
-      setDone(
-        (old) =>
-          new Set([
-            ...old,
-            ...(video.breaks ?? []).filter((b) => b <= seconds + 2),
-          ]),
-      );
-      return;
-    }
-    const hit = nextWaterBreak(
-      video.breaks ?? [],
-      done,
-      last,
-      seconds,
-      video.minutes,
-    );
-    if (hit !== null) {
-      if (bunny) command("pause");
-      else ref.current?.pause();
-      setDone((old) => new Set([...old, hit]));
-      setActiveBreak(hit);
-      setAd([15, 30].includes(video.break_seconds) ? video.break_seconds : 15);
-      setSoon(false);
-      return;
-    }
-    setSoon(
-      (video.breaks ?? []).some(
-        (b) => !done.has(b) && b - seconds > 0 && b - seconds <= 5,
-      ),
-    );
-  };
-  useEffect(() => {
-    setDone(new Set());
-    setAd(0);
-    setActiveBreak(null);
-    setUrl(null);
-    sign({ data: { id: video.id } })
-      .then(setUrl)
-      .catch(() => {
-        setUrl(null);
-        toast.error("Unable to open this workout. Please try again.");
-      });
-  }, [video.id]);
-  useEffect(() => {
-    if (!bunny) return;
-    const frame = frameRef.current;
-    const origin = new URL(url!).origin;
-    const receive = (event: MessageEvent) => {
-      if (event.origin !== origin || event.source !== frame?.contentWindow)
-        return;
-      const msg =
-        typeof event.data === "string"
-          ? (() => {
-              try {
-                return JSON.parse(event.data);
-              } catch {
-                return null;
-              }
-            })()
-          : event.data;
-      if (msg?.context !== "player.js") return;
-      if (msg.event === "ready")
-        frame?.contentWindow?.postMessage(
-          {
-            context: "player.js",
-            version: "0.0.11",
-            method: "addEventListener",
-            value: "timeupdate",
-          },
-          origin,
-        );
-      if (msg.event === "timeupdate" && typeof msg.value?.seconds === "number")
-        progress(msg.value.seconds);
-    };
-    window.addEventListener("message", receive);
-    // The player.js protocol works on both the modern and legacy Bunny players.
-    const register = () => {
-      frame?.contentWindow?.postMessage(
-        {
-          context: "player.js",
-          version: "0.0.11",
-          method: "addEventListener",
-          value: "timeupdate",
-        },
-        origin,
-      );
-    };
-    frame?.addEventListener("load", register);
-    register();
-    return () => {
-      window.removeEventListener("message", receive);
-      frame?.removeEventListener("load", register);
-    };
-  }, [url, bunny, ad, done]);
-  useEffect(() => {
-    if (ad <= 0) return;
-    const timeout = setTimeout(
-      () =>
-        setAd((a) => {
-          if (a === 1) {
-            if (bunny) command("play");
-            else void ref.current?.play().catch(() => {});
-            setActiveBreak(null);
-          }
-          return Math.max(0, a - 1);
-        }),
-      1000,
-    );
-    return () => clearTimeout(timeout);
-  }, [ad, bunny, url]);
-  return (
-    <div className="card mb-6 overflow-hidden">
-      <div className="relative bg-secondary">
-        {bunny ? (
-          <iframe
-            ref={frameRef}
-            src={url!}
-            title={video.title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            className="aspect-video w-full"
-          />
-        ) : url ? (
-          <video
-            ref={ref}
-            src={url}
-            controls={ad === 0}
-            autoPlay
-            onTimeUpdate={(e) => progress(e.currentTarget.currentTime)}
-            className="aspect-video w-full"
-          />
-        ) : (
-          <div className="grid aspect-video place-items-center text-muted-foreground">
-            Loading…
-          </div>
-        )}
-        {ad > 0 && (
-          <div className="absolute inset-0 grid place-items-center bg-background/95 text-center">
-            <div>
-              <Droplets className="mx-auto h-10 w-10 text-primary" />
-              <p className="mt-3 font-display text-2xl font-bold">
-                Water break 💧
-              </p>
-              <p className="text-muted-foreground">
-                Grab some water — resuming in {ad}s
-              </p>
-              {activeBreak !== null && (
-                <WaterBreakSponsor
-                  videoId={video.id}
-                  second={activeBreak}
-                  playbackId={playbackId}
-                />
-              )}
-              <button className="btn btn-ghost mt-3" onClick={resume}>
-                Resume now
-              </button>
-            </div>
-          </div>
-        )}
-        {soon && ad === 0 && (
-          <div className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground">
-            💧 Water break soon
-          </div>
-        )}
-        <button
-          onClick={onClose}
-          className="btn btn-ghost absolute right-3 top-3"
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      <p className="p-4 font-semibold">{video.title}</p>
     </div>
   );
 }

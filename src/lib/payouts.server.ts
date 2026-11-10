@@ -47,5 +47,5 @@ export async function sessionFee(
   const fee = transaction.fee;
   if (!Number.isSafeInteger(fee) || fee < 0 || fee > gross)
     throw new Error("Invalid processing fee");
-  return { gross, fee, chargeId: charge.id };
+  return { gross, fee, chargeId: charge.id, refunded: charge.amount_refunded };
 }

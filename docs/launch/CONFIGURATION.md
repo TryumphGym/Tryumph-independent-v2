@@ -1,3 +1,5 @@
+> November 4 Creator Studio update: see [implementation and staging handoff](../creator-studio/IMPLEMENTATION.md). New hosted PDF/video/mixed program sales use 90/10 after actual fees, before hosting. Previous dated release evidence remains historical.
+
 # Runtime and provider configuration
 
 The code phase does not require entering these secrets or connecting production services. Configure them later, securely in Cloudflare environment settings; use `.dev.vars` for private local Workers bindings. No private credentials were present in this cloud machine. Existing public Supabase configuration was reused. Never paste secrets into chat, Git, a PR, or a `VITE_` variable.
@@ -61,3 +63,20 @@ For a local public-only setup, `.env.local` contains just the two existing publi
 ## Network
 
 The environment draft preserves package-manager presets and adds known destinations: the configured Supabase project, `video.bunnycdn.com`, `tus.bunnycdn.com`, `iframe.mediadelivery.net`, `api.stripe.com`, `api.github.com`, and existing Google font hosts. Fonts are now bundled, so they no longer require runtime Google requests. Add the exact LiveKit and R2 account hostnames after choosing those accounts; do not replace an unknown allowlist or add arbitrary wildcards. Native Git branch push and draft PR creation were verified. Saving the environment draft does not itself establish publication or apply runtime settings.
+
+## October 27 completion additions
+
+Use [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) as the current sequence. `VITE_STRIPE_PUBLISHABLE_KEY` is a public **test** key required to authenticate the existing private-balance intent; never use a secret key in that build setting. The same server-only Stripe keys cover deposits, the one balance intent and its verified events. Add `payment_intent.succeeded` and `account.updated` to the staging webhook event selection alongside the existing checkout/refund/dispute events. `account.updated` persists true or false payout status from Stripe rather than trusting the browser.
+
+LiveKit participant webhook handling now performs a fresh provider presence lookup before spending tokens or advancing private balances. Attendees awaiting a debit have no subscription permission; deposit participants have no audio/video delivery until successful balance settlement. The scheduled job processes early-arriving participants who remain present at scheduled start. Room tokens expire no later than the access window, and expired/cancelled private rooms have durable shutdown jobs. Real provider permission updates and webhook retry behavior remain staging gates.
+
+Resend contact/sender/reply-to target is `mackenzie@tryumphgym.com` / Tryumph Gym. The app continues to use Supabase Auth; configure Resend behind Supabase custom SMTP, not a second authentication flow. The separately merged Contact Us form requires a server-only `RESEND_API_KEY`, plus optional non-secret `CONTACT_FROM_EMAIL` (default `mackenzie@tryumphgym.com`). Its fixed recipient is that same founder inbox; Reply-To is the visitor. Apply migration `0055` and verify provider receipt/delivery in staging. Supabase Auth SMTP is independent of this HTTP API integration. The requested setup guide could not be fetched because the network proxy returned 403; see [RESEND_SETUP.md](RESEND_SETUP.md). No provider setting or DNS was changed.
+
+
+## November 2 marketplace additions
+
+The current [FOUNDER_HANDOFF.md](FOUNDER_HANDOFF.md) overrides older five-video/no-recurring-product wording. No mandatory platform subscription exists; optional trainer subscriptions use 90/10 after actual fees. New native programs use 90/10, video-water-break ads 50/50 and community-feed ads 100% Tryumph.
+
+New false-by-default server gates: `CREATOR_MEMBERSHIPS_ENABLED`, `PROGRAM_DOWNLOADS_VERIFIED`, `COMMUNITY_PHOTOS_VERIFIED`, `COMMUNITY_FEED_ADS_VERIFIED`. Existing `PROGRAM_NATIVE_CHECKOUT_ENABLED` and `BUNNY_PROGRAM_MEDIA_VERIFIED` stay separately gated. Configure `CREATOR_PORTAL_CONFIGURATION_ID`; the existing `PROGRAM_TERMS_OWNER_ID` identifies the actual admin owner. Bind `COMMUNITY_IMAGES` only after the actual Cloudflare Images API/security workflow is verified. A vetted HTTPS `COMMUNITY_MODERATION_URL` and server-only `COMMUNITY_MODERATION_KEY` must satisfy the specialist-clearance contract in the handoff. Feed sponsorships require `COMMUNITY_AD_MODE=manual-sponsored` and a secure 32+ character server-only `COMMUNITY_AD_SESSION_KEY`. Do not invent a third-party ad-network integration or mark provider behavior verified from mock tests.
+
+Database commerce/media/ad gates also default off. Apply missing 0060–0064 only in reconciled staging, in order, and run `marketplace-postchecks.sql`. These apply-once migrations preserve existing records and inquiry policy. No environment setting, provider credential, binding, DNS entry or hosted schema was changed by the code continuation.

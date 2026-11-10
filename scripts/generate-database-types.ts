@@ -75,10 +75,8 @@ const funcs = functions
       .map((name, i) => ({ name, type: f.types[i]!, mode: f.modes?.[i] }))
       .filter((x) => x.mode === "t");
     const result =
-      f.setof &&
-      !output.length &&
-      columns.some((c) => c.table_name === f.returns)
-        ? `Database['public']['Tables']['${f.returns}']['Row'][]`
+      !output.length && columns.some((c) => c.table_name === f.returns)
+        ? `Database['public']['Tables']['${f.returns}']['Row']${f.setof ? "[]" : ""}`
         : output.length
           ? `{${output.map((x) => `${x.name}: ${ts(x.type)}`).join(";")}}[]`
           : ts(f.returns);

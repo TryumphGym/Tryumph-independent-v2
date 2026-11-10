@@ -1,4 +1,10 @@
+import { authenticatedExperience } from "@/lib/experience";
+import { MemberSubscriptions } from "@/components/CreatorMembership";
+import { Link as ProgramLink } from "@tanstack/react-router";
 import { MemberSessions } from "@/components/MemberSessions";
+import { TrainerMessages } from "@/components/TrainerMessages";
+import { ActiveMilestones } from "@/components/ActiveMilestones";
+import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { cancelPrivateSession } from "@/lib/session-management.functions";
 import {
   credentialLabel,
@@ -146,6 +152,9 @@ function Account() {
           password,
         });
         if (error) throw error;
+        const experience = await authenticatedExperience();
+        sessionStorage.removeItem(`tryumph-experience:${experience.userId}`);
+        await navigate({ to: experience.landing });
         toast.success("Welcome back!");
       }
     } catch (e) {
@@ -525,7 +534,30 @@ function SignedInAccount() {
           <GearPicker />
         </div>
       )}
-      {s.signedIn && <MemberSessions />}
+      {s.signedIn && <AccountNoticeCenter trainer={s.role === "trainer"} />}
+      {s.signedIn && (
+        <div className="mb-6">
+          <ActiveMilestones
+            days={s.activeDays}
+            role={s.role === "trainer" ? "trainer" : "member"}
+          />
+        </div>
+      )}
+      {s.signedIn && s.role === "member" && (
+        <div className="mb-6">
+          <TrainerMessages />
+        </div>
+      )}
+      {s.signedIn && (
+        <>
+          <div className="card p-4">
+            <ProgramLink className="text-primary underline" to="/programs">
+              My workout programs · resume progress →
+            </ProgramLink>
+          </div>
+          <MemberSessions />
+        </>
+      )}
       <div className="card mb-6 flex flex-wrap items-center gap-4 p-6">
         <Avatar
           size="lg"

@@ -1,4 +1,6 @@
 export type PublicTrainer = {
+  focus_tags?: string[];
+  services?: string[];
   id: string;
   name: string;
   bio: string;

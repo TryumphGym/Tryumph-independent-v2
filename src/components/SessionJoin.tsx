@@ -32,6 +32,7 @@ export function SessionJoinButton({
   title,
   hostName,
   isTrainer = false,
+  accessEndsAt,
 }: {
   trainerId: string;
   date: string;
@@ -39,6 +40,7 @@ export function SessionJoinButton({
   title: string;
   hostName: string;
   isTrainer?: boolean;
+  accessEndsAt?: string | undefined;
 }) {
   const [now, setNow] = useState<Date | null>(null);
   const [inRoom, setInRoom] = useState(false);
@@ -48,7 +50,13 @@ export function SessionJoinButton({
     return () => clearInterval(i);
   }, []);
   if (!now) return null;
-  const w = sessionWindow(date, time, now);
+  const baseWindow = sessionWindow(date, time, now);
+  const w =
+    accessEndsAt && baseWindow !== "early"
+      ? now.getTime() <= Date.parse(accessEndsAt)
+        ? "open"
+        : "ended"
+      : baseWindow;
   if (inRoom) {
     return (
       <div className="fixed inset-0 z-50 overflow-auto bg-background p-4">

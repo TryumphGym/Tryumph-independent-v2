@@ -1,3 +1,11 @@
+import { SpotlightAdmin } from "@/components/TryumphSpotlight";
+import {
+  CreatorResourcesAdmin,
+  CreatorPriceBounds,
+} from "@/components/CreatorResourcesAdmin";
+import { CommunitySafetyAdmin } from "@/components/CommunitySafetyAdmin";
+import { CreatorAdmin } from "@/components/CreatorAdmin";
+import { ProgramAdmin } from "@/components/ProgramAdmin";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +16,8 @@ import { PageHeader } from "@/components/Avatar";
 import { payOutPending } from "@/lib/payouts.functions";
 import { PrivateVideoPreview } from "@/components/PrivateVideoPreview";
 import { AdminOperations } from "@/components/AdminOperations";
+import { AdminSafetyCenter } from "@/components/AdminSafetyCenter";
+import { AdminAnnouncements } from "@/components/AdminAnnouncements";
 import { AdminSponsorCampaigns } from "@/components/AdminSponsorCampaigns";
 import {
   interestLabel,
@@ -286,6 +296,14 @@ function Admin() {
       </section>
       <AdminSponsorCampaigns />
       <AdminOperations />
+      <AdminAnnouncements />
+      <AdminSafetyCenter />
+      <ProgramAdmin />
+      <CreatorAdmin />
+      <CreatorResourcesAdmin />
+      <CreatorPriceBounds />
+      <SpotlightAdmin />
+      <CommunitySafetyAdmin />
       {LAUNCH.youth && (
         <section className="card space-y-3 p-5">
           <div>

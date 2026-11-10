@@ -6,6 +6,7 @@ export function PrivateVideoPreview({ id }: { id: string }) {
   return (
     <div>
       <button
+        type="button"
         className="btn btn-outline"
         onClick={() =>
           void getPrivateVideoUrl({ data: { id } })
@@ -32,7 +33,11 @@ export function PrivateVideoPreview({ id }: { id: string }) {
           ) : (
             <video src={url} controls className="aspect-video w-full" />
           )}
-          <button className="btn btn-ghost" onClick={() => setUrl(null)}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setUrl(null)}
+          >
             Close preview
           </button>
         </div>

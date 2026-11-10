@@ -1,3 +1,11 @@
+import { CommunityPostPhotos } from "@/components/CommunityPostPhotos";
+import { CommunityFeedAd } from "@/components/CommunityFeedAd";
+import { getCommunityAdSlot } from "@/lib/community-ads.functions";
+import {
+  CreatorMembership,
+  CreatorVideos,
+} from "@/components/CreatorMembership";
+import { publishCreatorPost } from "@/lib/creator.functions";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Heart,
@@ -8,7 +16,7 @@ import {
   UserPlus,
   Bell,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -20,13 +28,26 @@ import {
 import { useStore } from "@/lib/store";
 import { Avatar, PageHeader } from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { useChat, useFriendRequests, useFriends, usePosts, useUserId } from "@/lib/community";
+import {
+  useChat,
+  useFriendRequests,
+  useFriends,
+  usePosts,
+  useUserId,
+} from "@/lib/community";
+import { ProgramCatalog } from "@/components/ProgramCatalog";
 import { inTrybeFeed } from "@/lib/trybe-feed";
 import { Button } from "@/components/ui/button";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
+import { useTrybePolls } from "@/lib/use-trybe-polls";
+import { PollEditor, TrybePollCard } from "@/components/TrybePoll";
+import { ReportContent } from "@/components/ReportContent";
 
 export const Route = createFileRoute("/trybes")({
-  validateSearch: z.object({ t: z.string().optional() }),
+  validateSearch: z.object({
+    t: z.string().optional(),
+    poll: z.string().uuid().optional(),
+  }),
   head: () => ({
     meta: [
       { title: "Trybes Community — Tryumph Gym" },
@@ -49,16 +70,50 @@ export const Route = createFileRoute("/trybes")({
 });
 
 function Trybes() {
-  const { t } = Route.useSearch();
+  const { t, poll: focusedPoll } = Route.useSearch();
   const { s, setExtra } = useStore();
   const me = useUserId();
-  const { posts: all, reload } = usePosts(me);
+
   const { friends, reload: reloadFriends } = useFriends(me);
   const { incoming, outgoing, reload: reloadRequests } = useFriendRequests(me);
   const [trybe, setTrybe] = useState(t ?? "all");
-  const [postVisibility, setPostVisibility] = useState<"public" | "private">(
-    "private",
-  );
+  const [audienceTab, setAudienceTab] = useState<
+    "community" | "public" | "subscribers"
+  >("community");
+  const [ownedGroups, setOwnedGroups] = useState<
+      { id: string; name: string }[]
+    >([]),
+    [pollEditor, setPollEditor] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setOwnedGroups([]);
+    setPollEditor(false);
+    if (me)
+      void supabase.rpc("poll_owned_trybes").then((r) => {
+        if (active && !r.error) setOwnedGroups(r.data);
+      });
+    return () => {
+      active = false;
+    };
+  }, [me]);
+  useEffect(() => {
+    let active = true;
+    if (!focusedPoll) return;
+    void supabase
+      .from("posts")
+      .select("trybe")
+      .eq("id", focusedPoll)
+      .maybeSingle()
+      .then((r) => {
+        if (active && !r.error && r.data) setTrybe(r.data.trybe);
+      });
+    return () => {
+      active = false;
+    };
+  }, [focusedPoll, me]);
+  const [postVisibility, setPostVisibility] = useState<
+    "public" | "private" | "subscribers" | "both"
+  >("private");
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [directoryCoaches, setDirectoryCoaches] = useState<
     { id: string; name: string }[]
@@ -142,26 +197,81 @@ function Trybes() {
   const e = s.extra;
   const isMod = s.signedIn && s.role === "trainer";
   const partners = friends.filter((f) => f.partner);
+  const partnerIds = partners
+    .map((p) => p.friend_id)
+    .sort()
+    .join(",");
   // Private Trybes: posts are only ever visible to joined members.
-  const canSee = (id: string) => id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
+  const canSee = (id: string) =>
+    id === `coach-${me}` || !isPrivateTrybe(id) || joinedIds.includes(id);
   const locked = trybe !== "all" && trybe !== "discover" && !canSee(trybe);
-  const visible = all.filter((p) => !p.is_hidden && canSee(p.trybe));
-  const effectiveMemberships = s.signedIn && s.role === "trainer" && me
-    ? [...new Set([...joinedIds, `coach-${me}`])]
-    : joinedIds;
+  const effectiveMemberships =
+    s.signedIn && s.role === "trainer" && me
+      ? [...new Set([...joinedIds, `coach-${me}`])]
+      : joinedIds;
+  const {
+    posts: all,
+    reload,
+    hasMore,
+    loading: feedLoading,
+    error: feedError,
+    loadMore,
+  } = usePosts(
+    me,
+    trybe,
+    effectiveMemberships,
+    focusedPoll,
+    trybe.startsWith("coach-") ? audienceTab : undefined,
+  );
+  const pollState = useTrybePolls(
+    all.filter((p) => p.kind === "Poll").map((p) => p.id),
+  );
+  const visible = all.filter(
+    (p) => !p.is_hidden && (p.official === true || canSee(p.trybe)),
+  );
   const filtered = visible.filter((p) =>
     trybe === "discover"
       ? p.visibility === "public"
-      : inTrybeFeed(p.trybe, trybe, effectiveMemberships),
+      : (p.official === true && trybe === "all") ||
+        inTrybeFeed(p.trybe, trybe, effectiveMemberships),
   );
-  const posts = [...filtered].sort(
+  const audienceFiltered =
+    audienceTab === "community"
+      ? filtered
+      : filtered.filter((p) =>
+          audienceTab === "public"
+            ? p.visibility === "public"
+            : p.audience === "subscribers" || p.audience === "both",
+        );
+  const [adSlot, setAdSlot] =
+    useState<Awaited<ReturnType<typeof getCommunityAdSlot>>>(null);
+  const posts = [...audienceFiltered].sort(
     (a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned),
   );
+  const adPostIds = JSON.stringify(posts.slice(-20).map((p) => p.id));
+  useEffect(() => {
+    let active = true;
+    setAdSlot(null);
+    if (me)
+      void getCommunityAdSlot({ data: { postIds: JSON.parse(adPostIds) } })
+        .then((r) => {
+          if (active) setAdSlot(r);
+        })
+        .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [adPostIds, me, trybe]);
   const coaches = directoryCoaches;
   for (const c of coaches) coachTrybeNames[c.id] = c.name;
-  const joined = joinedIds.includes(trybe) || (s.signedIn && s.role === "trainer" && trybe === `coach-${me}`);
+  const joined =
+    joinedIds.includes(trybe) ||
+    (s.signedIn && s.role === "trainer" && trybe === `coach-${me}`);
   const isFriend = (id: string | null) =>
-    !!id && (friends.some((f) => f.friend_id === id) || incoming.some((r) => r.requester_id === id) || outgoing.some((r) => r.recipient_id === id));
+    !!id &&
+    (friends.some((f) => f.friend_id === id) ||
+      incoming.some((r) => r.requester_id === id) ||
+      outgoing.some((r) => r.recipient_id === id));
   // Never suggest partners based on private-Trybe activity.
   const suggestions = me
     ? [
@@ -194,13 +304,16 @@ function Trybes() {
   }, [t]);
 
   useEffect(() => {
-    if (!me || partners.length === 0) {
+    if (!me || !partnerIds) {
       setAlerts([]);
       return;
     }
     let active = true;
+    const authorizedPartners = new Set(partnerIds.split(","));
     const loadPartnerAlerts = async () => {
-      const { data: reservations, error } = await supabase.rpc("partner_reservations");
+      const { data: reservations, error } = await supabase.rpc(
+        "partner_reservations",
+      );
       if (error) {
         console.error("Partner reservations unavailable", error);
         if (active) setAlerts([]);
@@ -208,8 +321,10 @@ function Trybes() {
       }
       const partnerBySession = new Map<string, Set<string>>();
       for (const partner of reservations ?? []) {
-        if (!partners.some((f) => f.friend_id === partner.friend_id)) continue;
-        const ids = Array.isArray(partner.reservations) ? partner.reservations : [];
+        if (!authorizedPartners.has(partner.friend_id)) continue;
+        const ids = Array.isArray(partner.reservations)
+          ? partner.reservations
+          : [];
         for (const id of ids) {
           if (typeof id !== "string") continue;
           if (!partnerBySession.has(id)) partnerBySession.set(id, new Set());
@@ -242,9 +357,14 @@ function Trybes() {
       if (active) setAlerts(output);
     };
     void loadPartnerAlerts();
-    const poll = window.setInterval(() => { void loadPartnerAlerts(); }, 30000);
-    return () => { active = false; window.clearInterval(poll); };
-  }, [me, partners.map((p) => p.friend_id).sort().join(",")]);
+    const poll = window.setInterval(() => {
+      void loadPartnerAlerts();
+    }, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(poll);
+    };
+  }, [me, partnerIds]);
 
   const needAuth = (what: string) => {
     if (!s.signedIn || !me) {
@@ -270,13 +390,25 @@ function Trybes() {
       toast.error("Join this Trybe to post.");
       return;
     }
+    if (target === `coach-${me}` && postVisibility !== "private") {
+      try {
+        await publishCreatorPost({
+          data: { text: text.trim(), audience: postVisibility },
+        });
+        setText("");
+        reload();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not post");
+      }
+      return;
+    }
     const { error } = await supabase.from("posts").insert({
       author_id: me,
       author_name: s.name,
       trybe: target,
       kind,
       text: text.trim(),
-      visibility: target === `coach-${me}` ? postVisibility : "private",
+      visibility: "private",
     });
     if (error) {
       toast.error("Couldn't post. Try again.");
@@ -315,7 +447,7 @@ function Trybes() {
     reload();
   };
   const removeOwn = async (id: string) => {
-    await supabase.from("posts").delete().eq("id", id);
+    await supabase.rpc("delete_community_post", { p_post: id });
     reload();
   };
   const moderate = async (
@@ -334,29 +466,49 @@ function Trybes() {
   const addFriend = async (id: string, name: string) => {
     if (needAuth("send friend requests") || id === me || isFriend(id)) return;
     const { error } = await supabase.from("friend_requests").insert({
-      requester_id: me!, recipient_id: id,
-      requester_name: s.name, recipient_name: name,
+      requester_id: me!,
+      recipient_id: id,
+      requester_name: s.name,
+      recipient_name: name,
     });
-    if (error) { toast.error(`Couldn't send friend request: ${error.message}`); return; }
+    if (error) {
+      toast.error(`Couldn't send friend request: ${error.message}`);
+      return;
+    }
     toast.success(`Friend request sent to ${name}`);
     void reloadRequests();
   };
   const respondToRequest = async (requesterId: string, accept: boolean) => {
     if (!me) return;
     const result = accept
-      ? await supabase.rpc("accept_friend_request", { p_requester_id: requesterId })
-      : await supabase.from("friend_requests").delete()
-          .eq("requester_id", requesterId).eq("recipient_id", me);
+      ? await supabase.rpc("accept_friend_request", {
+          p_requester_id: requesterId,
+        })
+      : await supabase
+          .from("friend_requests")
+          .delete()
+          .eq("requester_id", requesterId)
+          .eq("recipient_id", me);
     if (result.error) {
-      toast.error(`Couldn't ${accept ? "accept" : "decline"} request: ${result.error.message}`);
+      toast.error(
+        `Couldn't ${accept ? "accept" : "decline"} request: ${result.error.message}`,
+      );
       return;
     }
-    toast.success(accept ? "Friend request accepted" : "Friend request declined");
+    toast.success(
+      accept ? "Friend request accepted" : "Friend request declined",
+    );
     void reloadRequests();
     void reloadFriends();
   };
   const unfriend = async (id: string, name: string) => {
-    if (!me || !window.confirm(`Remove ${name} from your friends? This also ends your accountability partnership.`)) return;
+    if (
+      !me ||
+      !window.confirm(
+        `Remove ${name} from your friends? This also ends your accountability partnership.`,
+      )
+    )
+      return;
     const { error } = await supabase.rpc("unfriend_user", { p_friend_id: id });
     if (error) {
       toast.error(`Couldn't unfriend ${name}: ${error.message}`);
@@ -395,7 +547,13 @@ function Trybes() {
     <div>
       <PageHeader
         eyebrow="Community"
-        title={trybe === "all" ? "Your Trybe feed" : trybe === `coach-${me}` && s.role === "trainer" ? "My Trybe" : trybeName(trybe)}
+        title={
+          trybe === "all"
+            ? "Your Trybe feed"
+            : trybe === `coach-${me}` && s.role === "trainer"
+              ? "My Trybe"
+              : trybeName(trybe)
+        }
         sub={
           trybe === "all"
             ? "Updates from the Trybes you've joined."
@@ -403,6 +561,20 @@ function Trybes() {
               "Classes, tips and encouragement with your coach.")
         }
       />
+      {ownedGroups.length > 0 && (
+        <nav className="mb-4 flex flex-wrap gap-2" aria-label="Trybes you own">
+          {ownedGroups.map((g) => (
+            <Link
+              className="btn btn-outline"
+              key={g.id}
+              to="/trybes"
+              search={{ t: g.id }}
+            >
+              {g.name}
+            </Link>
+          ))}
+        </nav>
+      )}
       {trybe === "all" ? (
         <>
           <div className="mb-6 flex flex-wrap gap-2">
@@ -432,7 +604,23 @@ function Trybes() {
       )}
       {trybe.startsWith("coach-") &&
         /^[0-9a-f-]{36}$/i.test(trybe.slice(6)) && (
-          <TrainerStorefront trainerId={trybe.slice(6)} />
+          <>
+            <TrainerStorefront trainerId={trybe.slice(6)} />
+            <CreatorMembership trainerId={trybe.slice(6)} />
+            <CreatorVideos trainerId={trybe.slice(6)} />
+            <div className="mb-6">
+              <ProgramCatalog trainerId={trybe.slice(6)} />
+            </div>
+            {me && me !== trybe.slice(6) && (
+              <div className="mb-4">
+                <ReportContent
+                  targetType="trainer"
+                  targetId={trybe.slice(6)}
+                  label="Report this trainer"
+                />
+              </div>
+            )}
+          </>
         )}
       {trybe !== "all" && trybe !== "discover" && (
         <div className="card mb-6 flex flex-wrap items-center gap-3 p-4">
@@ -454,6 +642,23 @@ function Trybes() {
           </button>
         </div>
       )}
+      {trybe.startsWith("coach-") && (
+        <nav className="mb-4 flex gap-2" aria-label="Trybe audiences">
+          {(["community", "public", "subscribers"] as const).map((tab) => (
+            <button
+              className={`chip ${audienceTab === tab ? "chip-active" : ""}`}
+              key={tab}
+              onClick={() => setAudienceTab(tab)}
+            >
+              {tab === "community"
+                ? "Free community"
+                : tab === "public"
+                  ? "Public"
+                  : "Subscribers"}
+            </button>
+          ))}
+        </nav>
+      )}
       <div className="mb-4 flex gap-2">
         <button
           className="btn btn-outline"
@@ -467,6 +672,45 @@ function Trybes() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
+          {ownedGroups.some((g) => g.id === target) && (
+            <div>
+              <button
+                className="btn btn-outline"
+                onClick={() => setPollEditor((v) => !v)}
+              >
+                {pollEditor ? "Cancel poll" : "Create a poll"}
+              </button>
+              {pollEditor && (
+                <PollEditor
+                  key={target}
+                  trybe={target!}
+                  onCancel={() => setPollEditor(false)}
+                  onSaved={() => {
+                    setPollEditor(false);
+                    if (target)
+                      setJoinedIds((old) => [...new Set([...old, target])]);
+                    pollState.refresh();
+                    reload();
+                    toast.success("Poll published");
+                  }}
+                />
+              )}
+            </div>
+          )}
+          {(feedError || pollState.error) && (
+            <p role="alert">
+              {feedError || pollState.error}
+              <button
+                className="underline ml-2"
+                onClick={() => {
+                  reload();
+                  pollState.refresh();
+                }}
+              >
+                Retry
+              </button>
+            </p>
+          )}
           {canPost ? (
             <div className="card space-y-3 p-4">
               <textarea
@@ -491,11 +735,18 @@ function Trybes() {
                     aria-label="Post visibility"
                     value={postVisibility}
                     onChange={(e) =>
-                      setPostVisibility(e.target.value as "public" | "private")
+                      setPostVisibility(
+                        e.target.value as
+                          "public" | "private" | "subscribers" | "both",
+                      )
                     }
                   >
                     <option value="private">Trybe members only</option>
-                    <option value="public">Public discovery</option>
+                    <option value="public">Public</option>
+                    <option value="subscribers">Subscribers Only</option>
+                    <option value="both">
+                      Both public and subscriber feeds
+                    </option>
                   </select>
                 )}
                 <button className="btn btn-primary ml-auto" onClick={post}>
@@ -582,121 +833,198 @@ function Trybes() {
                 </p>
               )}
               {posts.map((p) => (
-                <div key={p.id} className="card p-5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Avatar
-                      size="sm"
-                      initials={p.author_name.slice(0, 2).toUpperCase()}
-                    />
-                    <p className="font-semibold">{p.author_name}</p>
-                    {p.author_id &&
-                      p.author_id !== me &&
-                      !isFriend(p.author_id) && (
-                        <button
-                          className="flex items-center gap-1 text-xs text-primary"
-                          onClick={() => addFriend(p.author_id!, p.author_name)}
-                        >
-                          <UserPlus className="h-3 w-3" />
-                          Add friend
-                        </button>
-                      )}
-                    {isFriend(p.author_id) && (
-                      <span className="text-xs text-muted-foreground">
-                        Friend
-                      </span>
-                    )}
-                    <span className="chip">{p.kind.toLowerCase() === "text" ? "Post" : p.kind}</span>
-                    {p.is_pinned && (
-                      <span className="chip chip-active">📌 Pinned</span>
-                    )}
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {trybeName(p.trybe)}
-                    </span>
-                  </div>
-                  <p className="mt-3">{p.text}</p>
-                  <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
-                    <button
-                      className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
-                      onClick={() => like(p.id, p.liked)}
-                    >
-                      <Heart
-                        className={`h-4 w-4 ${p.liked ? "fill-primary" : ""}`}
+                <Fragment key={p.id}>
+                  <div id={`post-${p.id}`} className="card p-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Avatar
+                        size="sm"
+                        initials={p.author_name.slice(0, 2).toUpperCase()}
                       />
-                      {p.likes}
-                    </button>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      {p.comments.length}
-                    </span>
-                    {p.author_id && p.author_id === me && (
-                      <button
-                        className="ml-auto flex items-center gap-1"
-                        onClick={() => removeOwn(p.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    )}
-                    {isMod &&
-                      p.trybe === `coach-${me}` &&
-                      p.author_id !== me && (
-                        <>
+                      <p className="font-semibold">
+                        {p.official === true ? "Tryumph Gym" : p.author_name}
+                      </p>
+                      {p.official === true && (
+                        <span className="chip chip-active">
+                          Official announcement
+                        </span>
+                      )}
+                      {!p.official &&
+                        p.author_id &&
+                        p.author_id !== me &&
+                        !isFriend(p.author_id) && (
                           <button
-                            className="ml-auto flex items-center gap-1"
+                            className="flex items-center gap-1 text-xs text-primary"
                             onClick={() =>
-                              void moderate(p.id, "pin", !p.is_pinned)
+                              addFriend(p.author_id!, p.author_name)
                             }
                           >
-                            <Pin className="h-4 w-4" />
-                            {p.is_pinned ? "Unpin" : "Pin"}
+                            <UserPlus className="h-3 w-3" />
+                            Add friend
                           </button>
-                          <button
-                            className="flex items-center gap-1 text-destructive"
-                            onClick={() => void moderate(p.id, "hide", true)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Hide
-                          </button>
-                        </>
+                        )}
+                      {isFriend(p.author_id) && (
+                        <span className="text-xs text-muted-foreground">
+                          Friend
+                        </span>
                       )}
-                  </div>
-                  {p.comments.map((c) => (
-                    <div
-                      key={c.id}
-                      className="mt-2 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm"
-                    >
-                      <span>
-                        <b>{c.author_name}:</b> {c.text}
+                      <span className="chip">
+                        {p.kind.toLowerCase() === "text" ? "Post" : p.kind}
                       </span>
-                      {c.author_id !== me && !isFriend(c.author_id) && (
+                      {p.is_pinned && (
+                        <span className="chip chip-active">📌 Pinned</span>
+                      )}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {trybeName(p.trybe)}
+                      </span>
+                    </div>
+                    {!p.official && me && p.author_id && p.author_id !== me && (
+                      <ReportContent
+                        targetType="user"
+                        targetId={p.author_id}
+                        label="Report user"
+                      />
+                    )}
+                    {p.kind === "Poll" ? (
+                      pollState.polls[p.id] ? (
+                        <TrybePollCard
+                          poll={pollState.polls[p.id]!}
+                          onUpdate={pollState.update}
+                          onRefresh={pollState.refresh}
+                        />
+                      ) : (
+                        <p role="status">
+                          {pollState.error
+                            ? "Poll unavailable."
+                            : "Loading poll…"}
+                        </p>
+                      )
+                    ) : (
+                      <p className="mt-3">{p.text}</p>
+                    )}
+                    <CommunityPostPhotos
+                      postId={p.id}
+                      canEdit={p.author_id === me && p.kind !== "Poll"}
+                      onChange={reload}
+                    />
+                    {me && p.author_id !== me && (
+                      <ReportContent
+                        targetType="post"
+                        targetId={p.id}
+                        label="Report post"
+                      />
+                    )}
+                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
+                      <button
+                        className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
+                        onClick={() => like(p.id, p.liked)}
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${p.liked ? "fill-primary" : ""}`}
+                        />
+                        {p.likes}
+                      </button>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle className="h-4 w-4" />
+                        {p.comments.length}
+                      </span>
+                      {p.author_id && p.author_id === me && (
                         <button
-                          className="ml-auto text-xs text-primary"
-                          onClick={() => addFriend(c.author_id, c.author_name)}
+                          className="ml-auto flex items-center gap-1"
+                          onClick={() => removeOwn(p.id)}
                         >
-                          Add friend
+                          <Trash2 className="h-4 w-4" />
+                          Delete
                         </button>
                       )}
+                      {isMod &&
+                        p.trybe === `coach-${me}` &&
+                        p.author_id !== me && (
+                          <>
+                            <button
+                              className="ml-auto flex items-center gap-1"
+                              onClick={() =>
+                                void moderate(p.id, "pin", !p.is_pinned)
+                              }
+                            >
+                              <Pin className="h-4 w-4" />
+                              {p.is_pinned ? "Unpin" : "Pin"}
+                            </button>
+                            <button
+                              className="flex items-center gap-1 text-destructive"
+                              onClick={() => void moderate(p.id, "hide", true)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Hide
+                            </button>
+                          </>
+                        )}
                     </div>
-                  ))}
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      className="field"
-                      placeholder="Say something encouraging…"
-                      value={comment[p.id] ?? ""}
-                      onChange={(ev) =>
-                        setComment({ ...comment, [p.id]: ev.target.value })
-                      }
-                    />
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => reply(p.id)}
-                    >
-                      Reply
-                    </button>
+                    {p.comments.map((c) => (
+                      <div
+                        key={c.id}
+                        className="mt-2 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm"
+                      >
+                        <span>
+                          <b>{c.author_name}:</b> {c.text}
+                        </span>
+                        {me && c.author_id !== me && (
+                          <ReportContent
+                            targetType="user"
+                            targetId={c.author_id}
+                            label="Report user"
+                          />
+                        )}
+                        {me && c.author_id !== me && (
+                          <ReportContent
+                            targetType="comment"
+                            targetId={c.id}
+                            label="Report comment"
+                          />
+                        )}
+                        {c.author_id !== me && !isFriend(c.author_id) && (
+                          <button
+                            className="ml-auto text-xs text-primary"
+                            onClick={() =>
+                              addFriend(c.author_id, c.author_name)
+                            }
+                          >
+                            Add friend
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        className="field"
+                        placeholder="Say something encouraging…"
+                        value={comment[p.id] ?? ""}
+                        onChange={(ev) =>
+                          setComment({ ...comment, [p.id]: ev.target.value })
+                        }
+                      />
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => reply(p.id)}
+                      >
+                        Reply
+                      </button>
+                    </div>
                   </div>
-                </div>
+                  {adSlot?.afterPost === p.id && (
+                    <CommunityFeedAd creative={adSlot.creative} />
+                  )}
+                </Fragment>
               ))}
             </>
+          )}
+          {hasMore && !locked && (
+            <button
+              className="btn btn-outline"
+              disabled={feedLoading}
+              onClick={loadMore}
+            >
+              {feedLoading ? "Loading…" : "Load more posts"}
+            </button>
           )}
         </div>
         <aside className="space-y-4">
@@ -738,14 +1066,38 @@ function Trybes() {
             </ul>
           </div>
           <div className="card p-5">
-            <p className="eyebrow">Friend requests {incoming.length > 0 ? `(${incoming.length})` : ""}</p>
-            {incoming.length === 0 && <p className="mt-2 text-sm text-muted-foreground">No pending requests.</p>}
+            <p className="eyebrow">
+              Friend requests{" "}
+              {incoming.length > 0 ? `(${incoming.length})` : ""}
+            </p>
+            {incoming.length === 0 && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                No pending requests.
+              </p>
+            )}
             <ul className="mt-3 space-y-3">
               {incoming.map((request) => (
-                <li key={request.requester_id} className="flex flex-wrap items-center gap-2 text-sm">
+                <li
+                  key={request.requester_id}
+                  className="flex flex-wrap items-center gap-2 text-sm"
+                >
                   <span className="flex-1">{request.requester_name}</span>
-                  <button className="btn btn-primary" onClick={() => void respondToRequest(request.requester_id, true)}>Accept</button>
-                  <button className="btn btn-outline" onClick={() => void respondToRequest(request.requester_id, false)}>Decline</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() =>
+                      void respondToRequest(request.requester_id, true)
+                    }
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() =>
+                      void respondToRequest(request.requester_id, false)
+                    }
+                  >
+                    Decline
+                  </button>
                 </li>
               ))}
             </ul>
@@ -753,7 +1105,11 @@ function Trybes() {
               <>
                 <p className="eyebrow mt-4">Sent requests</p>
                 <ul className="mt-2 space-y-2 text-sm">
-                  {outgoing.map((request) => <li key={request.recipient_id}>{request.recipient_name} · Pending</li>)}
+                  {outgoing.map((request) => (
+                    <li key={request.recipient_id}>
+                      {request.recipient_name} · Pending
+                    </li>
+                  ))}
                 </ul>
               </>
             )}
@@ -762,9 +1118,9 @@ function Trybes() {
             <p className="eyebrow">Friends</p>
             {friends.length === 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
-                Send friend requests from suggestions, posts and replies. Once accepted, tap "Make
-                partner" to get a private chat and alerts when they reserve a
-                live.
+                Send friend requests from suggestions, posts and replies. Once
+                accepted, tap "Make partner" to get a private chat and alerts
+                when they reserve a live.
               </p>
             )}
             <ul className="mt-3 space-y-2">
@@ -778,6 +1134,13 @@ function Trybes() {
                     initials={f.friend_name.slice(0, 2).toUpperCase()}
                   />
                   {f.friend_name}
+                  {me && f.friend_id !== me && (
+                    <ReportContent
+                      targetType="user"
+                      targetId={f.friend_id}
+                      label="Report user"
+                    />
+                  )}
                   <button
                     className={`ml-auto chip ${f.partner ? "chip-active" : ""}`}
                     onClick={() => togglePartner(f.friend_id, f.partner)}
@@ -822,7 +1185,10 @@ function Trybes() {
           {friends.length > 0 && (
             <div className="card p-5">
               <p className="eyebrow">Messages</p>
-              <p className="mt-1 text-xs text-muted-foreground">Private conversations with accepted friends. Accountability partners are marked below.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Private conversations with accepted friends. Accountability
+                partners are marked below.
+              </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {friends.map((p) => (
                   <button
@@ -830,12 +1196,22 @@ function Trybes() {
                     className={`chip ${chatWith === p.friend_id ? "chip-active" : ""}`}
                     onClick={() => setChatWith(p.friend_id)}
                   >
-                    {p.friend_name}{p.partner ? " · Partner" : ""}
+                    {p.friend_name}
+                    {p.partner ? " · Partner" : ""}
                   </button>
                 ))}
               </div>
               {chatWith && (
                 <>
+                  {chatWith !== me && (
+                    <div className="mt-2">
+                      <ReportContent
+                        targetType="user"
+                        targetId={chatWith}
+                        label="Report chat partner"
+                      />
+                    </div>
+                  )}
                   <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                     {msgs.length === 0 && (
                       <p className="text-sm text-muted-foreground">

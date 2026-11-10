@@ -1,3 +1,4 @@
+import { assertProgramMediaReady } from "./program-media.server";
 import { runtimeEnv } from "@/lib/runtime-env.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { env } from "cloudflare:workers";
@@ -32,8 +33,20 @@ export async function finishRecordedClass(egressId: string) {
     recording.object_key.includes("..")
   )
     throw new Error("Recording is not ready to import");
-  const libraryId = runtimeEnv("BUNNY_STREAM_LIBRARY_ID");
-  const apiKey = runtimeEnv("BUNNY_STREAM_API_KEY");
+  const sourceSession = await supabaseAdmin
+    .from("live_sessions")
+    .select("session_type")
+    .eq("id", recording.session_id)
+    .single();
+  if (sourceSession.error)
+    throw new Error("Original class visibility unavailable");
+  const protectedRecording = sourceSession.data.session_type === "subscriber";
+  const libraryId = protectedRecording
+    ? assertProgramMediaReady()
+    : runtimeEnv("BUNNY_STREAM_LIBRARY_ID");
+  const apiKey = runtimeEnv(
+    protectedRecording ? "BUNNY_PROGRAM_API_KEY" : "BUNNY_STREAM_API_KEY",
+  );
   if (!libraryId || !apiKey) throw new Error("Bunny Stream is not configured");
   const claim = await supabaseAdmin.rpc("claim_recording_import", {
     p_egress_id: egressId,
@@ -105,6 +118,18 @@ export async function finishRecordedClass(egressId: string) {
   const stableVideoId =
     recording.trainer_video_id ??
     `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  if (protectedRecording) {
+    const upload = await supabaseAdmin.from("video_uploads").upsert(
+      {
+        guid,
+        user_id: recording.trainer_id,
+        library_id: libraryId,
+        access_scope: "program",
+      },
+      { onConflict: "guid", ignoreDuplicates: true },
+    );
+    if (upload.error) throw upload.error;
+  }
   const { error: videoError } = await supabaseAdmin
     .from("trainer_videos")
     .upsert(
@@ -119,6 +144,7 @@ export async function finishRecordedClass(egressId: string) {
         breaks: [],
         break_seconds: 0,
         review_status: "pending",
+        access_scope: protectedRecording ? "program" : "public",
       },
       { onConflict: "id", ignoreDuplicates: true },
     );
@@ -133,6 +159,17 @@ export async function finishRecordedClass(egressId: string) {
     throw new Error(
       existing.error?.message ?? "Unable to submit recording for approval",
     );
+  if (protectedRecording) {
+    const visibility = await supabaseAdmin.from("creator_video_access").upsert(
+      {
+        video_id: video.id,
+        trainer_id: recording.trainer_id,
+        audience: "subscribers",
+      },
+      { onConflict: "video_id", ignoreDuplicates: true },
+    );
+    if (visibility.error) throw visibility.error;
+  }
   const { error: markError } = await supabaseAdmin
     .from("live_recordings")
     .update({

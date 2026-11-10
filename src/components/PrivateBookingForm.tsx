@@ -17,6 +17,8 @@ export function PrivateBookingForm({
     [time, setTime] = useState("");
   const [busy, setBusy] = useState<Busy[]>([]),
     [loading, setLoading] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const deposit = Math.floor((Math.round(rate * 100) + 2) / 4) / 100;
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     if (!date) {
@@ -43,11 +45,12 @@ export function PrivateBookingForm({
     };
   }, [trainerId, date]);
   const book = async () => {
-    if (!date || !time) return void toast.error("Choose a day and time");
+    if (!date || !time || !consent)
+      return void toast.error("Choose a day and time");
     setSubmitting(true);
     try {
       const { url } = await createBookingCheckout({
-        data: { trainerId, date, time },
+        data: { trainerId, date, time, terms: "private-deposit-v1" },
       });
       if (!url) throw new Error("Checkout unavailable");
       window.location.assign(url);
@@ -100,17 +103,39 @@ export function PrivateBookingForm({
           ))}
         </select>
       </label>
+      <p className="text-sm">
+        ${deposit.toFixed(2)} deposit (25%) now. ${(rate - deposit).toFixed(2)}{" "}
+        balance only after both you and your trainer enter the waiting room and
+        your payment succeeds. No recurring charge.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Cancel any unfulfilled session for a full refund under our launch
+        policy. A trainer may instead approve your requested reschedule once
+        using the same deposit. If either participant is absent after 15
+        minutes, or credentials prevent the session, a full refund is queued.
+        Statutory rights remain available.
+      </p>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+        />
+        I agree to pay the deposit and authorize Stripe to save my card for the
+        disclosed remaining balance when both participants enter. Extra
+        authentication may be required before session access.
+      </label>
       <button
         className="btn btn-primary"
-        disabled={submitting || loading || !date || !time}
+        disabled={submitting || loading || !date || !time || !consent}
         onClick={() => void book()}
       >
         {submitting
           ? "Opening secure checkout…"
-          : `Book for $${rate.toFixed(2)}`}
+          : `Pay $${deposit.toFixed(2)} deposit`}
       </button>
       <p className="text-xs text-muted-foreground">
-        Your booking is confirmed only after payment succeeds. A video room
+        Your booking is reserved after the deposit succeeds. A waiting room
         opens shortly before the scheduled session.
       </p>
     </section>

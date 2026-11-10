@@ -261,7 +261,7 @@ export function TrainerStoreManager() {
   );
 }
 
-export function TrainerProgramManager() {
+export function LegacyTrainerProgramManager() {
   const [me, setMe] = useState<string | null>(null),
     [programs, setPrograms] = useState<Program[]>([]),
     [videos, setVideos] = useState<{ id: string; title: string }[]>([]);
@@ -273,7 +273,11 @@ export function TrainerProgramManager() {
   >([]);
   const load = async (id: string) => {
     const [p, v] = await Promise.all([
-      supabase.from("trainer_programs").select("*").eq("trainer_id", id),
+      supabase
+        .from("trainer_programs")
+        .select("*")
+        .eq("trainer_id", id)
+        .eq("builder_version", 1),
       supabase
         .from("trainer_videos")
         .select("id,title")
@@ -301,14 +305,12 @@ export function TrainerProgramManager() {
   };
   const create = async () => {
     if (!me || !title.trim()) return;
-    const { error } = await supabase
-      .from("trainer_programs")
-      .insert({
-        trainer_id: me,
-        title: title.trim(),
-        description: "",
-        published: false,
-      });
+    const { error } = await supabase.from("trainer_programs").insert({
+      trainer_id: me,
+      title: title.trim(),
+      description: "",
+      published: false,
+    });
     if (error) toast.error(error.message);
     else {
       setTitle("");

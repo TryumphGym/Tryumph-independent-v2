@@ -1,3 +1,7 @@
+import { useUserId } from "@/lib/community";
+import { trackDiscoveryDemand } from "@/lib/demand";
+import { DiscoveryFilters } from "@/components/DiscoveryFilters";
+import { matchesDiscovery } from "@/lib/discovery";
 import {
   ClientOnly,
   createFileRoute,
@@ -37,11 +41,24 @@ export const Route = createFileRoute("/live")({
 });
 
 function Live() {
-  const { s, reserve, setExtra, uid } = useStore();
+  const me = useUserId();
+  return <LiveForIdentity key={me ?? "signed-out"} />;
+}
+function LiveForIdentity() {
+  const { s, reserve } = useStore();
   const navigate = useNavigate();
-  const [room, setRoom] = useState<(LiveClass & { hostName?: string }) | null>(
-    null,
-  );
+  const [room, setRoom] = useState<
+    | (LiveClass & {
+        hostName?: string;
+        session_type?: string;
+        discovery_tags?: string[];
+        equipment_notes?: string;
+        modification_notes?: string;
+      })
+    | null
+  >(null);
+  const [subscribed, setSubscribed] = useState<Set<string>>(new Set());
+  const [focus, setFocus] = useState<string[]>([]);
   const [needTokens, setNeedTokens] = useState<LiveClass | null>(null);
   const [access, setAccess] = useState<Set<string>>(new Set());
   const [busyCheckout, setBusyCheckout] = useState<string | null>(null);
@@ -95,32 +112,91 @@ function Live() {
     }
   };
   const [coachLives, setCoachLives] = useState<
-    (LiveClass & { hostName: string })[]
+    (LiveClass & {
+      hostName: string;
+      session_type?: string;
+      discovery_tags?: string[];
+      equipment_notes?: string;
+      modification_notes?: string;
+    })[]
   >([]);
   useEffect(() => {
     const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from("live_sessions")
+    let query = supabase
+      .from("discoverable_lives")
       .select("*")
       .in("status", ["scheduled", "live"])
       .gte("starts_at", since)
       .order("starts_at")
-      .limit(50)
-      .then(async ({ data, error }) => {
-        if (error) {
-          toast.error("Unable to load live classes");
-          setCoachLives([]);
-          return;
-        }
-        const candidates = data ?? [];
-        const trainerIds = [...new Set(candidates.map((r) => r.trainer_id))];
-        const checks = await Promise.all(trainerIds.map(async (id) => {
-          const result = await supabase.rpc("trainer_is_eligible", { p_user_id: id, p_live: true });
+      .limit(50);
+    if (focus.length) query = query.contains("discovery_focus_tags", focus);
+    void query.then(async ({ data, error }) => {
+      if (error) {
+        toast.error("Unable to load live classes");
+        setCoachLives([]);
+        return;
+      }
+      const candidates = (data ?? []).filter(
+        (
+          r,
+        ): r is typeof r & {
+          id: string;
+          trainer_id: string;
+          trainer_name: string;
+          title: string;
+          category: string;
+          level: string;
+          starts_at: string;
+          minutes: number;
+          description: string;
+          discovery_tags: string[];
+          equipment_notes: string;
+          modification_notes: string;
+        } =>
+          r.id !== null &&
+          r.trainer_id !== null &&
+          r.trainer_name !== null &&
+          r.title !== null &&
+          r.category !== null &&
+          r.level !== null &&
+          r.starts_at !== null &&
+          r.minutes !== null &&
+          r.description !== null &&
+          r.discovery_tags !== null &&
+          r.equipment_notes !== null &&
+          r.modification_notes !== null,
+      );
+      const trainerIds = [...new Set(candidates.map((r) => r.trainer_id))];
+      const checks = await Promise.all(
+        trainerIds.map(async (id) => {
+          const result = await supabase.rpc("trainer_is_eligible", {
+            p_user_id: id,
+            p_live: true,
+          });
           return [id, !result.error && result.data === true] as const;
-        }));
-        const eligibleIds = new Set(checks.filter(([, eligible]) => eligible).map(([id]) => id));
-        setCoachLives(
-          candidates.filter((r) => eligibleIds.has(r.trainer_id)).map((r) => ({
+        }),
+      );
+      const subscriberIds = await Promise.all(
+        trainerIds.map(async (id) => {
+          const r = await supabase.rpc("is_creator_subscriber", {
+            p_trainer: id,
+          });
+          return !r.error && r.data ? id : null;
+        }),
+      );
+      setSubscribed(new Set(subscriberIds.filter((id): id is string => !!id)));
+      if (s.signedIn) trackDiscoveryDemand({ source: "live", tags: focus });
+      const eligibleIds = new Set(
+        checks.filter(([, eligible]) => eligible).map(([id]) => id),
+      );
+      setCoachLives(
+        candidates
+          .filter((r) => eligibleIds.has(r.trainer_id))
+          .map((r) => ({
+            session_type: r.session_type ?? "scheduled",
+            discovery_tags: r.discovery_tags,
+            equipment_notes: r.equipment_notes,
+            modification_notes: r.modification_notes,
             id: r.id,
             title: r.title,
             trainerId: r.trainer_id,
@@ -138,10 +214,16 @@ function Live() {
               minute: "2-digit",
             }),
           })),
-        );
-      });
-  }, []);
-  const allLives: (LiveClass & { hostName?: string })[] = coachLives;
+      );
+    });
+  }, [focus, s.signedIn]);
+  const allLives: (LiveClass & {
+    hostName?: string;
+    session_type?: string;
+    discovery_tags?: string[];
+    equipment_notes?: string;
+    modification_notes?: string;
+  })[] = coachLives;
   if (room) return <Room live={room} onLeave={() => setRoom(null)} />;
   const modal = needTokens && (
     <div
@@ -182,6 +264,7 @@ function Live() {
         title="Live Classes"
         sub="Reserve a reminder for free, or book your class for $5. Payment is verified before joining the room."
       />
+      <DiscoveryFilters value={focus} onChange={setFocus} />
       {s.signedIn && s.extra.alerts.length > 0 && (
         <div className="card mb-6 p-5">
           <p className="eyebrow">Your reminders</p>
@@ -196,92 +279,101 @@ function Live() {
         </div>
       )}
       <div className="grid gap-4 md:grid-cols-2">
-        {allLives.map((l) => {
-          const t = {
-            name: l.hostName || "Verified trainer",
-            initials: (l.hostName || "VT").slice(0, 2).toUpperCase(),
-          };
-          const reserved = s.reservations.includes(l.id);
-          const paid = access.has(l.id);
-          return (
-            <div key={l.id} className="card flex flex-col p-6">
-              <div className="flex items-center gap-3">
-                <Avatar initials={t.initials} />
-                <div>
-                  <p className="font-semibold">{t.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {l.when} · {l.minutes} min
-                  </p>
+        {allLives
+          .filter((l) => matchesDiscovery(l, focus))
+          .map((l) => {
+            const t = {
+              name: l.hostName || "Verified trainer",
+              initials: (l.hostName || "VT").slice(0, 2).toUpperCase(),
+            };
+            const reserved = s.reservations.includes(l.id);
+            const paid = access.has(l.id);
+            return (
+              <div key={l.id} className="card flex flex-col p-6">
+                <div className="flex items-center gap-3">
+                  <Avatar initials={t.initials} />
+                  <div>
+                    <p className="font-semibold">{t.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {l.when} · {l.minutes} min
+                    </p>
+                  </div>
+                  <span className="chip ml-auto">{l.category}</span>
                 </div>
-                <span className="chip ml-auto">{l.category}</span>
-              </div>
-              <h3 className="mt-4 text-xl font-bold">{l.title}</h3>
-              <p className="mt-1 flex-1 text-sm text-muted-foreground">
-                {l.description}
-              </p>
-              <p className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
-                <Users className="h-4 w-4" />
-                {l.level} · $5 drop-in · no subscription
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    if (!s.signedIn) {
-                      toast.error("Sign in to reserve and get reminders.");
-                      navigate({ to: "/account" });
-                      return;
+                <h3 className="mt-4 text-xl font-bold">{l.title}</h3>
+                <p className="mt-1 flex-1 text-sm text-muted-foreground">
+                  {l.description}
+                </p>
+                <p className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                  {l.level} ·{" "}
+                  {l.session_type === "subscriber"
+                    ? "Subscriber live — no entry charge"
+                    : subscribed.has(l.trainerId)
+                      ? "Included with your subscription — no token"
+                      : "$5 drop-in · included for this trainer’s subscribers"}
+                </p>
+                <p className="text-sm">
+                  Equipment: {l.equipment_notes || "See trainer instructions"}
+                </p>
+                <p className="whitespace-pre-wrap text-sm">
+                  {l.modification_notes}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      if (!s.signedIn) {
+                        toast.error("Sign in to reserve and get reminders.");
+                        navigate({ to: "/account" });
+                        return;
+                      }
+                      void reserve(l.id)
+                        .then(() =>
+                          toast.success(
+                            reserved
+                              ? "Reservation removed"
+                              : subscribed.has(l.trainerId)
+                                ? "Reserved with your subscription. No token is spent."
+                                : "Reserved free. One token will be spent only on verified entry.",
+                          ),
+                        )
+                        .catch((error) => toast.error(error.message));
+                    }}
+                  >
+                    {reserved ? (
+                      <BellRing className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Bell className="h-4 w-4" />
+                    )}
+                    {reserved ? "Reserved" : "Reserve"}
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      void join(l);
+                    }}
+                    disabled={
+                      busyCheckout === l.id ||
+                      (l.session_type === "subscriber" &&
+                        !subscribed.has(l.trainerId) &&
+                        s.role !== "trainer")
                     }
-                    reserve(l.id);
-                    if (!reserved) {
-                      setExtra((e) => ({
-                        ...e,
-                        alerts: [
-                          {
-                            id: uid(),
-                            text: `Reminders set for ${l.title}: 10 minutes before.`,
-                            date: l.when,
-                          },
-                          ...e.alerts,
-                        ].slice(0, 20),
-                      }));
-                      if (
-                        typeof Notification !== "undefined" &&
-                        Notification.permission === "default"
-                      )
-                        void Notification.requestPermission();
-                    }
-                    toast(
-                      reserved
-                        ? "Reservation removed"
-                        : "Reserved! We'll remind you 10 minutes before.",
-                    );
-                  }}
-                >
-                  {reserved ? (
-                    <BellRing className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Bell className="h-4 w-4" />
-                  )}
-                  {reserved ? "Reserved" : "Reserve"}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    void join(l);
-                  }}
-                  disabled={busyCheckout === l.id}
-                >
-                  {busyCheckout === l.id
-                    ? "Opening checkout…"
-                    : paid
-                      ? "Join paid room"
-                      : "Book class · $5"}
-                </button>
+                  >
+                    {busyCheckout === l.id
+                      ? "Opening checkout…"
+                      : paid
+                        ? "Join paid room"
+                        : subscribed.has(l.trainerId)
+                          ? "Join with subscription"
+                          : l.session_type === "subscriber"
+                            ? "Subscription required"
+                            : "Book class · $5"}
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
     </div>
   );
@@ -291,7 +383,13 @@ function Room({
   live,
   onLeave,
 }: {
-  live: LiveClass & { hostName?: string };
+  live: LiveClass & {
+    hostName?: string;
+    session_type?: string;
+    discovery_tags?: string[];
+    equipment_notes?: string;
+    modification_notes?: string;
+  };
   onLeave: () => void;
 }) {
   const t = { name: live.hostName || "Verified trainer" };

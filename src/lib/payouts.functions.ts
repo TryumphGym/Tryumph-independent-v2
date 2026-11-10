@@ -72,7 +72,10 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
     let enabled = acct?.payouts_enabled ?? false;
     if (acct?.stripe_account_id) {
       const a = await stripe().accounts.retrieve(acct.stripe_account_id);
-      enabled = !!a.payouts_enabled;
+      enabled =
+        !a.deleted &&
+        !!a.payouts_enabled &&
+        a.capabilities?.transfers === "active";
       await supabaseAdmin
         .from("trainer_accounts")
         .update({ payouts_enabled: enabled })
@@ -93,6 +96,25 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
           (a, r) => a + Math.max(0, r.payout_cents - r.reversal_target_cents),
           0,
         );
+    const programResult = await context.supabase.rpc("program_metrics");
+    if (
+      programResult.error &&
+      !["PGRST202", "42883"].includes(programResult.error.code)
+    )
+      throw new Error("Unable to load program payout totals");
+    const programMetrics = Object.values(
+      (programResult.data ??
+        {}) as unknown as import("./programs").ProgramMetrics,
+    );
+    const programPending = programMetrics.reduce(
+      (n, p) => n + Math.max(0, p.payable - p.transferred),
+      0,
+    );
+    const programTransferred = programMetrics.reduce(
+      (n, p) => n + p.transferred,
+      0,
+    );
+    const programPayable = programMetrics.reduce((n, p) => n + p.payable, 0);
     const monthAgo = Date.now() - 30 * 864e5;
     const recent = (rows ?? []).filter(
       (r) => new Date(r.created_at).getTime() >= monthAgo,
@@ -118,27 +140,40 @@ export const getPayoutStatus = createServerFn({ method: "POST" })
       .in("status", ["live", "ended"])
       .gte("starts_at", new Date(monthAgo).toISOString())
       .lte("starts_at", new Date().toISOString());
+    const privateCount = await supabaseAdmin
+      .from("private_session_access")
+      .select("checkout_id", { count: "exact", head: true })
+      .eq("trainer_id", context.userId)
+      .eq("status", "paid")
+      .or("payment_version.eq.1,delivered_at.not.is.null");
     const attendance = await supabaseAdmin.rpc("trainer_attendance_count", {
       p_trainer_id: context.userId,
     });
-    if (membership.error || classCount.error || attendance.error)
+    if (
+      membership.error ||
+      classCount.error ||
+      attendance.error ||
+      privateCount.error
+    )
       throw new Error("Unable to load verified trainer statistics");
     return {
       linked: !!acct?.stripe_account_id,
       enabled,
-      pending: sum((r) => r.status === "pending"),
-      paid: sum((r) => r.status === "paid"),
+      pending: sum((r) => r.status === "pending") + programPending,
+      paid: sum((r) => r.status === "paid") + programTransferred,
       bySource: {
         oneonone: sum((r) => r.source === "oneonone"),
         live: sum((r) => r.source === "live"),
         ads: sum((r) => r.source === "ads"),
+        programs: programPayable,
       },
-      fees: (rows ?? []).reduce((a, r) => a + r.fee_cents, 0),
+      fees:
+        (rows ?? []).reduce((a, r) => a + r.fee_cents, 0) +
+        programMetrics.reduce((n, p) => n + p.fees, 0),
       stats: {
         liveAttendanceMonth: attendance.data ?? 0,
         liveClassesMonth: classCount.count ?? 0,
-        oneononeSessions: (rows ?? []).filter((r) => r.source === "oneonone")
-          .length,
+        oneononeSessions: privateCount.count ?? 0,
         followers,
         trybeMembers,
       },

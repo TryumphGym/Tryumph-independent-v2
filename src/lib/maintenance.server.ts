@@ -2,7 +2,60 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { stopRecordedClass } from "./recording-control.server";
 import { processRefundJobs } from "./refunds.server";
 export async function runMaintenance() {
-  const results = await Promise.allSettled([processRefundJobs(), closeRooms()]);
+  const { advancePresentPrivateSessions } =
+    await import("./private-payments.server");
+  const attendance = await Promise.allSettled([
+    advancePresentPrivateSessions(),
+  ]);
+  const preparation = [
+    ...attendance,
+    ...(await Promise.allSettled([
+      supabaseAdmin
+        .from("community_ad_sessions")
+        .delete()
+        .lt("expires_at", new Date().toISOString())
+        .then((r) => {
+          if (r.error && !["42P01", "PGRST205"].includes(r.error.code))
+            throw r.error;
+        }),
+      import("./creator-payments.server").then((m) =>
+        m.maintainCreatorRenewals(),
+      ),
+      supabaseAdmin.rpc("record_creator_releases").then((r) => {
+        if (r.error && !["42883", "PGRST202"].includes(r.error.code))
+          throw r.error;
+      }),
+      supabaseAdmin
+        .rpc("deliver_trybe_poll_notices", { p_limit: 200 })
+        .then((r) => {
+          if (r.error && !["42883", "PGRST202"].includes(r.error.code))
+            throw r.error;
+        }),
+      supabaseAdmin.rpc("generate_live_session_reminders", {}).then((r) => {
+        if (r.error) throw r.error;
+      }),
+      supabaseAdmin.rpc("generate_credential_alerts", {}).then((r) => {
+        if (r.error) throw r.error;
+      }),
+      supabaseAdmin.rpc("maintain_private_bookings", {}).then((r) => {
+        if (r.error) throw r.error;
+      }),
+    ])),
+  ];
+  const results = [
+    ...preparation,
+    ...(await Promise.allSettled([
+      processRefundJobs(),
+      import("./subscriber-live.server").then((m) =>
+        m.reconcileSubscriberRooms(),
+      ),
+      supabaseAdmin.rpc("purge_discovery_demand").then((r) => {
+        if (r.error) throw r.error;
+      }),
+      closeRooms(),
+      closePrivateRooms(),
+    ])),
+  ];
   for (const result of results)
     if (result.status === "rejected")
       console.error("Maintenance job will retry", result.reason);
@@ -48,5 +101,49 @@ async function closeRooms() {
       .update({ completed_at: new Date().toISOString() })
       .eq("session_id", job.session_id);
     if (saved.error) throw saved.error;
+  }
+}
+
+export async function closePrivateRooms() {
+  const jobs = await supabaseAdmin
+    .from("private_room_shutdown_jobs")
+    .select("booking_id")
+    .is("completed_at", null)
+    .limit(100);
+  if (jobs.error) throw jobs.error;
+  const { roomService } = await import("./attendance.server");
+  for (const job of jobs.data ?? []) {
+    const booking = await supabaseAdmin
+      .from("private_session_access")
+      .select("trainer_id,day,time")
+      .eq("checkout_id", job.booking_id)
+      .single();
+    if (booking.error) throw booking.error;
+    try {
+      await roomService().deleteRoom(
+        `oneonone-${booking.data.trainer_id}-${booking.data.day}-${booking.data.time}`,
+      );
+      const done = await supabaseAdmin
+        .from("private_room_shutdown_jobs")
+        .update({ completed_at: new Date().toISOString(), last_error: null })
+        .eq("booking_id", job.booking_id);
+      if (done.error) throw done.error;
+    } catch (error) {
+      // Deleting an already absent room is a successful idempotent shutdown.
+      const missing = (error as { code?: string }).code === "not_found";
+      const saved = await supabaseAdmin
+        .from("private_room_shutdown_jobs")
+        .update(
+          missing
+            ? { completed_at: new Date().toISOString() }
+            : {
+                last_error:
+                  "LiveKit room shutdown failed; maintenance will retry",
+              },
+        )
+        .eq("booking_id", job.booking_id);
+      if (saved.error) throw saved.error;
+      if (!missing) console.error("Private room shutdown will retry", error);
+    }
   }
 }
