@@ -9,6 +9,15 @@ vi.mock("@/lib/videos.functions", () => ({
     ),
 }));
 vi.mock("./WaterBreakSponsor", () => ({ WaterBreakSponsor: () => null }));
+// These tests exercise the Bunny iframe protocol, not Supabase or the
+// comments/feedback APIs. Never use hosted credentials for unit tests.
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+  },
+}));
+vi.mock("./WorkoutFeedback", () => ({ WorkoutFeedback: () => null }));
+vi.mock("./WorkoutComments", () => ({ WorkoutComments: () => null }));
 import { OnDemandPlayer } from "./OnDemandPlayer";
 afterEach(cleanup);
 describe("Bunny player synchronization without changing marked-water-break rules", () => {

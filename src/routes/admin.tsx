@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/Avatar";
 import { payOutPending } from "@/lib/payouts.functions";
 import { PrivateVideoPreview } from "@/components/PrivateVideoPreview";
 import { AdminOperations } from "@/components/AdminOperations";
+import { FounderHQ } from "@/components/FounderHQ";
 import { AdminSafetyCenter } from "@/components/AdminSafetyCenter";
 import { AdminAnnouncements } from "@/components/AdminAnnouncements";
 import { AdminSponsorCampaigns } from "@/components/AdminSponsorCampaigns";
@@ -222,6 +223,7 @@ function Admin() {
   const pending = rows.filter((r) => r.status === "pending");
   return (
     <div className="space-y-6">
+      <FounderHQ />
       <section className="card space-y-3 p-5">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1">
@@ -295,9 +297,13 @@ function Admin() {
         </button>
       </section>
       <AdminSponsorCampaigns />
-      <AdminOperations />
+      <div id="hq-operations">
+        <AdminOperations />
+      </div>
       <AdminAnnouncements />
-      <AdminSafetyCenter />
+      <div id="hq-safety">
+        <AdminSafetyCenter />
+      </div>
       <ProgramAdmin />
       <CreatorAdmin />
       <CreatorResourcesAdmin />
@@ -361,7 +367,7 @@ function Admin() {
           )}
         </section>
       )}
-      <section className="card space-y-3 p-5">
+      <section id="hq-videos" className="card space-y-3 p-5">
         <h2 className="text-xl font-bold">Video approval queue</h2>
         <p className="text-sm text-muted-foreground">
           Review the video in Bunny's private dashboard before approving. Do not
@@ -408,6 +414,7 @@ function Admin() {
           <p className="text-sm text-muted-foreground">No pending videos.</p>
         )}
       </section>
+      <div id="hq-certifications" />
       <PageHeader
         eyebrow="Admin"
         title="Certification review"
