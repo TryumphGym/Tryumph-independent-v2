@@ -1,4 +1,5 @@
 import { WorkoutComments } from "@/components/WorkoutComments";
+import { StudioNavigation, StudioSubnav, STUDIO_SECTIONS } from "@/components/StudioNavigation";
 import {
   CreatorComments,
   CreatorProgramAnalytics,
@@ -66,8 +67,10 @@ import { isLaunchWorkout } from "@/lib/launch";
 import { MultiDropdown } from "@/components/WorkoutFilters";
 
 export const Route = createFileRoute("/studio")({
-  validateSearch: (search: Record<string, unknown>): { section?: string } =>
-    typeof search["section"] === "string" ? { section: search["section"] } : {},
+  validateSearch: (search: Record<string, unknown>): { section?: string; view?: string } => ({
+    ...(typeof search["section"] === "string" ? { section: search["section"] } : {}),
+    ...(typeof search["view"] === "string" ? { view: search["view"] } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Trainer Studio — Tryumph Gym" },
@@ -89,21 +92,7 @@ export const Route = createFileRoute("/studio")({
   component: Studio,
 });
 
-const TABS = [
-  "Dashboard",
-  "Analytics",
-  "Content Library",
-  "Live Studio",
-  "Programs",
-  "Trybe & Community",
-  "Messages & Partnerships",
-  "Bookings & Clients",
-  "Earnings & Payouts",
-  "Creator Perks",
-  "Tryumph School",
-  "Settings",
-  "Marketing & Spotlight",
-] as const;
+const TABS = STUDIO_SECTIONS;
 const sectionKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 function Studio() {
   const me = useUserId();
@@ -112,11 +101,18 @@ function Studio() {
 function StudioForIdentity({ me }: { me: string | null }) {
   const { s } = useStore();
   const [profileRole, setProfileRole] = useState<string | null>(null);
-  const section = Route.useSearch().section;
+  const { section, view } = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab = TABS.find((t) => sectionKey(t) === section) ?? "Dashboard";
   const setTab = (t: (typeof TABS)[number]) =>
     void navigate({ search: { section: sectionKey(t) } });
+  const setView = (next: string) =>
+    void navigate({ search: { section: sectionKey(tab), view: next } });
+  const activeView = (allowed: string[], fallback: string) =>
+    view && allowed.includes(view) ? view : fallback;
+  const subnav = (options: { id: string; label: string }[], fallback: string) => (
+    <StudioSubnav options={options} active={activeView(options.map(x => x.id), fallback)} onSelect={setView} />
+  );
   useEffect(() => {
     let active = true;
     setProfileRole(null);
@@ -195,21 +191,7 @@ function StudioForIdentity({ me }: { me: string | null }) {
   );
   const credentialsPaused = expiredUnreplaced.length > 0;
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Tryumph Creator Studio"
-        title="Your business at a glance"
-        sub="Your verified trainer account, upcoming classes, video approvals, and earnings."
-      >
-        <span className={`chip ${verified ? "chip-active" : ""}`}>
-          <ShieldCheck className="mr-1 inline h-4 w-4" />
-          {verified
-            ? "Verified Pro"
-            : certStatus.length
-              ? "CPR/AED verification required"
-              : "Add CPR/AED certification"}
-        </span>
-      </PageHeader>
+    <StudioNavigation active={tab} verified={verified} onSelect={setTab}>
       {credentialsPaused && (
         <div role="alert" className="card border-amber-500/60 p-5">
           <p className="font-bold">
@@ -225,19 +207,23 @@ function StudioForIdentity({ me }: { me: string | null }) {
           </p>
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            className={`chip ${tab === t ? "chip-active" : ""}`}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
       {tab === "Dashboard" && (
         <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {([
+              ["Upload a workout", "Content Library", "Create a new on-demand class"],
+              ["Schedule a live class", "Live Studio", "Plan a session for your audience"],
+              ["Build a program", "Programs", "Design a training plan"],
+              ["See your earnings", "Earnings & Payouts", "Review your verified payout totals"],
+              ["Manage your Trybe", "Trybe & Community", "Connect with members"],
+              ["Check messages", "Messages & Partnerships", "Member questions and inquiries"],
+            ] as const).map(([label, target, description]) => (
+              <button key={target} type="button" onClick={() => setTab(target)} className="card p-4 text-left transition-colors hover:border-primary">
+                <span className="font-semibold">{label} →</span>
+                <span className="mt-1 block text-sm text-muted-foreground">{description}</span>
+              </button>
+            ))}
+          </div>
           <AccountNoticeCenter trainer />
           <ActiveMilestones days={s.activeDays} role="trainer" />
           <CreatorAnalytics />
@@ -245,95 +231,86 @@ function StudioForIdentity({ me }: { me: string | null }) {
       )}
       {tab === "Settings" && (
         <>
-          <TrainerProfileTab />
-          <TrainerFocusEditor />
+          {subnav([{id:"profile",label:"Profile & specialties"},{id:"credentials",label:"Certifications"},{id:"preferences",label:"Account settings"}], "profile")}
+          {activeView(["profile","credentials","preferences"],"profile")==="profile" && <><TrainerProfileTab /><TrainerFocusEditor /></>}
+          {activeView(["profile","credentials","preferences"],"profile")==="credentials" && (
+            <div className="card space-y-6 p-6">
+              <RolePicker /><CertManager />
+              <p className="text-xs text-muted-foreground">Update your training and CPR/AED proof whenever it changes. Expiring credentials can pause new uploads and hosting.</p>
+            </div>
+          )}
+          {activeView(["profile","credentials","preferences"],"profile")==="preferences" && (
+            <div className="card p-6"><p className="mb-3 text-sm text-muted-foreground">Infrequently changed notifications and workout preferences are kept with your main account.</p><Link to="/account" className="btn btn-outline">Open Account Settings</Link></div>
+          )}
         </>
       )}
       {tab === "Live Studio" && !credentialsPaused && (
         <>
-          <SubscriberLive />
-          <Overview />
-          <CalendarTab />
-          <MemberSessions trainer />
-          <ClassManager />
-          <RecordingManager />
+          {subnav([{id:"schedule",label:"Schedule & overview"},{id:"calendar",label:"Calendar"},{id:"sessions",label:"Clients & reservations"},{id:"classes",label:"Manage live classes"},{id:"recordings",label:"Recordings"},{id:"subscriber",label:"Subscriber lives"}], "schedule")}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="schedule" && <Overview />}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="calendar" && <CalendarTab />}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="sessions" && <MemberSessions trainer />}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="classes" && <ClassManager />}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="recordings" && <RecordingManager />}
+          {activeView(["schedule","calendar","sessions","classes","recordings","subscriber"],"schedule")==="subscriber" && <SubscriberLive />}
         </>
       )}
       {tab === "Content Library" && !credentialsPaused && (
         <>
-          <CreatorVideoStudio />
-          <WorkoutComments />
-          <Uploads />
-          <details className="card p-5">
-            <summary>Legacy ordered playlists</summary>
-            <LegacyTrainerProgramManager />
-          </details>
+          {subnav([{id:"workouts",label:"Your videos & uploads"},{id:"visibility",label:"Membership video access"},{id:"comments",label:"Workout discussions"},{id:"playlists",label:"Playlists"}], "workouts")}
+          {activeView(["workouts","visibility","comments","playlists"],"workouts")==="workouts" && <Uploads />}
+          {activeView(["workouts","visibility","comments","playlists"],"workouts")==="visibility" && <CreatorVideoStudio />}
+          {activeView(["workouts","visibility","comments","playlists"],"workouts")==="comments" && <WorkoutComments />}
+          {activeView(["workouts","visibility","comments","playlists"],"workouts")==="playlists" && <LegacyTrainerProgramManager />}
         </>
       )}
       {tab === "Programs" && (
         <>
-          <CreatorOfferStudio />
-          <TrainerProgramBuilder />
+          {subnav([{id:"builder",label:"Program builder"},{id:"offers",label:"Membership & offers"}], "builder")}
+          {activeView(["builder","offers"],"builder")==="builder" && <TrainerProgramBuilder />}
+          {activeView(["builder","offers"],"builder")==="offers" && <CreatorOfferStudio />}
         </>
       )}
       {tab === "Trybe & Community" && (
         <>
-          <StoreTab />
-          <CreatorComments />
-          {me && (
-            <Link
-              className="btn btn-primary"
-              to="/trybes"
-              search={{ t: `coach-${me}` }}
-            >
-              Manage posts, photos, polls and announcements
-            </Link>
+          {subnav([{id:"posts",label:"Trybe posts"},{id:"comments",label:"Community discussions"},{id:"store",label:"Your store"}], "posts")}
+          {activeView(["posts","comments","store"],"posts")==="posts" && me && (
+            <div className="card p-6"><p className="mb-3 text-sm text-muted-foreground">Manage posts, photos, polls and announcements in your Trybe.</p><Link className="btn btn-primary" to="/trybes" search={{ t: `coach-${me}` }}>Open my Trybe</Link></div>
           )}
+          {activeView(["posts","comments","store"],"posts")==="comments" && <CreatorComments />}
+          {activeView(["posts","comments","store"],"posts")==="store" && <StoreTab />}
         </>
       )}
       {tab === "Messages & Partnerships" && (
         <>
-          <h2 className="text-xl font-bold">Member messages</h2>
-          <TrainerMessages />
-          <PartnershipInbox />
+          {subnav([{id:"messages",label:"Member messages"},{id:"partnerships",label:"Work With Me inquiries"}], "messages")}
+          {activeView(["messages","partnerships"],"messages")==="messages" && <TrainerMessages />}
+          {activeView(["messages","partnerships"],"messages")==="partnerships" && <PartnershipInbox />}
         </>
       )}
       {tab === "Analytics" && (
         <>
-          <CreatorAnalytics />
-          <CreatorProgramAnalytics />
-          <AudienceDemandInsights />
+          {subnav([{id:"business",label:"Business overview"},{id:"programs",label:"Program analytics"},{id:"demand",label:"Audience demand"}], "business")}
+          {activeView(["business","programs","demand"],"business")==="business" && <CreatorAnalytics />}
+          {activeView(["business","programs","demand"],"business")==="programs" && <CreatorProgramAnalytics />}
+          {activeView(["business","programs","demand"],"business")==="demand" && <AudienceDemandInsights />}
         </>
       )}
       {tab === "Bookings & Clients" && (
         <>
-          <CalendarTab />
-          <MemberSessions trainer />
+          {subnav([{id:"calendar",label:"Calendar & availability"},{id:"clients",label:"Client sessions"}], "calendar")}
+          {activeView(["calendar","clients"],"calendar")==="calendar" && <CalendarTab />}
+          {activeView(["calendar","clients"],"calendar")==="clients" && <MemberSessions trainer />}
         </>
       )}
       {tab === "Earnings & Payouts" && <Payouts />}
       {tab === "Creator Perks" && <CreatorPerks />}
       {tab === "Tryumph School" && <TryumphSchool />}
       {tab === "Marketing & Spotlight" && <TryumphSpotlight />}
-      {credentialsPaused &&
-        (tab === "Live Studio" || tab === "Content Library") && (
-          <p className="card p-6" role="alert">
-            New uploads and live hosting are paused until expired required
-            credentials are renewed and verified. Go to Settings to submit
-            updated proof.
-          </p>
-        )}
-      {tab === "Settings" && (
-        <div className="card space-y-6 p-6">
-          <RolePicker />
-          <CertManager />
-          <p className="text-xs text-muted-foreground">
-            Finished a new course? Add it here — we review it and it shows on
-            your profile once verified.
-          </p>
-        </div>
+      {credentialsPaused && (tab === "Live Studio" || tab === "Content Library") && (
+        <p className="card p-6" role="alert">New uploads and live hosting are paused until expired required credentials are renewed and verified. Go to Settings → Certifications to submit updated proof.</p>
       )}
-    </div>
+    </StudioNavigation>
   );
 }
 

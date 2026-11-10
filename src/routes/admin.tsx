@@ -17,6 +17,7 @@ import { payOutPending } from "@/lib/payouts.functions";
 import { PrivateVideoPreview } from "@/components/PrivateVideoPreview";
 import { AdminOperations } from "@/components/AdminOperations";
 import { FounderHQ } from "@/components/FounderHQ";
+import { HQNavigation, type HQSection } from "@/components/HQNavigation";
 import { AdminSafetyCenter } from "@/components/AdminSafetyCenter";
 import { AdminAnnouncements } from "@/components/AdminAnnouncements";
 import { AdminSponsorCampaigns } from "@/components/AdminSponsorCampaigns";
@@ -76,6 +77,7 @@ const REGISTRIES: [string, string][] = [
 function Admin() {
   const me = useUserId();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [hqTab, setHqTab] = useState<HQSection>("overview");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<Row[]>([]);
   const [reviewVideos, setReviewVideos] = useState<
@@ -222,8 +224,11 @@ function Admin() {
     );
   const pending = rows.filter((r) => r.status === "pending");
   return (
-    <div className="space-y-6">
-      <FounderHQ />
+    <HQNavigation active={hqTab} onSelect={setHqTab}>
+      {hqTab === "overview" && <FounderHQ onOpenSection={(destination) => {
+        setHqTab(destination === "hq-operations" ? "operations" : destination === "hq-safety" ? "safety" : "reviews");
+      }} />}
+      {hqTab === "growth" && (
       <section className="card space-y-3 p-5">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1">
@@ -272,6 +277,8 @@ function Admin() {
           </div>
         )}
       </section>
+      )}
+      {hqTab === "operations" && (
       <section className="card flex flex-wrap items-center gap-4 p-5">
         <div className="flex-1">
           <h2 className="text-xl font-bold">Trainer payouts</h2>
@@ -296,21 +303,15 @@ function Admin() {
           Pay out now
         </button>
       </section>
-      <AdminSponsorCampaigns />
-      <div id="hq-operations">
-        <AdminOperations />
-      </div>
-      <AdminAnnouncements />
-      <div id="hq-safety">
-        <AdminSafetyCenter />
-      </div>
-      <ProgramAdmin />
-      <CreatorAdmin />
-      <CreatorResourcesAdmin />
-      <CreatorPriceBounds />
-      <SpotlightAdmin />
-      <CommunitySafetyAdmin />
-      {LAUNCH.youth && (
+      )}
+      {hqTab === "growth" && <AdminSponsorCampaigns />}
+      {hqTab === "operations" && <div id="hq-operations"><AdminOperations /></div>}
+      {hqTab === "growth" && <AdminAnnouncements />}
+      {hqTab === "safety" && <div id="hq-safety"><AdminSafetyCenter /></div>}
+      {hqTab === "creators" && <><ProgramAdmin /><CreatorAdmin /><CreatorResourcesAdmin /><CreatorPriceBounds /></>}
+      {hqTab === "growth" && <SpotlightAdmin />}
+      {hqTab === "safety" && <CommunitySafetyAdmin />}
+      {hqTab === "reviews" && LAUNCH.youth && (
         <section className="card space-y-3 p-5">
           <div>
             <h2 className="text-xl font-bold">Youth contributor approvals</h2>
@@ -367,6 +368,7 @@ function Admin() {
           )}
         </section>
       )}
+      {hqTab === "reviews" && (
       <section id="hq-videos" className="card space-y-3 p-5">
         <h2 className="text-xl font-bold">Video approval queue</h2>
         <p className="text-sm text-muted-foreground">
@@ -414,6 +416,8 @@ function Admin() {
           <p className="text-sm text-muted-foreground">No pending videos.</p>
         )}
       </section>
+      )}
+      {hqTab === "reviews" && (<>
       <div id="hq-certifications" />
       <PageHeader
         eyebrow="Admin"
@@ -489,6 +493,7 @@ function Admin() {
           </p>
         )}
       </div>
-    </div>
+      </>)}
+    </HQNavigation>
   );
 }

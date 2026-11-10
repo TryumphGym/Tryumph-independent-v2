@@ -577,7 +577,9 @@ function Trybes() {
       )}
       {trybe === "all" ? (
         <>
-          <div className="mb-6 flex flex-wrap gap-2">
+          <details className="card mb-6 p-4">
+            <summary className="cursor-pointer font-semibold">Find more Trybes to join <span className="text-sm font-normal text-muted-foreground">· Browse trainers and goals</span></summary>
+            <div className="mt-4 flex flex-wrap gap-2">
             {coaches.map((c) => (
               <Button key={c.id} asChild variant="outline">
                 <Link to="/trybes" search={{ t: c.id }}>
@@ -593,7 +595,8 @@ function Trybes() {
                 </Link>
               </Button>
             ))}
-          </div>
+            </div>
+          </details>
         </>
       ) : (
         <Button asChild variant="ghost" className="mb-4">
@@ -670,8 +673,8 @@ function Trybes() {
           Joined Trybes
         </button>
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <section className="min-w-0 space-y-5" aria-label="Trybe feed">
           {ownedGroups.some((g) => g.id === target) && (
             <div>
               <button
@@ -712,7 +715,11 @@ function Trybes() {
             </p>
           )}
           {canPost ? (
-            <div className="card space-y-3 p-4">
+            <div className="card space-y-3 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <Avatar size="sm" initials={s.name.slice(0,2).toUpperCase()} />
+                <div><p className="font-semibold">Share with your Trybe</p><p className="text-xs text-muted-foreground">Share a goal, a small win or ask for encouragement.</p></div>
+              </div>
               <textarea
                 className="field min-h-20"
                 placeholder="Share a goal, win or fail…"
@@ -834,7 +841,7 @@ function Trybes() {
               )}
               {posts.map((p) => (
                 <Fragment key={p.id}>
-                  <div id={`post-${p.id}`} className="card p-5">
+                  <article id={`post-${p.id}`} className="card rounded-2xl border border-border p-5">
                     <div className="flex flex-wrap items-center gap-3">
                       <Avatar
                         size="sm"
@@ -913,7 +920,7 @@ function Trybes() {
                         label="Report post"
                       />
                     )}
-                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
+                    <div className="mt-4 flex flex-wrap items-center gap-5 border-y border-border py-3 text-sm text-muted-foreground">
                       <button
                         className={`flex items-center gap-1 ${p.liked ? "text-primary" : ""}`}
                         onClick={() => like(p.id, p.liked)}
@@ -921,11 +928,11 @@ function Trybes() {
                         <Heart
                           className={`h-4 w-4 ${p.liked ? "fill-primary" : ""}`}
                         />
-                        {p.likes}
+                        {p.likes} {p.likes === 1 ? "Like" : "Likes"}
                       </button>
                       <span className="flex items-center gap-1">
                         <MessageCircle className="h-4 w-4" />
-                        {p.comments.length}
+                        {p.comments.length} {p.comments.length === 1 ? "Comment" : "Comments"}
                       </span>
                       {p.author_id && p.author_id === me && (
                         <button
@@ -1009,7 +1016,7 @@ function Trybes() {
                         Reply
                       </button>
                     </div>
-                  </div>
+                  </article>
                   {adSlot?.afterPost === p.id && (
                     <CommunityFeedAd creative={adSlot.creative} />
                   )}
@@ -1026,7 +1033,7 @@ function Trybes() {
               {feedLoading ? "Loading…" : "Load more posts"}
             </button>
           )}
-        </div>
+        </section>
         <aside className="space-y-4">
           <div className="card p-5">
             <p className="eyebrow">Find accountability partners</p>

@@ -4,41 +4,21 @@ import type { Tables } from "@/integrations/supabase/types";
 import { AudienceAnnouncements } from "./AudienceAnnouncements";
 import { toast } from "sonner";
 
-export function AccountNoticeCenter({
-  trainer = false,
-}: {
-  trainer?: boolean;
-}) {
+export function AccountNoticeCenter(_props: { trainer?: boolean }) {
   const [rows, setRows] = useState<Tables<"account_notifications">[]>([]),
     [error, setError] = useState("");
-  const [preferences, setPreferences] = useState({
-    session_updates: true,
-    poll_updates: false,
-    creator_updates: true,
-    subscriber_lives: false,
-    credential_updates: true,
-    friend_activity: false,
-    share_live_activity: false,
-  });
   const [restriction, setRestriction] =
       useState<Tables<"account_restrictions"> | null>(null),
     [appeal, setAppeal] = useState("");
   const load = useCallback(async () => {
     const auth = await supabase.auth.getUser();
     if (!auth.data.user) return;
-    const [notices, prefs, restricted] = await Promise.all([
+    const [notices, restricted] = await Promise.all([
       supabase
         .from("account_notifications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
-        .from("notification_preferences")
-        .select(
-          "session_updates,credential_updates,friend_activity,share_live_activity,poll_updates,creator_updates,subscriber_lives",
-        )
-        .eq("user_id", auth.data.user.id)
-        .maybeSingle(),
       supabase
         .from("account_restrictions")
         .select("*")
@@ -47,12 +27,11 @@ export function AccountNoticeCenter({
         .maybeSingle(),
     ]);
     setError(
-      notices.error || prefs.error || restricted.error
+      notices.error || restricted.error
         ? "Notifications could not be loaded. Please retry."
         : "",
     );
     if (notices.data) setRows(notices.data);
-    if (prefs.data) setPreferences(prefs.data);
     setRestriction(restricted.data);
   }, []);
   useEffect(() => {
@@ -60,15 +39,6 @@ export function AccountNoticeCenter({
     const timer = setInterval(() => void load(), 30000);
     return () => clearInterval(timer);
   }, [load]);
-  async function preference(key: keyof typeof preferences, value: boolean) {
-    const auth = await supabase.auth.getUser();
-    if (!auth.data.user) return;
-    const result = await supabase
-      .from("notification_preferences")
-      .upsert({ user_id: auth.data.user.id, ...preferences, [key]: value });
-    if (result.error) toast.error("Could not save preferences");
-    else setPreferences((p) => ({ ...p, [key]: value }));
-  }
   return (
     <section
       className="card mb-6 space-y-3 p-5"
@@ -118,39 +88,6 @@ export function AccountNoticeCenter({
           </button>
         </div>
       )}
-      <div className="flex flex-wrap gap-3 text-xs">
-        {(
-          [
-            "session_updates",
-            "poll_updates",
-            ...(trainer ? ["credential_updates" as const] : []),
-            "creator_updates",
-            "subscriber_lives",
-            "friend_activity",
-            "share_live_activity",
-          ] as const
-        ).map((key) => (
-          <label key={key} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={preferences[key]}
-              onChange={(e) => void preference(key, e.target.checked)}
-            />
-            {
-              {
-                creator_updates: "Business and creator activity",
-                subscriber_lives: "Opt in to subscriber live announcements",
-                session_updates: "Session updates",
-                poll_updates: "New polls in my Trybes",
-                credential_updates: "Credential reminders",
-                friend_activity: "Receive friends’ community class activity",
-                share_live_activity:
-                  "Share my community class attendance with mutual partners",
-              }[key]
-            }
-          </label>
-        ))}
-      </div>
       {rows.map((n) => (
         <article
           key={n.id}

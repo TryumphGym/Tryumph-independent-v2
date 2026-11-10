@@ -8,17 +8,19 @@ import { GetAppButton } from "@/components/GetAppButton";
 import { useUserId } from "@/lib/community";
 import { supabase } from "@/integrations/supabase/client";
 
-const nav = [
+const primaryNav = [
   { to: "/", label: "Home" },
   { to: "/on-demand", label: "Workouts" },
   { to: "/live", label: "Live Classes" },
   { to: "/trainers", label: "Trainers" },
   { to: "/programs", label: "Programs" },
   { to: "/trybes", label: "Trybes" },
-  { to: "/school", label: "School" },
-  { to: "/about", label: "About" },
+] as const;
+const secondaryNav = [
   { to: "/wallet", label: "Wallet" },
-  { to: "/account", label: "Account" },
+  { to: "/account", label: "Account & Settings" },
+  { to: "/school", label: "Tryumph School" },
+  { to: "/about", label: "About Tryumph" },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -106,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             TRY<span className="text-gradient">UMPH</span>
           </Link>
           <nav className="hidden flex-1 items-center gap-1 lg:flex">
-            {nav.map((n) => (
+            {primaryNav.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
@@ -129,6 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <GetAppButton className="btn btn-ghost hidden md:inline-flex" />
+            {!s.signedIn && <Link to="/account" className="btn btn-outline hidden sm:inline-flex">Sign in</Link>}
             {isAdmin && (
               <Link
                 to="/admin"
@@ -203,7 +206,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 My Trybe
               </Link>
             )}
-            {[...nav, { to: "/studio", label: "Trainer Studio" }].map((n) => (
+            {[...primaryNav, ...secondaryNav, ...(s.role === "trainer" && s.signedIn ? [{ to: "/studio" as const, label: "Trainer Studio" }] : [])].map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
@@ -259,6 +262,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link to="/privacy">Privacy Policy</Link>
             <Link to="/contact">Contact Us</Link>
             <Link to="/about">About Tryumph</Link>
+            <Link to="/school">Tryumph School</Link>
             <Link to="/policies/$page" params={{ page: "accessibility" }}>
               Policies & accessibility
             </Link>
