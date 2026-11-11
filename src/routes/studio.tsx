@@ -305,7 +305,7 @@ function StudioForIdentity({ me }: { me: string | null }) {
       )}
       {tab === "Earnings & Payouts" && <Payouts />}
       {tab === "Creator Perks" && <CreatorPerks />}
-      {tab === "Tryumph School" && <TryumphSchool />}
+      {tab === "Tryumph School" && <TryumphSchool trainerView />}
       {tab === "Marketing & Spotlight" && <TryumphSpotlight />}
       {credentialsPaused && (tab === "Live Studio" || tab === "Content Library") && (
         <p className="card p-6" role="alert">New uploads and live hosting are paused until expired required credentials are renewed and verified. Go to Settings → Certifications to submit updated proof.</p>
