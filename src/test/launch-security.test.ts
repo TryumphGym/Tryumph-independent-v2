@@ -120,7 +120,7 @@ describe("launch database authorization and lifecycle", () => {
     await asUser(
       db,
       trainer,
-      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Eligible trainer',now()+interval '2 hours')`,
+      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Eligible trainer',now()+interval '4 hours')`,
     );
     await db.exec(
       `UPDATE trainer_accounts SET payouts_enabled=false WHERE user_id='${trainer}'`,
