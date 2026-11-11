@@ -1,5 +1,6 @@
 import { CATEGORIES } from "@/lib/data";
 import { DiscoveryFilters } from "./DiscoveryFilters";
+import { TrainerWelcomeGuides, trainerWelcomeMatch } from "./TrainerWelcomeGuides";
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -726,7 +727,7 @@ export function CreatorPerks() {
     </section>
   );
 }
-export function TryumphSchool() {
+export function TryumphSchool({ trainerView = false }: { trainerView?: boolean } = {}) {
   const me = useUserId(),
     [items, setItems] = useState<Tables<"school_tutorials">[]>([]),
     [search, setSearch] = useState(""),
@@ -751,6 +752,8 @@ export function TryumphSchool() {
       active = false;
     };
   }, [me]);
+  const welcome = trainerView ? trainerWelcomeMatch(search) : null;
+  const hasWelcomeMatch = Boolean(welcome && (welcome.introMatches || welcome.guides.length));
   const visible = items.filter((t) =>
     `${t.title} ${t.category} ${t.instructions}`
       .toLowerCase()
@@ -769,7 +772,8 @@ export function TryumphSchool() {
         />
       </label>
       {error && <p role="alert">{error}</p>}
-      {ready && !visible.length && (
+      {trainerView && <TrainerWelcomeGuides search={search} />}
+      {ready && !visible.length && !hasWelcomeMatch && (
         <p>
           No published tutorials match yet. Unfinished guides stay unpublished.
         </p>
