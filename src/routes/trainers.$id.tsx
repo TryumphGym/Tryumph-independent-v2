@@ -12,6 +12,7 @@ import type { PublicTrainer } from "@/lib/public-trainers";
 import { PrivateBookingForm } from "@/components/PrivateBookingForm";
 import { TrainerStorefront } from "@/components/TrainerStorefront";
 import { TrainerMessages } from "@/components/TrainerMessages";
+import { TrainerAchievementBadges } from "@/components/TrainerAchievementBadges";
 
 export const Route = createFileRoute("/trainers/$id")({
   head: () => ({ meta: [{ title: "Trainer Profile — Tryumph Gym" }] }),
@@ -81,6 +82,15 @@ function TrainerProfile() {
             <p className="mt-2 text-muted-foreground">
               {trainer.bio || "This trainer has not added a bio yet."}
             </p>
+            {!!trainer.achievements?.length && (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-sm font-semibold">Tryumph achievements</p>
+                <TrainerAchievementBadges ids={trainer.achievements} />
+                <p className="text-xs text-muted-foreground">
+                  Activity milestones, separate from verified qualifications.
+                </p>
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <div>
                 <p className="text-sm font-semibold">
