@@ -77,6 +77,7 @@ export const Route = createFileRoute("/api/public/trainers")({
             throw new Error("Service directory unavailable");
           const workoutCounts = new Map<string, number>();
           for (const workout of videos.data ?? []) {
+            if (!workout.user_id) continue;
             workoutCounts.set(workout.user_id, (workoutCounts.get(workout.user_id) ?? 0) + 1);
           }
           const liveCounts = new Map<string, number>();
