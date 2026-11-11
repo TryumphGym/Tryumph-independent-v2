@@ -34,7 +34,7 @@ export const trainerWelcomeGuides: readonly WelcomeGuide[] = [
       "Submit it for review. Only approved videos appear to members.",
       "If you want eligible video ads, mark real water-break moments. Ads are never inserted mid-set; workouts without eligible breaks are ad-free.",
       "You can include a Spotify playlist link instead of recording copyrighted music into the video.",
-      "Five approved on-demand videos are needed before you can host live classes. You do not need five videos just to create a PDF program."
+      "On-demand uploads are optional, even if you only want to teach live. Approved public workouts can earn achievement badges and help new members discover you."
     ],
     section: "content-library",
     view: "workouts",
@@ -58,7 +58,7 @@ export const trainerWelcomeGuides: readonly WelcomeGuide[] = [
     summary: "Choose the coaching format that works for you. You do not have to do both.",
     steps: [
       "For group classes, open Live Studio to set up a scheduled session. Standard non-subscriber drop-ins are $5 when paid-class checkout is available.",
-      "Live hosting requires current verified credentials, five approved videos and the necessary payout eligibility.",
+      "Live hosting requires current verified credentials and the necessary payout eligibility, but no on-demand video quota.",
       "For private coaching, open Bookings & Clients to manage your availability and individual sessions. You set your own coaching rate.",
       "Live attendance and private-session billing use platform attendance and payment safeguards. Subscriber-only lives depend on an active membership and feature activation."
     ],

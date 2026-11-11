@@ -1,3 +1,5 @@
+import type { TrainerAchievementId } from "./trainer-achievements";
+
 export type PublicTrainer = {
   focus_tags?: string[];
   services?: string[];
@@ -10,4 +12,5 @@ export type PublicTrainer = {
   rate: number;
   qualifications: string[];
   avatarUrl: string | null;
+  achievements?: TrainerAchievementId[];
 };

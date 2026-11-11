@@ -98,7 +98,7 @@ function ForTrainers() {
             that suit your business.
           </p>
           <p>
-            Five approved videos unlock live hosting. No required monthly
+            No on-demand upload quota for live hosting. No required monthly
             platform subscription. Optional profile photos, an introduction and
             sample workouts can help members understand your approach.
           </p>

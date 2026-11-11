@@ -150,7 +150,7 @@ afterEach(async () => {
   await db.exec("ROLLBACK");
 });
 describe("Creator Studio authorization, commercial terms and benefits", () => {
-  it("keeps roles server-authoritative, enforces five approved videos, and retains no quota for programs", async () => {
+  it("keeps roles server-authoritative and allows live hosting without a video quota", async () => {
     await expect(
       as(member, "UPDATE profiles SET role='trainer' WHERE id=$1", [member]),
     ).rejects.toThrow("role changes require support");
@@ -167,7 +167,9 @@ describe("Creator Studio authorization, commercial terms and benefits", () => {
           [trainer],
         )
       )[0],
-    ).toEqual({ ok: false, credentials: true });
+    ).toEqual({ ok: true, credentials: true });
+    await q("UPDATE certifications SET expires=(current_date-1)::text WHERE user_id=$1", [trainer]);
+    expect((await q("SELECT trainer_is_eligible($1,true) ok", [trainer]))[0]!["ok"]).toBe(false);
     await expect(
       as(trainer, "SELECT start_subscriber_live('Subscriber live',45)"),
     ).rejects.toThrow("eligibility");
@@ -240,9 +242,9 @@ describe("Creator Studio authorization, commercial terms and benefits", () => {
         ["subscriber-live:" + id],
       ),
     ).toEqual([{ n: 1 }]);
-    await expect(
-      as(other, "SELECT start_subscriber_live('No approved videos',45)"),
-    ).rejects.toThrow("eligibility");
+    // A trainer with zero on-demand uploads can still start a subscriber live.
+    const liveOnlyHost = await as(other, "SELECT start_subscriber_live('Live-only host',45) id");
+    expect(liveOnlyHost[0]?.["id"]).toBeTruthy();
   });
   it("enforces trainer-specific members-only access, edition pinning, progress and refund revocation", async () => {
     const r = await paidPeriod(),

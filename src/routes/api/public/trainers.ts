@@ -1,4 +1,5 @@
 import { offersPrivateCoaching } from "@/lib/trainer-services";
+import { getTrainerAchievementIds } from "@/lib/trainer-achievements";
 import { mayPublishFitnessCopy } from "@/lib/professional-claims";
 import { safeExternalUrl } from "@/lib/launch-features";
 import { runtimeEnv } from "@/lib/runtime-env.server";
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/api/public/trainers")({
             .in("id", ids)
             .eq("role", "trainer");
           if (profileError) throw profileError;
-          const [programs, videos, lives, offers] = await Promise.all([
+          const [programs, videos, lives, offers, completedLives] = await Promise.all([
             db
               .from("trainer_programs")
               .select("trainer_id")
@@ -70,9 +71,20 @@ export const Route = createFileRoute("/api/public/trainers")({
               .select("trainer_id")
               .eq("enabled", true)
               .eq("blocked", false),
+            db.from("live_sessions").select("trainer_id").in("trainer_id", ids).eq("status", "ended"),
           ]);
-          if (programs.error || videos.error || lives.error || offers.error)
+          if (programs.error || videos.error || lives.error || offers.error || completedLives.error)
             throw new Error("Service directory unavailable");
+          const workoutCounts = new Map<string, number>();
+          for (const workout of videos.data ?? []) {
+            if (!workout.user_id) continue;
+            workoutCounts.set(workout.user_id, (workoutCounts.get(workout.user_id) ?? 0) + 1);
+          }
+          const liveCounts = new Map<string, number>();
+          for (const completed of completedLives.data ?? []) {
+            if (!completed.trainer_id) continue;
+            liveCounts.set(completed.trainer_id, (liveCounts.get(completed.trainer_id) ?? 0) + 1);
+          }
           const trainers = (profiles ?? []).map((p) => {
             const extra =
               p.extra && typeof p.extra === "object" && !Array.isArray(p.extra)
@@ -109,6 +121,10 @@ export const Route = createFileRoute("/api/public/trainers")({
                   ? trainer["instagram"]
                   : null,
               id: p.id,
+              achievements: getTrainerAchievementIds({
+                publicWorkouts: workoutCounts.get(p.id) ?? 0,
+                completedLives: liveCounts.get(p.id) ?? 0,
+              }),
               name: p.name,
               bio:
                 typeof trainer["bio"] === "string"

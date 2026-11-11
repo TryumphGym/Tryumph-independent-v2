@@ -23,6 +23,7 @@ import { TrainerProgramBuilder } from "@/components/TrainerProgramBuilder";
 import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
+import { TrainerAchievementsPanel } from "@/components/TrainerAchievementBadges";
 import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { RecordingManager } from "@/components/RecordingManager";
 import { ClassManager } from "@/components/ClassManager";
@@ -226,6 +227,7 @@ function StudioForIdentity({ me }: { me: string | null }) {
           </div>
           <AccountNoticeCenter trainer />
           <ActiveMilestones days={s.activeDays} role="trainer" />
+          {me && <TrainerAchievementsPanel trainerId={me} />}
           <CreatorAnalytics />
         </>
       )}
@@ -403,7 +405,7 @@ function Overview() {
     ["1-on-1 sessions", st ? String(st.stats.oneononeSessions) : "—"],
     ["Followers", st ? String(st.stats.followers) : "—"],
     ["Trybe members", st ? String(st.stats.trybeMembers) : "—"],
-    ["Approved on-demand videos", countLoaded ? String(approvedCount) : "…"],
+    ["Approved on-demand videos (optional)", countLoaded ? String(approvedCount) : "…"],
   ];
   return (
     <div className="space-y-6">
@@ -422,8 +424,8 @@ function Overview() {
           {!unlocked ? (
             <div className="rounded-xl bg-secondary p-4 text-sm">
               <p className="font-semibold">
-                Current verified credentials and at least five approved videos
-                are required to host.
+                Current verified credentials are required to host.
+                Paid classes also require an eligible payout account.
               </p>
               <p className="mt-2 text-muted-foreground">
                 Optional profile checklist: add a photo, biography,

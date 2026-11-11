@@ -104,24 +104,23 @@ describe("launch database authorization and lifecycle", () => {
       `UPDATE certifications SET name='CPR/AED' WHERE user_id='${trainer}'`,
     );
   });
-  it("requires five approved videos plus current credentials and payout eligibility", async () => {
+  it("allows zero on-demand uploads while preserving credentials and payout eligibility", async () => {
     await db.exec(
       `UPDATE trainer_videos SET review_status='pending' WHERE user_id='${trainer}'`,
     );
-    await expect(
-      asUser(
-        db,
-        trainer,
-        `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Live-only trainer',now()+interval '2 hours')`,
-      ),
-    ).rejects.toThrow("five approved videos");
+    expect((await scalar(`SELECT trainer_is_eligible('${trainer}',true) AS ok`))?.["ok"]).toBe(true);
+    await asUser(
+      db,
+      trainer,
+      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Live-only trainer',now()+interval '2 hours')`,
+    );
     await db.exec(
       `UPDATE trainer_videos SET review_status='approved' WHERE user_id='${trainer}'`,
     );
     await asUser(
       db,
       trainer,
-      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Eligible trainer',now()+interval '2 hours')`,
+      `INSERT INTO live_sessions(trainer_id,trainer_name,title,starts_at) VALUES('${trainer}','Trainer','Eligible trainer',now()+interval '4 hours')`,
     );
     await db.exec(
       `UPDATE trainer_accounts SET payouts_enabled=false WHERE user_id='${trainer}'`,
