@@ -81,6 +81,7 @@ export const Route = createFileRoute("/api/public/trainers")({
           }
           const liveCounts = new Map<string, number>();
           for (const completed of completedLives.data ?? []) {
+            if (!completed.trainer_id) continue;
             liveCounts.set(completed.trainer_id, (liveCounts.get(completed.trainer_id) ?? 0) + 1);
           }
           const trainers = (profiles ?? []).map((p) => {
