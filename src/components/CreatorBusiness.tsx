@@ -515,8 +515,8 @@ export function SubscriberLive() {
     <section className="card space-y-3 p-5">
       <h2 className="text-xl font-bold">Go Live Now — subscribers only</h2>
       <p>
-        Requires current verified credentials, CPR/AED, five approved videos and
-        payout eligibility. Subscribers enter without a charge or token.
+        Requires current verified credentials, CPR/AED and payout eligibility.
+        No on-demand uploads are required. Subscribers enter without a charge or token.
         Opted-in subscribers are notified when you actually join the room.
       </p>
       <form
