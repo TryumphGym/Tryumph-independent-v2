@@ -19,6 +19,7 @@ import {
   getCreatorVideo,
 } from "@/lib/creator.functions";
 import { OnDemandPlayer } from "./OnDemandPlayer";
+import { CreatorTierWizard } from "./CreatorTierWizard";
 const msg = (e: unknown) =>
   e instanceof Error ? e.message : "Membership action failed";
 export function CreatorMembership({ trainerId }: { trainerId: string }) {
@@ -294,14 +295,15 @@ function CreatorOfferForViewer({ me }: { me: string | null }) {
     };
   }, [me]);
   return (
+    <>
+      <CreatorTierWizard />
     <section className="card my-5 space-y-3 p-5">
-      <h2 className="text-xl font-bold">Optional monthly Trybe membership</h2>
+      <h2 className="text-xl font-bold">Legacy single-plan membership settings</h2>
       <p className="text-sm">
-        Keep 90% after actual processing fees; Tryumph receives 10%, before
-        hosting costs. No required platform subscription. New prices affect
-        future subscriptions, not existing customers’ agreed prices. Disabling
-        the offer requests an end to future renewals; existing eligible paid
-        periods remain available.
+        This original single-plan setting is separate from the new tier drafts above.
+        Do not enable paid membership checkout until tier-aware Stripe billing,
+        access enforcement, and 80/20 live benefit accounting are tested.
+        Previously agreed subscription prices and paid periods remain protected.
       </p>
       {data && (
         <p>
@@ -378,6 +380,7 @@ function CreatorOfferForViewer({ me }: { me: string | null }) {
       </form>
       {error && <p role="alert">{error}</p>}
     </section>
+    </>
   );
 }
 export function CreatorVideoStudio() {
