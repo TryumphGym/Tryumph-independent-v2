@@ -68,15 +68,15 @@ BEGIN
  THEN RAISE EXCEPTION 'Invalid membership tier'; END IF;
  IF (p_benefits - ARRAY['scheduledLives','memberOnlyLives','liveClassesPerMonth','programAccess','selectedProgramIds','memberVideos','earlyAccess','trybePosts','autoIncludeNewPrograms']) <> '{}'::jsonb
  THEN RAISE EXCEPTION 'Unknown membership benefit'; END IF;
- IF jsonb_typeof(p_benefits->'scheduledLives')<>'boolean'
-    OR jsonb_typeof(p_benefits->'memberOnlyLives')<>'boolean'
-    OR jsonb_typeof(p_benefits->'liveClassesPerMonth')<>'number'
-    OR jsonb_typeof(p_benefits->'programAccess')<>'string'
-    OR jsonb_typeof(p_benefits->'selectedProgramIds')<>'array'
-    OR jsonb_typeof(p_benefits->'memberVideos')<>'boolean'
-    OR jsonb_typeof(p_benefits->'earlyAccess')<>'boolean'
-    OR jsonb_typeof(p_benefits->'trybePosts')<>'boolean'
-    OR jsonb_typeof(p_benefits->'autoIncludeNewPrograms')<>'boolean'
+ IF jsonb_typeof(p_benefits->'scheduledLives') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(p_benefits->'memberOnlyLives') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(p_benefits->'liveClassesPerMonth') IS DISTINCT FROM 'number'
+    OR jsonb_typeof(p_benefits->'programAccess') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(p_benefits->'selectedProgramIds') IS DISTINCT FROM 'array'
+    OR jsonb_typeof(p_benefits->'memberVideos') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(p_benefits->'earlyAccess') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(p_benefits->'trybePosts') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(p_benefits->'autoIncludeNewPrograms') IS DISTINCT FROM 'boolean'
  THEN RAISE EXCEPTION 'Every membership benefit must be explicitly configured'; END IF;
  scheduled=(p_benefits->>'scheduledLives')::boolean;
  members_only=(p_benefits->>'memberOnlyLives')::boolean;
@@ -85,7 +85,7 @@ BEGIN
  selected=p_benefits->'selectedProgramIds';
  IF live_count NOT IN (0,4,8,-1) OR ((scheduled OR members_only) <> (live_count<>0))
  THEN RAISE EXCEPTION 'Choose a valid live-class allowance and at least one live-class type'; END IF;
- IF programs NOT IN ('none','all','selected')
+ IF programs IS NULL OR programs NOT IN ('none','all','selected')
     OR jsonb_array_length(selected)>100
     OR (programs<>'selected' AND jsonb_array_length(selected)>0)
     OR (programs='selected' AND jsonb_array_length(selected)=0)
