@@ -3730,6 +3730,16 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
+      creator_tier_setup: { Args: Record<never, never>; Returns: Json };
+      save_creator_tier_draft: {
+        Args: { p_tier: number; p_title: string; p_description: string; p_price: number; p_benefits: Json };
+        Returns: undefined;
+      };
+      delete_creator_tier_draft: { Args: { p_tier: number }; Returns: undefined };
+      update_creator_tier_policy: {
+        Args: { p_four: number; p_eight: number; p_unlimited: number };
+        Returns: undefined;
+      };
       accept_friend_request: {
         Args: { p_requester_id: string };
         Returns: undefined;
