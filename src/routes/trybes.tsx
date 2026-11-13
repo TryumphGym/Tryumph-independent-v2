@@ -527,6 +527,17 @@ function Trybes() {
       .eq("friend_id", id);
     reloadFriends();
   };
+  // Check-ins use the existing private, friend-only message channel. Never
+  // expose a member's activity or goals without their choosing to share them.
+  const prepareCheckIn = (kind: "showed-up" | "workout" | "goal" | "encourage") => {
+    const templates = {
+      "showed-up": "Checking in 💪 I showed up for myself today, and that counts!",
+      workout: "Workout check-in 💪 Today I completed: ",
+      goal: "My goal this week is: ",
+      encourage: "Hey! Just checking in. How are you doing with your goals? You've got this! 💛",
+    };
+    setMsg(templates[kind]);
+  };
   const send = async () => {
     if (!chatWith || !msg.trim() || !me) return;
     const { error } = await supabase.from("messages").insert({
@@ -1235,6 +1246,19 @@ function Trybes() {
                       </p>
                     ))}
                   </div>
+                  {partners.some((p) => p.friend_id === chatWith) && (
+                    <div className="mt-3 space-y-2" aria-label="Accountability check-ins">
+                      <p className="text-xs text-muted-foreground">
+                        Share a check-in with your partner. Showing up counts even without a workout; only send what you're comfortable sharing.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className="chip" onClick={() => prepareCheckIn("showed-up")}>I showed up</button>
+                        <button type="button" className="chip" onClick={() => prepareCheckIn("workout")}>Workout check-in</button>
+                        <button type="button" className="chip" onClick={() => prepareCheckIn("goal")}>Share a goal</button>
+                        <button type="button" className="chip" onClick={() => prepareCheckIn("encourage")}>Encourage partner</button>
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-3 flex gap-2">
                     <input
                       className="field"
