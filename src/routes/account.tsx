@@ -4,6 +4,7 @@ import { Link as ProgramLink } from "@tanstack/react-router";
 import { MemberSessions } from "@/components/MemberSessions";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { ActiveMilestones } from "@/components/ActiveMilestones";
+import { MemberAccountability } from "@/components/MemberAccountability";
 import { AccountNoticeCenter } from "@/components/AccountNoticeCenter";
 import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { cancelPrivateSession } from "@/lib/session-management.functions";
@@ -556,6 +557,7 @@ function SignedInAccount() {
           />
         </div>
       )}
+      {s.signedIn && s.role === "member" && <div className="mb-6"><MemberAccountability /></div>}
       {s.signedIn && s.role === "member" && (
         <div className="mb-6">
           <TrainerMessages />

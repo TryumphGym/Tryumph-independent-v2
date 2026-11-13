@@ -93,6 +93,8 @@ export type CalBlock = {
 export type Alert = { id: string; text: string; date: string };
 export type Extra = {
   onboarded: boolean;
+  accountabilityGoal?: string;
+  selfReportedWorkouts?: { id: string; title: string; at: string }[];
   conditions: string[];
   goals: string[];
   why: string;
